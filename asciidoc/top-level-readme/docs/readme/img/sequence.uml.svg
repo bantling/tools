@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="222px" preserveAspectRatio="none" style="width:276px;height:222px;background:#FFFFFF;" version="1.1" viewBox="0 0 276 222" width="276px" zoomAndPan="magnify">
+  <title>Sequence</title>
+  <defs>
+    <filter height="300%" id="fn3yvorrca0j1" width="300%" x="-1" y="-1">
+      <feGaussianBlur result="blurOut" stdDeviation="2.0"/>
+      <feColorMatrix in="blurOut" result="blurOut2" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .4 0"/>
+      <feOffset dx="4.0" dy="4.0" in="blurOut2" result="blurOut3"/>
+      <feBlend in="SourceGraphic" in2="blurOut3" mode="normal"/>
+    </filter>
+  </defs>
+  <g>
+    <line style="stroke:#A80036;stroke-width:1.0;stroke-dasharray:5.0,5.0;" x1="29" x2="29" y1="40.7999" y2="179.2"/>
+    <line style="stroke:#A80036;stroke-width:1.0;stroke-dasharray:5.0,5.0;" x1="244.5" x2="244.5" y1="40.7999" y2="179.2"/>
+    <rect fill="#FEFECE" filter="url(#fn3yvorrca0j1)" height="30.7999" style="stroke:#A80036;stroke-width:1.5;" width="44" x="5" y="5"/>
+    <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="30" x="12" y="25.0059">Alice</text>
+    <rect fill="#FEFECE" filter="url(#fn3yvorrca0j1)" height="30.7999" style="stroke:#A80036;stroke-width:1.5;" width="44" x="5" y="178.2"/>
+    <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="30" x="12" y="198.2059">Alice</text>
+    <rect fill="#FEFECE" filter="url(#fn3yvorrca0j1)" height="30.7999" style="stroke:#A80036;stroke-width:1.5;" width="39" x="223.5" y="5"/>
+    <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="25" x="230.5" y="25.0059">Bob</text>
+    <rect fill="#FEFECE" filter="url(#fn3yvorrca0j1)" height="30.7999" style="stroke:#A80036;stroke-width:1.5;" width="39" x="223.5" y="178.2"/>
+    <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="25" x="230.5" y="198.2059">Bob</text>
+    <polygon fill="#A80036" points="233,68.3999,243,72.3999,233,76.3999,237,72.3999" style="stroke:#A80036;stroke-width:1.0;"/>
+    <line style="stroke:#A80036;stroke-width:1.0;" x1="29" x2="239" y1="72.3999" y2="72.3999"/>
+    <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="135" x="36" y="66.8769">Authentication Request</text>
+    <polygon fill="#A80036" points="40,98,30,102,40,106,36,102" style="stroke:#A80036;stroke-width:1.0;"/>
+    <line style="stroke:#A80036;stroke-width:1.0;stroke-dasharray:2.0,2.0;" x1="34" x2="244" y1="102" y2="102"/>
+    <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="145" x="46" y="96.477">Authentication Response</text>
+    <polygon fill="#A80036" points="233,127.6,243,131.6,233,135.6,237,131.6" style="stroke:#A80036;stroke-width:1.0;"/>
+    <line style="stroke:#A80036;stroke-width:1.0;" x1="29" x2="239" y1="131.6" y2="131.6"/>
+    <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="182" x="36" y="126.077">Another authentication Request</text>
+    <polygon fill="#A80036" points="40,157.2,30,161.2,40,165.2,36,161.2" style="stroke:#A80036;stroke-width:1.0;"/>
+    <line style="stroke:#A80036;stroke-width:1.0;stroke-dasharray:2.0,2.0;" x1="34" x2="244" y1="161.2" y2="161.2"/>
+    <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="192" x="46" y="155.677">Another authentication Response</text>
+    <!--MD5=[82a08071ec8faa58b6d5d191348195f7]
+@startuml
+Alice -> Bob: Authentication Request
+Bob - -> Alice: Authentication Response
+
+Alice -> Bob: Another authentication Request
+Alice <- - Bob: Another authentication Response
+@enduml
+
+PlantUML version 1.2021.9(Sun Jul 25 07:13:56 ADT 2021)
+(GPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Default Encoding: ANSI_X3.4-1968
+Language: en
+Country: US
+-->
+  </g>
+</svg>

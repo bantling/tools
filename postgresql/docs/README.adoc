@@ -1,0 +1,109 @@
+// SPDX-License-Identifier: Apache-2.0
+doctype: article
+
+= Single table strategy for data storage
+
+For applications that don't store a lot of data, a single table with JSONB data should suffice,
+which has the following benefits:
+
+* No need for additional DDL for new types to store
+* Store data as JSONB so that fields can be added/removed without extra DDL
+* Require each JSONB document to have a type, which effectively partitions data
+* Extract a required UUID for primary key column
+* Extract an optional UUID for parentId foreign key column
+* Extract an optional descriptor containing key words for full text searching
+* Default descriptor is all json strings that are not UUIDs and all numbers
+* Index on JSONB that allows any number of equality comparisons on values at any level in the JSONB
+* Index on descriptor for fast full text searching (eg filter box)
+* Generally no need for indexes for relational operators; a sequential scan after applying indexed equality commparisons is usually good enough 
+* Easy to generate realistic test data for local development and/or seed data using CTEs (example provided)
+
+== General strategy for writing CTEs that use randomness to insert test data
+
+. Use an anonymous DO function to insert only if the table is empty:
++
+....
+DO $$
+DECLARE
+BEGIN
+  IF NOT EXISTS (SELECT FROM docs) THEN
+    ...
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+....
++
+. Write one or more CTE expressions that provide simple arrays of data:
++
+....
+    WITH firstNames AS (
+      SELECT ARRAY[
+        'Jane', 'Sarah', 'Christy', 'Deborah', 'Jen',
+        'John', 'Thomas', 'James', 'Jason', 'Kevin'
+      ] firstNames
+    )
+....
++
+. Write a two level INSERT SELECT query, where:
+.. Inner query generates random values for outer query to use as array indexes,
+   using a cartesian product with generate_series(1, N) to generate N rows of random array indexes  
+.. Outer query uses arrays with generated indexes to produce data at the appropriate place in a generated JSONB document
++
+. The resulting query looks as follows:
+....
+INSERT INTO docs(doc)
+    SELECT jsonb_build_object(
+      'type', 'Customer',
+      'id', gen_random_uuid(),
+      'firstName', firstNames[firstNamesIdx],
+      ...
+    )
+    FROM firstNames,
+         ...,
+         ( SELECT ceil(random() * array_length(firstNames, 1)) firstNamesIdx,
+                  ...
+             FROM firstNames,
+                  ...,
+                  generate_series(1, 1000000)
+      ) t;
+....
+
+== Writing queries to access the table
+
+The only special considerations for writing queries are:
+
+. Always use the jsonb '@>' operator to perform equality comparisons, as it is the only jsonb operator that is indexed
+.. The expression must be 'doc @> comparison doc', where the doc column is on the left side of the '@>' operator
+.. The comparison doc can be created by jsonb_build_object(key1, value1, ...)
+.. If the comparison doc needs to compare aginst child object or array values, use nested jsonb_object_builder/jsonb_array_builder functions
+. EG:
++
+....
+-- Select every doc of type customer with an address in Barrie, Ontario:
+
+SELECT doc FROM docs
+ WHERE doc @> jsonb_build_object(
+         'type', 'Customer',
+         'address', jsonb_build_object(
+           'city', 'Barrie',
+           'region', 'ON'
+         )
+       );
+....
++
+. Perform full text search queries using '@@' operator with descriptor field, as it is the postgres operator for such queries
+.. The expression should be 'descriptor @@ query_string', where query_string is an SQL string that usually just contains words separated by ampersands
+. EG:
++
+....
+-- Similar to as above select, using full text search.
+-- Possible that some words appear somewhere else, like maybe someone has Barrie as a first name.
+-- All records that contains all the given words are selected, no matter where the words appear in the document.
+
+SELECT doc FROM docs
+ WHERE descriptor @@ 'Customer & Barrie & ON';
+....
++
+. Inserting/updating records
+.. For simplicity, perform "upsert" queries that insert or update as needed, simplifying the application code
+.. Postgres syntax is "INSERT INTO docs(doc) VALUES(<document>) ON CONFLICT(id) DO UPDATE SET doc = <document>"
