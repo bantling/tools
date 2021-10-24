@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-doctype: article
+:doctype: article
 
 = Single table strategy for data storage
 
