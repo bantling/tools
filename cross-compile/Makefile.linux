@@ -22,8 +22,8 @@ LIN_RELEASE_APP       := $(LIN_BUILD)/app
 LIN_RELEASE_LIBS      :=
 
 # Default target
-.PHONY: lin-all
-lin-all: $(LIN_DEBUG_APP) $(LIN_RELEASE_APP)
+.PHONY: linux-all
+linux-all: $(LIN_DEBUG_APP) $(LIN_RELEASE_APP)
 
 # Debug app
 $(LIN_DEBUG_APP): $(LIN_DEBUG_OBJ_ALL) $(LIN_DEBUG_OBJ_LINUX)
@@ -58,24 +58,27 @@ $(LIN_RELEASE_DIR_LINUX):
 	mkdir -p $@
 
 # Clean the linux artifacts only
-.PHONY: lin-clean
-lin-clean:
+.PHONY: linux-clean
+linux-clean:
 	rm -rf $(LIN_BUILD) || :
 
 # Generate the echo lines for lin-vars target
-# This target shd be run if any vars are added or removed,
-# and the output copied over the lines of lin-vars starting with a >
-.PHONY: lin-vars-generate
-.SILENT: lin-vars-generate
-lin-vars-generate:
-	mf='$(word $(words $(MAKEFILE_LIST)), $(MAKEFILE_LIST))'; \
+# This target shd be run if any vars are added or removed.
+# It modifies this makefile, assuming that all lines beginning with >
+# are at the end of the file.
+.PHONY: linux-vars-generate
+.SILENT: linux-vars-generate
+linux-vars-generate:
+	mf='Makefile.linux'; \
+	sed -r -i '/^>/d;' $$mf; sed -i '$$d' $$mf; sed -i '$$d' $$mf; \
 	grep '^[A-Z].*:=' $$mf | \
-	sed -r 's/([^ ]*)(.*):=.*/>echo "\1\2 = \$$\(\1\)"/'
+	sed -r 's/([^ ]*)(.*):=.*/>echo "\1\2 = \$$\(\1\)"/' >> $$mf; \
+	echo ".RECIPEPREFIX =" >> $$mf
 
-.PHONY: lin-vars
-.SILENT: lin-vars
+.PHONY: linux-vars
+.SILENT: linux-vars
 .RECIPEPREFIX = >
-lin-vars:
+linux-vars:
 >echo "LIN_INC                = $(LIN_INC)"
 >echo "LIN_SRC_ALL            = $(LIN_SRC_ALL)"
 >echo "LIN_SRC_LINUX          = $(LIN_SRC_LINUX)"
@@ -96,3 +99,5 @@ lin-vars:
 >echo "LIN_RELEASE_OBJ_LINUX  = $(LIN_RELEASE_OBJ_LINUX)"
 >echo "LIN_RELEASE_APP        = $(LIN_RELEASE_APP)"
 >echo "LIN_RELEASE_LIBS       = $(LIN_RELEASE_LIBS)"
+
+.RECIPEPREFIX =

@@ -22,8 +22,8 @@ WIN_RELEASE_APP         := $(WIN_BUILD)/app.exe
 WIN_RELEASE_LIBS        :=
 
 # Default target
-.PHONY: win-all
-win-all: $(WIN_DEBUG_APP) $(WIN_RELEASE_APP)
+.PHONY: windows-all
+windows-all: $(WIN_DEBUG_APP) $(WIN_RELEASE_APP)
 
 # Debug app
 $(WIN_DEBUG_APP): $(WIN_DEBUG_OBJ_ALL) $(WIN_DEBUG_OBJ_WINDOWS)
@@ -59,23 +59,26 @@ $(WIN_RELEASE_DIR_WINDOWS):
 
 # Clean the win artifacts only
 .PHONY: win-clean
-win-clean:
+windows-clean:
 	rm -rf $(WIN_BUILD) || :
 
 # Generate the echo lines for win-vars target
-# This target shd be run if any vars are added or removed,
-# and the output copied over the lines of win-vars starting with a >
-.PHONY: win-vars-generate
-.SILENT: win-vars-generate
-win-vars-generate:
-	mf='$(word $(words $(MAKEFILE_LIST)), $(MAKEFILE_LIST))'; \
+# This target shd be run if any vars are added or removed.
+# It modifies this makefile, assuming that all lines beginning with >
+# are at the end of the file.
+.PHONY: windows-vars-generate
+.SILENT: windows-vars-generate
+windows-vars-generate:
+	mf='Makefile.windows'; \
+	sed -r -i '/^>/d;' $$mf; sed -i '$$d' $$mf; sed -i '$$d' $$mf; \
 	grep '^[A-Z].*:=' $$mf | \
-	sed -r 's/([^ ]*)(.*):=.*/>echo "\1\2 = \$$\(\1\)"/'
+	sed -r 's/([^ ]*)(.*):=.*/>echo "\1\2 = \$$\(\1\)"/' >> $$mf; \
+	echo ".RECIPEPREFIX =" >> $$mf
 
-.PHONY: win-vars
-.SILENT: win-vars
+.PHONY: windows-vars
+.SILENT: windows-vars
 .RECIPEPREFIX = >
-win-vars:
+windows-vars:
 >echo "WIN_INC                  = $(WIN_INC)"
 >echo "WIN_SRC_ALL              = $(WIN_SRC_ALL)"
 >echo "WIN_SRC_WIN              = $(WIN_SRC_WIN)"
@@ -96,3 +99,5 @@ win-vars:
 >echo "WIN_RELEASE_OBJ_WINDOWS  = $(WIN_RELEASE_OBJ_WINDOWS)"
 >echo "WIN_RELEASE_APP          = $(WIN_RELEASE_APP)"
 >echo "WIN_RELEASE_LIBS         = $(WIN_RELEASE_LIBS)"
+
+.RECIPEPREFIX =
