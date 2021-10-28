@@ -70,15 +70,17 @@ linux-clean:
 .SILENT: linux-vars-generate
 linux-vars-generate:
 	mf='Makefile.linux'; \
-	sed -r -i '/^>/d;' $$mf; sed -i '$$d' $$mf; sed -i '$$d' $$mf; \
-	grep '^[A-Z].*:=' $$mf | \
-	sed -r 's/([^ ]*)(.*):=.*/>echo "\1\2 = \$$\(\1\)"/' >> $$mf; \
-	echo ".RECIPEPREFIX =" >> $$mf
+	sed -r -i '/^>/,$$d;' $$mf\
+	echo '>echo "==== Linux vars ===="' >> $$mf; \
+	grep '^[A-Z][A-Z].*:=' $$mf | \
+	sed -r 's/([^ ]*)( *):=.*/>echo "\1\2 = \$$\(\1\)"/' >> $$mf; \
+	echo -e "\\n.RECIPEPREFIX =" >> $$mf
 
 .PHONY: linux-vars
 .SILENT: linux-vars
 .RECIPEPREFIX = >
 linux-vars:
+>echo "==== Linux vars ===="
 >echo "LIN_INC                = $(LIN_INC)"
 >echo "LIN_SRC_ALL            = $(LIN_SRC_ALL)"
 >echo "LIN_SRC_LINUX          = $(LIN_SRC_LINUX)"

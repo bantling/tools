@@ -70,10 +70,11 @@ windows-clean:
 .SILENT: windows-vars-generate
 windows-vars-generate:
 	mf='Makefile.windows'; \
-	sed -r -i '/^>/d;' $$mf; sed -i '$$d' $$mf; sed -i '$$d' $$mf; \
-	grep '^[A-Z].*:=' $$mf | \
-	sed -r 's/([^ ]*)(.*):=.*/>echo "\1\2 = \$$\(\1\)"/' >> $$mf; \
-	echo ".RECIPEPREFIX =" >> $$mf
+	sed -r -i '/^>/,$$d;' $$mf\
+	echo '>echo "==== Windows vars ===="' >> $$mf; \
+	grep '^[A-Z][A-Z].*:=' $$mf | \
+	sed -r 's/([^ ]*)( *):=.*/>echo "\1\2 = \$$\(\1\)"/' >> $$mf; \
+	echo -e "\\n.RECIPEPREFIX =" >> $$mf
 
 .PHONY: windows-vars
 .SILENT: windows-vars
