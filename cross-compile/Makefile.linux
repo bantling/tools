@@ -73,7 +73,7 @@ linux-vars-generate:
 	sed -i '/^>/,$$d' $$mf; \
 	echo '>echo "==== Linux vars ===="' >> $$mf; \
 	grep '^[A-Z].*:=' $$mf | \
-	sed -r 's/([^ ]*)( *):=.*/>echo "\1\2 = \$$\(\1\)"/' >> $$mf; \
+	sed -r 's/([^ ]*)( *):=.*/>echo "\1\2= \$$\(\1\)"/' >> $$mf; \
 	echo -e "\\n.RECIPEPREFIX =" >> $$mf
 
 .PHONY: linux-vars
@@ -81,25 +81,25 @@ linux-vars-generate:
 .RECIPEPREFIX = >
 linux-vars:
 >echo "==== Linux vars ===="
->echo "LIN_INC                = $(LIN_INC)"
->echo "LIN_SRC_ALL            = $(LIN_SRC_ALL)"
->echo "LIN_SRC_LINUX          = $(LIN_SRC_LINUX)"
->echo "LIN_COMPILER           = $(LIN_COMPILER)"
->echo "LIN_CPP_OPTS           = $(LIN_CPP_OPTS)"
->echo "LIN_BUILD              = $(LIN_BUILD)"
->echo "LIN_DEBUG_CPP_OPTS     = $(LIN_DEBUG_CPP_OPTS)"
->echo "LIN_DEBUG_DIR_ALL      = $(LIN_DEBUG_DIR_ALL)"
->echo "LIN_DEBUG_DIR_LINUX    = $(LIN_DEBUG_DIR_LINUX)"
->echo "LIN_DEBUG_OBJ_ALL      = $(LIN_DEBUG_OBJ_ALL)"
->echo "LIN_DEBUG_OBJ_LINUX    = $(LIN_DEBUG_OBJ_LINUX)"
->echo "LIN_DEBUG_APP          = $(LIN_DEBUG_APP)"
->echo "LIN_DEBUG_LIBS         = $(LIN_DEBUG_LIBS)"
->echo "LIN_RELEASE_CPP_OPTS   = $(LIN_RELEASE_CPP_OPTS)"
->echo "LIN_RELEASE_DIR_ALL    = $(LIN_RELEASE_DIR_ALL)"
->echo "LIN_RELEASE_DIR_LINUX  = $(LIN_RELEASE_DIR_LINUX)"
->echo "LIN_RELEASE_OBJ_ALL    = $(LIN_RELEASE_OBJ_ALL)"
->echo "LIN_RELEASE_OBJ_LINUX  = $(LIN_RELEASE_OBJ_LINUX)"
->echo "LIN_RELEASE_APP        = $(LIN_RELEASE_APP)"
->echo "LIN_RELEASE_LIBS       = $(LIN_RELEASE_LIBS)"
+>echo "LIN_INC               = $(LIN_INC)"
+>echo "LIN_SRC_ALL           = $(LIN_SRC_ALL)"
+>echo "LIN_SRC_LINUX         = $(LIN_SRC_LINUX)"
+>echo "LIN_COMPILER          = $(LIN_COMPILER)"
+>echo "LIN_CPP_OPTS          = $(LIN_CPP_OPTS)"
+>echo "LIN_BUILD             = $(LIN_BUILD)"
+>echo "LIN_DEBUG_CPP_OPTS    = $(LIN_DEBUG_CPP_OPTS)"
+>echo "LIN_DEBUG_DIR_ALL     = $(LIN_DEBUG_DIR_ALL)"
+>echo "LIN_DEBUG_DIR_LINUX   = $(LIN_DEBUG_DIR_LINUX)"
+>echo "LIN_DEBUG_OBJ_ALL     = $(LIN_DEBUG_OBJ_ALL)"
+>echo "LIN_DEBUG_OBJ_LINUX   = $(LIN_DEBUG_OBJ_LINUX)"
+>echo "LIN_DEBUG_APP         = $(LIN_DEBUG_APP)"
+>echo "LIN_DEBUG_LIBS        = $(LIN_DEBUG_LIBS)"
+>echo "LIN_RELEASE_CPP_OPTS  = $(LIN_RELEASE_CPP_OPTS)"
+>echo "LIN_RELEASE_DIR_ALL   = $(LIN_RELEASE_DIR_ALL)"
+>echo "LIN_RELEASE_DIR_LINUX = $(LIN_RELEASE_DIR_LINUX)"
+>echo "LIN_RELEASE_OBJ_ALL   = $(LIN_RELEASE_OBJ_ALL)"
+>echo "LIN_RELEASE_OBJ_LINUX = $(LIN_RELEASE_OBJ_LINUX)"
+>echo "LIN_RELEASE_APP       = $(LIN_RELEASE_APP)"
+>echo "LIN_RELEASE_LIBS      = $(LIN_RELEASE_LIBS)"
 
 .RECIPEPREFIX =
