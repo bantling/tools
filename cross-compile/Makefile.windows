@@ -70,9 +70,9 @@ windows-clean:
 .SILENT: windows-vars-generate
 windows-vars-generate:
 	mf='Makefile.windows'; \
-	sed -r -i '/^>/,$$d;' $$mf\
+	sed -i '/^>/,$$d' $$mf; \
 	echo '>echo "==== Windows vars ===="' >> $$mf; \
-	grep '^[A-Z][A-Z].*:=' $$mf | \
+	grep '^[A-Z][A-Z]* *:=' $$mf | \
 	sed -r 's/([^ ]*)( *):=.*/>echo "\1\2 = \$$\(\1\)"/' >> $$mf; \
 	echo -e "\\n.RECIPEPREFIX =" >> $$mf
 
@@ -80,6 +80,7 @@ windows-vars-generate:
 .SILENT: windows-vars
 .RECIPEPREFIX = >
 windows-vars:
+>echo "==== Windows vars ===="
 >echo "WIN_INC                  = $(WIN_INC)"
 >echo "WIN_SRC_ALL              = $(WIN_SRC_ALL)"
 >echo "WIN_SRC_WIN              = $(WIN_SRC_WIN)"
