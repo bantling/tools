@@ -1,0 +1,98 @@
+# Linux Makefile
+
+LIN_INC               := $(wildcard include/all/*.h) $(wildcard include/linux/*.h)
+LIN_SRC_ALL           := $(wildcard src/all/*.cpp)
+LIN_SRC_LINUX         := $(wildcard src/linux/*.cpp)
+LIN_COMPILER          := g++
+LIN_CPP_OPTS          := -std=c++14 -Wall -pedantic -Werror -c -MMD -D_LINUX
+LIN_BUILD             := build/linux
+LIN_DEBUG_CPP_OPTS    := -g -DDEBUG
+LIN_DEBUG_DIR_ALL     := $(LIN_BUILD)/debug/all
+LIN_DEBUG_DIR_LINUX   := $(LIN_BUILD)/debug/linux
+LIN_DEBUG_OBJ_ALL     := $(LIN_SRC_ALL:src/all/%.cpp=$(LIN_DEBUG_DIR_ALL)/%.o)
+LIN_DEBUG_OBJ_LINUX   := $(LIN_SRC_LINUX:src/linux/%.cpp=$(LIN_DEBUG_DIR_LINUX)/%.o)
+LIN_DEBUG_APP         := $(LIN_BUILD)/app-debug
+LIN_DEBUG_LIBS        :=
+LIN_RELEASE_CPP_OPTS  :=
+LIN_RELEASE_DIR_ALL   := $(LIN_BUILD)/release/all
+LIN_RELEASE_DIR_LINUX := $(LIN_BUILD)/release/linux
+LIN_RELEASE_OBJ_ALL   := $(LIN_SRC_ALL:src/all/%.cpp=$(LIN_RELEASE_DIR_ALL)/%.o)
+LIN_RELEASE_OBJ_LINUX := $(LIN_SRC_LINUX:src/linux/%.cpp=$(LIN_RELEASE_DIR_LINUX)/%.o)
+LIN_RELEASE_APP       := $(LIN_BUILD)/app
+LIN_RELEASE_LIBS      :=
+
+# Default target
+.PHONY: lin-all
+lin-all: $(LIN_DEBUG_APP) $(LIN_RELEASE_APP)
+
+# Debug app
+$(LIN_DEBUG_APP): $(LIN_DEBUG_OBJ_ALL) $(LIN_DEBUG_OBJ_LINUX)
+	$(LIN_COMPILER) -o $@ $(LIN_DEBUG_OBJ_ALL) $(LIN_DEBUG_LIBS)
+
+$(LIN_DEBUG_DIR_ALL)/%.o: $(LIN_SRC_ALL) $(LIN_DEBUG_DIR_ALL)
+	$(LIN_COMPILER) $(LIN_CPP_OPTS) $(LIN_DEBUG_CPP_OPTS) $< -o $@
+
+$(LIN_DEBUG_DIR_LINUX)/%.o: $(LIN_SRC_LINUX) $(LIN_DEBUG_DIR_LINUX)
+	$(LIN_COMPILER) $(LIN_CPP_OPTS) $(LIN_DEBUG_CPP_OPTS) $< -o $@
+
+$(LIN_DEBUG_DIR_ALL):
+	mkdir -p $@
+
+$(LIN_DEBUG_DIR_LINUX):
+	mkdir -p $@
+
+# Release app
+$(LIN_RELEASE_APP): $(LIN_RELEASE_OBJ_ALL) $(LIN_RELEASE_OBJ_LINUX)
+	$(LIN_COMPILER) -o $@ $(LIN_RELEASE_OBJ_ALL) $(LIN_RELEASE_LIBS)
+
+$(LIN_RELEASE_DIR_ALL)/%.o: $(LIN_SRC_ALL) $(LIN_RELEASE_DIR_ALL)
+	$(LIN_COMPILER) $(LIN_CPP_OPTS) $(LIN_RELEASE_CPP_OPTS) $< -o $@
+
+$(LIN_RELEASE_DIR_LINUX)/%.o: $(LIN_SRC_LINUX) $(LIN_RELEASE_DIR_LINUX)
+	$(LIN_COMPILER) $(LIN_CPP_OPTS) $(LIN_RELEASE_CPP_OPTS) $< -o $@
+
+$(LIN_RELEASE_DIR_ALL):
+	mkdir -p $@
+
+$(LIN_RELEASE_DIR_LINUX):
+	mkdir -p $@
+
+# Clean the linux artifacts only
+.PHONY: lin-clean
+lin-clean:
+	rm -rf $(LIN_BUILD) || :
+
+# Generate the echo lines for lin-vars target
+# This target shd be run if any vars are added or removed,
+# and the output copied over the lines of lin-vars starting with a >
+.PHONY: lin-vars-generate
+.SILENT: lin-vars-generate
+lin-vars-generate:
+	mf='$(word $(words $(MAKEFILE_LIST)), $(MAKEFILE_LIST))'; \
+	grep '^[A-Z].*:=' $$mf | \
+	sed -r 's/([^ ]*)(.*):=.*/>echo "\1\2 = \$$\(\1\)"/'
+
+.PHONY: lin-vars
+.SILENT: lin-vars
+.RECIPEPREFIX = >
+lin-vars:
+>echo "LIN_INC                = $(LIN_INC)"
+>echo "LIN_SRC_ALL            = $(LIN_SRC_ALL)"
+>echo "LIN_SRC_LINUX          = $(LIN_SRC_LINUX)"
+>echo "LIN_COMPILER           = $(LIN_COMPILER)"
+>echo "LIN_CPP_OPTS           = $(LIN_CPP_OPTS)"
+>echo "LIN_BUILD              = $(LIN_BUILD)"
+>echo "LIN_DEBUG_CPP_OPTS     = $(LIN_DEBUG_CPP_OPTS)"
+>echo "LIN_DEBUG_DIR_ALL      = $(LIN_DEBUG_DIR_ALL)"
+>echo "LIN_DEBUG_DIR_LINUX    = $(LIN_DEBUG_DIR_LINUX)"
+>echo "LIN_DEBUG_OBJ_ALL      = $(LIN_DEBUG_OBJ_ALL)"
+>echo "LIN_DEBUG_OBJ_LINUX    = $(LIN_DEBUG_OBJ_LINUX)"
+>echo "LIN_DEBUG_APP          = $(LIN_DEBUG_APP)"
+>echo "LIN_DEBUG_LIBS         = $(LIN_DEBUG_LIBS)"
+>echo "LIN_RELEASE_CPP_OPTS   = $(LIN_RELEASE_CPP_OPTS)"
+>echo "LIN_RELEASE_DIR_ALL    = $(LIN_RELEASE_DIR_ALL)"
+>echo "LIN_RELEASE_DIR_LINUX  = $(LIN_RELEASE_DIR_LINUX)"
+>echo "LIN_RELEASE_OBJ_ALL    = $(LIN_RELEASE_OBJ_ALL)"
+>echo "LIN_RELEASE_OBJ_LINUX  = $(LIN_RELEASE_OBJ_LINUX)"
+>echo "LIN_RELEASE_APP        = $(LIN_RELEASE_APP)"
+>echo "LIN_RELEASE_LIBS       = $(LIN_RELEASE_LIBS)"
