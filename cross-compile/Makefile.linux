@@ -72,7 +72,7 @@ linux-vars-generate:
 	mf='Makefile.linux'; \
 	sed -i '/^>/,$$d' $$mf; \
 	echo '>echo "==== Linux vars ===="' >> $$mf; \
-	grep '^[A-Z][A-Z]* *:=' $$mf | \
+	grep '^[A-Z].*:=' $$mf | \
 	sed -r 's/([^ ]*)( *):=.*/>echo "\1\2 = \$$\(\1\)"/' >> $$mf; \
 	echo -e "\\n.RECIPEPREFIX =" >> $$mf
 
