@@ -18,5 +18,10 @@ clean:
 vars-generate: linux-vars-generate windows-vars-generate
 
 # Display vars for all platforms
+.PHONY: display-vars
+display-vars: linux-vars windows-vars
+
+# Page vars for all platforms using more
 .PHONY: vars
-vars: linux-vars windows-vars
+vars:
+	$(MAKE) -s display-vars | more
