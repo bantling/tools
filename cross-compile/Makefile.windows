@@ -12,14 +12,16 @@ WIN_DEBUG_DIR_WINDOWS   := $(WIN_BUILD)/debug/windows
 WIN_DEBUG_OBJ_ALL       := $(WIN_SRC_ALL:src/all/%.cpp=$(WIN_DEBUG_DIR_ALL)/%.o)
 WIN_DEBUG_OBJ_WINDOWS   := $(WIN_SRC_WIN:src/windows/%.cpp=$(WIN_DEBUG_DIR_WINDOWS)/%.o)
 WIN_DEBUG_APP           := $(WIN_BUILD)/app-debug.exe
-WIN_DEBUG_LIBS          :=
+WIN_DEBUG_LIBS          := /usr/x86_64-w64-mingw32/lib/libstdc++.a \
+                           /usr/x86_64-w64-mingw32/lib/libwinpthread.a
 WIN_RELEASE_CPP_OPTS    :=
 WIN_RELEASE_DIR_ALL     := $(WIN_BUILD)/release/all
 WIN_RELEASE_DIR_WINDOWS := $(WIN_BUILD)/release/windows
 WIN_RELEASE_OBJ_ALL     := $(WIN_SRC_ALL:src/all/%.cpp=$(WIN_RELEASE_DIR_ALL)/%.o)
 WIN_RELEASE_OBJ_WINDOWS := $(WIN_SRC_WIN:src/win/%.cpp=$(WIN_RELEASE_DIR_WINDOWS)/%.o)
 WIN_RELEASE_APP         := $(WIN_BUILD)/app.exe
-WIN_RELEASE_LIBS        :=
+WIN_RELEASE_LIBS        := /usr/x86_64-w64-mingw32/lib/libstdc++.a \
+                           /usr/x86_64-w64-mingw32/lib/libwinpthread.a
 
 # Default target
 .PHONY: windows-all
@@ -27,7 +29,7 @@ windows-all: $(WIN_DEBUG_APP) $(WIN_RELEASE_APP)
 
 # Debug app
 $(WIN_DEBUG_APP): $(WIN_DEBUG_OBJ_ALL) $(WIN_DEBUG_OBJ_WINDOWS)
-	$(WIN_COMPILER) -o $@ $(WIN_DEBUG_OBJ_ALL) $(WIN_DEBUG_LIBS)
+	$(WIN_COMPILER) -static -s -o $@ $(WIN_DEBUG_OBJ_ALL) $(WIN_DEBUG_LIBS)
 
 $(WIN_DEBUG_DIR_ALL)/%.o: $(WIN_SRC_ALL) $(WIN_DEBUG_DIR_ALL)
 	$(WIN_COMPILER) $(WIN_CPP_OPTS) $(WIN_DEBUG_CPP_OPTS) $< -o $@
@@ -43,7 +45,7 @@ $(WIN_DEBUG_DIR_WINDOWS):
 
 # Release app
 $(WIN_RELEASE_APP): $(WIN_RELEASE_OBJ_ALL) $(WIN_RELEASE_OBJ_WINDOWS)
-	$(WIN_COMPILER) -o $@ $(WIN_RELEASE_OBJ_ALL) $(WIN_RELEASE_LIBS)
+	$(WIN_COMPILER) -static -s -o $@ $(WIN_RELEASE_OBJ_ALL) $(WIN_RELEASE_LIBS)
 
 $(WIN_RELEASE_DIR_ALL)/%.o: $(WIN_SRC_ALL) $(WIN_RELEASE_DIR_ALL)
 	$(WIN_COMPILER) $(WIN_CPP_OPTS) $(WIN_RELEASE_CPP_OPTS) $< -o $@
@@ -61,6 +63,15 @@ $(WIN_RELEASE_DIR_WINDOWS):
 .PHONY: win-clean
 windows-clean:
 	rm -rf $(WIN_BUILD) || :
+
+# Copy the windows exes and required runtime dlls to a target folder.
+# Set make var WIN_COPY to target location.
+.PHONY: win-copy
+win-copy:
+	if [ -n "$(WIN_COPY)" ]; then \
+	  [ -f "$(WIN_DEBUG_APP)" ] && cp "$(WIN_DEBUG_APP)" "$(WIN_COPY)"; \
+	  [ -f "$(WIN_RELEASE_APP)" ] && cp "$(WIN_RELEASE_APP)" "$(WIN_COPY)"; \
+	fi
 
 # Generate the echo lines for win-vars target
 # This target shd be run if any vars are added or removed.
