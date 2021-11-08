@@ -98,6 +98,7 @@ vars-generate:
 .RECIPEPREFIX = >
 vars:
 >echo "==== Linux vars ===="
+>echo "APP_NAME          = $(APP_NAME)"
 >echo "INC               = $(INC)"
 >echo "SRC_ALL           = $(SRC_ALL)"
 >echo "SRC_LINUX         = $(SRC_LINUX)"
@@ -109,14 +110,16 @@ vars:
 >echo "DEBUG_DIR_LINUX   = $(DEBUG_DIR_LINUX)"
 >echo "DEBUG_OBJ_ALL     = $(DEBUG_OBJ_ALL)"
 >echo "DEBUG_OBJ_LINUX   = $(DEBUG_OBJ_LINUX)"
+>echo "DEBUG_APP_DIR     = $(DEBUG_APP_DIR)"
 >echo "DEBUG_APP         = $(DEBUG_APP)"
->echo "DEBUG_LIBS        = $(DEBUG_LIBS)"
+>echo "DEBUG_APP_OPTS    = $(DEBUG_APP_OPTS)"
 >echo "RELEASE_CPP_OPTS  = $(RELEASE_CPP_OPTS)"
 >echo "RELEASE_DIR_ALL   = $(RELEASE_DIR_ALL)"
 >echo "RELEASE_DIR_LINUX = $(RELEASE_DIR_LINUX)"
 >echo "RELEASE_OBJ_ALL   = $(RELEASE_OBJ_ALL)"
 >echo "RELEASE_OBJ_LINUX = $(RELEASE_OBJ_LINUX)"
+>echo "RELEASE_APP_DIR   = $(RELEASE_APP_DIR)"
 >echo "RELEASE_APP       = $(RELEASE_APP)"
->echo "RELEASE_LIBS      = $(RELEASE_LIBS)"
+>echo "RELEASE_APP_OPTS  = $(RELEASE_APP_OPTS)"
 
 .RECIPEPREFIX =
