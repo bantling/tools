@@ -9,7 +9,7 @@ APP_NAME            := myapp
 BASE                := ../..
 INC                 := $(wildcard $(BASE)/include/all/*.h) $(wildcard $(BASE)/include/windows/*.h)
 SRC_ALL             := $(wildcard $(BASE)/src/all/*.cpp)
-SRC_WIN             := $(wildcard $(BASE)/src/windows/*.cpp)
+SRC_WINDOWS         := $(wildcard $(BASE)/src/windows/*.cpp)
 COMPILER            := /usr/bin/x86_64-w64-mingw32-g++
 CPP_OPTS            := -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -DWINDOWS
 BUILD_DIR           := build
@@ -17,7 +17,7 @@ DEBUG_CPP_OPTS      := -g -DDEBUG
 DEBUG_DIR_ALL       := $(BUILD_DIR)/debug/all
 DEBUG_DIR_WINDOWS   := $(BUILD_DIR)/debug/windows
 DEBUG_OBJ_ALL       := $(SRC_ALL:$(BASE)/src/all/%.cpp=$(DEBUG_DIR_ALL)/%.o)
-DEBUG_OBJ_WINDOWS   := $(SRC_WIN:$(BASE)/src/windows/%.cpp=$(DEBUG_DIR_WINDOWS)/%.o)
+DEBUG_OBJ_WINDOWS   := $(SRC_WINDOWS:$(BASE)/src/windows/%.cpp=$(DEBUG_DIR_WINDOWS)/%.o)
 DEBUG_APP_DIR       := $(BUILD_DIR)/app/debug
 DEBUG_APP           := $(DEBUG_APP_DIR)/$(APP_NAME).exe
 DEBUG_APP_OPTS      := /usr/x86_64-w64-mingw32/lib/libstdc++.a \
@@ -26,7 +26,7 @@ RELEASE_CPP_OPTS    :=
 RELEASE_DIR_ALL     := $(BUILD_DIR)/release/all
 RELEASE_DIR_WINDOWS := $(BUILD_DIR)/release/windows
 RELEASE_OBJ_ALL     := $(SRC_ALL:$(BASE)/src/all/%.cpp=$(RELEASE_DIR_ALL)/%.o)
-RELEASE_OBJ_WINDOWS := $(SRC_WIN:$(BASE)/src/win/%.cpp=$(RELEASE_DIR_WINDOWS)/%.o)
+RELEASE_OBJ_WINDOWS := $(SRC_WINDOWS:$(BASE)/src/win/%.cpp=$(RELEASE_DIR_WINDOWS)/%.o)
 RELEASE_APP_DIR     := $(BUILD_DIR)/app/release
 RELEASE_APP         := $(RELEASE_APP_DIR)/$(APP_NAME).exe
 RELEASE_APP_OPTS    := /usr/x86_64-w64-mingw32/lib/libwinpthread.a
@@ -42,7 +42,7 @@ $(DEBUG_APP): $(DEBUG_OBJ_ALL) $(DEBUG_OBJ_WINDOWS) $(DEBUG_APP_DIR)
 $(DEBUG_DIR_ALL)/%.o: $(SRC_ALL) $(DEBUG_DIR_ALL)
 	$(COMPILER) $(CPP_OPTS) $(DEBUG_CPP_OPTS) $< -o $@
 
-$(DEBUG_DIR_WINDOWS)/%.o: $(SRC_WIN) $(DEBUG_DIR_WINDOWS)
+$(DEBUG_DIR_WINDOWS)/%.o: $(SRC_WINDOWS) $(DEBUG_DIR_WINDOWS)
 	$(COMPILER) $(CPP_OPTS) $(DEBUG_CPP_OPTS) $< -o $@
 
 $(DEBUG_DIR_ALL):
@@ -61,7 +61,7 @@ $(RELEASE_APP): $(RELEASE_OBJ_ALL) $(RELEASE_OBJ_WINDOWS) $(RELEASE_APP_DIR)
 $(RELEASE_DIR_ALL)/%.o: $(SRC_ALL) $(RELEASE_DIR_ALL)
 	$(COMPILER) $(CPP_OPTS) $(RELEASE_CPP_OPTS) $< -o $@
 
-$(RELEASE_DIR_WINDOWS)/%.o: $(SRC_WIN) $(RELEASE_DIR_WINDOWS)
+$(RELEASE_DIR_WINDOWS)/%.o: $(SRC_WINDOWS) $(RELEASE_DIR_WINDOWS)
 	$(COMPILER) $(CPP_OPTS) $(RELEASE_CPP_OPTS) $< -o $@
 
 $(RELEASE_DIR_ALL):
@@ -109,7 +109,7 @@ vars:
 >echo "BASE                = $(BASE)"
 >echo "INC                 = $(INC)"
 >echo "SRC_ALL             = $(SRC_ALL)"
->echo "SRC_WIN             = $(SRC_WIN)"
+>echo "SRC_WINDOWS         = $(SRC_WINDOWS)"
 >echo "COMPILER            = $(COMPILER)"
 >echo "CPP_OPTS            = $(CPP_OPTS)"
 >echo "BUILD_DIR           = $(BUILD_DIR)"
