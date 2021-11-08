@@ -6,37 +6,37 @@
 # The release executable will be $(RELEASE_APP_DIR)/$(APP_NAME).exe
 APP_NAME            := myapp
 
-INC                 := $(wildcard include/all/*.h) $(wildcard include/windows/*.h)
-SRC_ALL             := $(wildcard src/all/*.cpp)
-SRC_WIN             := $(wildcard src/windows/*.cpp)
+BASE                := ../..
+INC                 := $(wildcard $(BASE)/include/all/*.h) $(wildcard $(BASE)/include/windows/*.h)
+SRC_ALL             := $(wildcard $(BASE)/src/all/*.cpp)
+SRC_WIN             := $(wildcard $(BASE)/src/windows/*.cpp)
 COMPILER            := /usr/bin/x86_64-w64-mingw32-g++
 CPP_OPTS            := -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -DWINDOWS
-BUILD               := build/win
+BUILD_DIR           := build
 DEBUG_CPP_OPTS      := -g -DDEBUG
-DEBUG_DIR_ALL       := $(BUILD)/debug/all
-DEBUG_DIR_WINDOWS   := $(BUILD)/debug/windows
-DEBUG_OBJ_ALL       := $(SRC_ALL:src/all/%.cpp=$(DEBUG_DIR_ALL)/%.o)
-DEBUG_OBJ_WINDOWS   := $(SRC_WIN:src/windows/%.cpp=$(DEBUG_DIR_WINDOWS)/%.o)
+DEBUG_DIR_ALL       := $(BUILD_DIR)/debug/all
+DEBUG_DIR_WINDOWS   := $(BUILD_DIR)/debug/windows
+DEBUG_OBJ_ALL       := $(SRC_ALL:$(BASE)/src/all/%.cpp=$(DEBUG_DIR_ALL)/%.o)
+DEBUG_OBJ_WINDOWS   := $(SRC_WIN:$(BASE)/src/windows/%.cpp=$(DEBUG_DIR_WINDOWS)/%.o)
 DEBUG_APP_DIR       := $(BUILD_DIR)/app/debug
 DEBUG_APP           := $(DEBUG_APP_DIR)/$(APP_NAME).exe
 DEBUG_APP_OPTS      := /usr/x86_64-w64-mingw32/lib/libstdc++.a \
                        /usr/x86_64-w64-mingw32/lib/libwinpthread.a
 RELEASE_CPP_OPTS    :=
-RELEASE_DIR_ALL     := $(BUILD)/release/all
-RELEASE_DIR_WINDOWS := $(BUILD)/release/windows
-RELEASE_OBJ_ALL     := $(SRC_ALL:src/all/%.cpp=$(RELEASE_DIR_ALL)/%.o)
-RELEASE_OBJ_WINDOWS := $(SRC_WIN:src/win/%.cpp=$(RELEASE_DIR_WINDOWS)/%.o)
+RELEASE_DIR_ALL     := $(BUILD_DIR)/release/all
+RELEASE_DIR_WINDOWS := $(BUILD_DIR)/release/windows
+RELEASE_OBJ_ALL     := $(SRC_ALL:$(BASE)/src/all/%.cpp=$(RELEASE_DIR_ALL)/%.o)
+RELEASE_OBJ_WINDOWS := $(SRC_WIN:$(BASE)/src/win/%.cpp=$(RELEASE_DIR_WINDOWS)/%.o)
 RELEASE_APP_DIR     := $(BUILD_DIR)/app/release
 RELEASE_APP         := $(RELEASE_APP_DIR)/$(APP_NAME).exe
-RELEASE_APP_OPTS    := /usr/x86_64-w64-mingw32/lib/libstdc++.a \
-                       /usr/x86_64-w64-mingw32/lib/libwinpthread.a
+RELEASE_APP_OPTS    := /usr/x86_64-w64-mingw32/lib/libwinpthread.a
 
 # Default target
 .PHONY: all
 all: $(DEBUG_APP) $(RELEASE_APP)
 
 # Debug app
-$(DEBUG_APP): $(DEBUG_OBJ_ALL) $(DEBUG_OBJ_WINDOWS)
+$(DEBUG_APP): $(DEBUG_OBJ_ALL) $(DEBUG_OBJ_WINDOWS) $(DEBUG_APP_DIR)
 	$(COMPILER) -static -s -o $@ $(DEBUG_OBJ_ALL) $(DEBUG_LIBS)
 
 $(DEBUG_DIR_ALL)/%.o: $(SRC_ALL) $(DEBUG_DIR_ALL)
@@ -51,8 +51,11 @@ $(DEBUG_DIR_ALL):
 $(DEBUG_DIR_WINDOWS):
 	mkdir -p $@
 
+$(DEBUG_APP_DIR):
+	mkdir -p $@
+
 # Release app
-$(RELEASE_APP): $(RELEASE_OBJ_ALL) $(RELEASE_OBJ_WINDOWS)
+$(RELEASE_APP): $(RELEASE_OBJ_ALL) $(RELEASE_OBJ_WINDOWS) $(RELEASE_APP_DIR)
 	$(COMPILER) -static -s -o $@ $(RELEASE_OBJ_ALL) $(RELEASE_LIBS)
 
 $(RELEASE_DIR_ALL)/%.o: $(SRC_ALL) $(RELEASE_DIR_ALL)
@@ -67,19 +70,21 @@ $(RELEASE_DIR_ALL):
 $(RELEASE_DIR_WINDOWS):
 	mkdir -p $@
 
+$(RELEASE_APP_DIR):
+	mkdir -p $@
+
 # Copy the windows executables and required runtime files to a target folder.
 # Set make var COPY to target location.
 .PHONY: copy
 copy:
-	if [ -n "$(COPY)" ]; then \
-	  [ -f "$(DEBUG_APP)" ] && cp "$(DEBUG_APP)" "$(COPY)"; \
-	  [ -f "$(RELEASE_APP)" ] && cp "$(RELEASE_APP)" "$(COPY)"; \
-	fi
+	[ -n "$(COPY)" ] || { echo "COPY must be set to target dir"; exit 1; }; \
+	[ -d "$(DEBUG_APP_DIR)" ]   && cp -r "$(DEBUG_APP_DIR)"   "$(COPY)"; \
+	[ -d "$(RELEASE_APP_DIR)" ] && cp -r "$(RELEASE_APP_DIR)" "$(COPY)"; \
 
 # Clean the artifacts
 .PHONY: clean
 clean:
-	rm -rf $(BUILD) || :
+	rm -rf $(BUILD_DIR) || :
 
 # Generate the echo lines for win-vars target
 # This target shd be run if any vars are added or removed.
@@ -101,12 +106,13 @@ vars-generate:
 vars:
 >echo "==== Windows vars ===="
 >echo "APP_NAME            = $(APP_NAME)"
+>echo "BASE                = $(BASE)"
 >echo "INC                 = $(INC)"
 >echo "SRC_ALL             = $(SRC_ALL)"
 >echo "SRC_WIN             = $(SRC_WIN)"
 >echo "COMPILER            = $(COMPILER)"
 >echo "CPP_OPTS            = $(CPP_OPTS)"
->echo "BUILD               = $(BUILD)"
+>echo "BUILD_DIR           = $(BUILD_DIR)"
 >echo "DEBUG_CPP_OPTS      = $(DEBUG_CPP_OPTS)"
 >echo "DEBUG_DIR_ALL       = $(DEBUG_DIR_ALL)"
 >echo "DEBUG_DIR_WINDOWS   = $(DEBUG_DIR_WINDOWS)"
