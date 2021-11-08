@@ -2,7 +2,7 @@
 
 int main() {
 	std::cout << "Hello";
-#ifdef _WIN32
+#ifdef WINDOWS
 	std::cout << " Windows";
 #else
 	std::cout << " Linux";
