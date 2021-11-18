@@ -1,35 +1,38 @@
 # Windows Makefile
-# Note the symbol WINDOWS can be tested for in source code
 
 # This is the only variable to change per project, it is the name of the executables
 # The debug executable   will be $(DEBUG_APP_DIR)/$(APP_NAME).exe
 # The release executable will be $(RELEASE_APP_DIR)/$(APP_NAME).exe
+
+#docker run -it --rm -v $(pwd):/workdir -e CROSS_TRIPLE=x86_64-w64-mingw32 multiarch/crossbuild bash -c "make -f make/windows/Makefile; chown -R `id -u`:`id -g` make/windows/build"
+
 APP_NAME            := myapp
 
-BASE                := ../..
-INC                 := $(wildcard $(BASE)/include/all/*.h) $(wildcard $(BASE)/include/windows/*.h)
-SRC_ALL             := $(wildcard $(BASE)/src/all/*.cpp)
-SRC_WINDOWS         := $(wildcard $(BASE)/src/windows/*.cpp)
-COMPILER            := /usr/bin/x86_64-w64-mingw32-g++
+MAKEFILE_PATH       := $(abspath $(lastword $(MAKEFILE_LIST)))
+MAKEFILE_DIR        := $(patsubst %/,%,$(dir $(MAKEFILE_PATH)))
+BASE_DIR            := $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(patsubst %/,%,$(MAKEFILE_DIR))))))
+INC                 := $(wildcard $(BASE_DIR)/include/all/*.h) $(wildcard $(BASE_DIR)/include/windows/*.h)
+SRC_ALL             := $(wildcard $(BASE_DIR)/src/all/*.cpp)
+SRC_WINDOWS         := $(wildcard $(BASE_DIR)/src/windows/*.cpp)
+COMPILER            := c++
 CPP_OPTS            := -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -DWINDOWS
-BUILD_DIR           := build
+BUILD_DIR           := $(MAKEFILE_DIR)/build
 DEBUG_CPP_OPTS      := -g -DDEBUG
 DEBUG_DIR_ALL       := $(BUILD_DIR)/debug/all
 DEBUG_DIR_WINDOWS   := $(BUILD_DIR)/debug/windows
-DEBUG_OBJ_ALL       := $(SRC_ALL:$(BASE)/src/all/%.cpp=$(DEBUG_DIR_ALL)/%.o)
-DEBUG_OBJ_WINDOWS   := $(SRC_WINDOWS:$(BASE)/src/windows/%.cpp=$(DEBUG_DIR_WINDOWS)/%.o)
+DEBUG_OBJ_ALL       := $(SRC_ALL:$(BASE_DIR)/src/all/%.cpp=$(DEBUG_DIR_ALL)/%.o)
+DEBUG_OBJ_WINDOWS   := $(SRC_WINDOWS:$(BASE_DIR)/src/windows/%.cpp=$(DEBUG_DIR_WINDOWS)/%.o)
 DEBUG_APP_DIR       := $(BUILD_DIR)/app/debug
 DEBUG_APP           := $(DEBUG_APP_DIR)/$(APP_NAME).exe
-DEBUG_APP_OPTS      := /usr/x86_64-w64-mingw32/lib/libstdc++.a \
-                       /usr/x86_64-w64-mingw32/lib/libwinpthread.a
+DEBUG_APP_OPTS      := -static
 RELEASE_CPP_OPTS    :=
 RELEASE_DIR_ALL     := $(BUILD_DIR)/release/all
 RELEASE_DIR_WINDOWS := $(BUILD_DIR)/release/windows
-RELEASE_OBJ_ALL     := $(SRC_ALL:$(BASE)/src/all/%.cpp=$(RELEASE_DIR_ALL)/%.o)
-RELEASE_OBJ_WINDOWS := $(SRC_WINDOWS:$(BASE)/src/win/%.cpp=$(RELEASE_DIR_WINDOWS)/%.o)
+RELEASE_OBJ_ALL     := $(SRC_ALL:$(BASE_DIR)/src/all/%.cpp=$(RELEASE_DIR_ALL)/%.o)
+RELEASE_OBJ_WINDOWS := $(SRC_WINDOWS:$(BASE_DIR)/src/win/%.cpp=$(RELEASE_DIR_WINDOWS)/%.o)
 RELEASE_APP_DIR     := $(BUILD_DIR)/app/release
 RELEASE_APP         := $(RELEASE_APP_DIR)/$(APP_NAME).exe
-RELEASE_APP_OPTS    := /usr/x86_64-w64-mingw32/lib/libwinpthread.a
+RELEASE_APP_OPTS    := -static -s 
 
 # Default target
 .PHONY: all
@@ -37,7 +40,7 @@ all: $(DEBUG_APP) $(RELEASE_APP)
 
 # Debug app
 $(DEBUG_APP): $(DEBUG_OBJ_ALL) $(DEBUG_OBJ_WINDOWS) $(DEBUG_APP_DIR)
-	$(COMPILER) -static -s -o $@ $(DEBUG_OBJ_ALL) $(DEBUG_LIBS)
+	$(COMPILER) $(DEBUG_APP_OPTS) -o $@ $(DEBUG_OBJ_ALL) $(DEBUG_LIBS)
 
 $(DEBUG_DIR_ALL)/%.o: $(SRC_ALL) $(DEBUG_DIR_ALL)
 	$(COMPILER) $(CPP_OPTS) $(DEBUG_CPP_OPTS) $< -o $@
@@ -56,7 +59,7 @@ $(DEBUG_APP_DIR):
 
 # Release app
 $(RELEASE_APP): $(RELEASE_OBJ_ALL) $(RELEASE_OBJ_WINDOWS) $(RELEASE_APP_DIR)
-	$(COMPILER) -static -s -o $@ $(RELEASE_OBJ_ALL) $(RELEASE_LIBS)
+	$(COMPILER) $(RELEASE_APP_OPTS) -o $@ $(RELEASE_OBJ_ALL) $(RELEASE_LIBS)
 
 $(RELEASE_DIR_ALL)/%.o: $(SRC_ALL) $(RELEASE_DIR_ALL)
 	$(COMPILER) $(CPP_OPTS) $(RELEASE_CPP_OPTS) $< -o $@
@@ -106,7 +109,9 @@ vars-generate:
 vars:
 >echo "==== Windows vars ===="
 >echo "APP_NAME            = $(APP_NAME)"
->echo "BASE                = $(BASE)"
+>echo "MAKEFILE_PATH       = $(MAKEFILE_PATH)"
+>echo "MAKEFILE_DIR        = $(MAKEFILE_DIR)"
+>echo "BASE_DIR            = $(BASE_DIR)"
 >echo "INC                 = $(INC)"
 >echo "SRC_ALL             = $(SRC_ALL)"
 >echo "SRC_WINDOWS         = $(SRC_WINDOWS)"

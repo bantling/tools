@@ -1,34 +1,37 @@
 # Linux Makefile
-# Note the symbol LINUX can be tested for in source code
 
 # This is the only variable to change per project, it is the name of the executables
 # The debug executable   will be $(DEBUG_APP_DIR)/$(APP_NAME)
 # The release executable will be $(RELEASE_APP_DIR)/$(APP_NAME)
-APP_NAME          := myapp
 
-BASE              := ../..
-INC               := $(wildcard $(BASE)/include/all/*.h) $(wildcard $(BASE)/include/linux/*.h)
-SRC_ALL           := $(wildcard $(BASE)/src/all/*.cpp)
-SRC_LINUX         := $(wildcard $(BASE)/src/linux/*.cpp)
-COMPILER          := g++
+#docker run -it --rm -v $(pwd):/workdir -e CROSS_TRIPLE=x86_64-linux-gnu multiarch/crossbuild bash -c "make -f make/linux/Makefile; chown -R `id -u`:`id -g` make/linux/build"
+
+APP_NAME          := myapp
+MAKEFILE_PATH       := $(abspath $(lastword $(MAKEFILE_LIST)))
+MAKEFILE_DIR        := $(patsubst %/,%,$(dir $(MAKEFILE_PATH)))
+BASE_DIR            := $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(patsubst %/,%,$(MAKEFILE_DIR))))))
+INC               := $(wildcard $(BASE_DIR)/include/all/*.h) $(wildcard $(BASE_DIR)/include/linux/*.h)
+SRC_ALL           := $(wildcard $(BASE_DIR)/src/all/*.cpp)
+SRC_LINUX         := $(wildcard $(BASE_DIR)/src/linux/*.cpp)
+COMPILER          := c++
 CPP_OPTS          := -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -DLINUX
-BUILD_DIR         := build
+BUILD_DIR         := $(MAKEFILE_DIR)/build
 DEBUG_CPP_OPTS    := -g -DDEBUG
 DEBUG_DIR_ALL     := $(BUILD_DIR)/debug/all
 DEBUG_DIR_LINUX   := $(BUILD_DIR)/debug/linux
-DEBUG_OBJ_ALL     := $(SRC_ALL:$(BASE)/src/all/%.cpp=$(DEBUG_DIR_ALL)/%.o)
-DEBUG_OBJ_LINUX   := $(SRC_LINUX:$(BASE)/src/linux/%.cpp=$(DEBUG_DIR_LINUX)/%.o)
+DEBUG_OBJ_ALL     := $(SRC_ALL:$(BASE_DIR)/src/all/%.cpp=$(DEBUG_DIR_ALL)/%.o)
+DEBUG_OBJ_LINUX   := $(SRC_LINUX:$(BASE_DIR)/src/linux/%.cpp=$(DEBUG_DIR_LINUX)/%.o)
 DEBUG_APP_DIR     := $(BUILD_DIR)/app/debug
 DEBUG_APP         := $(DEBUG_APP_DIR)/$(APP_NAME)
 DEBUG_APP_OPTS    :=
 RELEASE_CPP_OPTS  :=
 RELEASE_DIR_ALL   := $(BUILD_DIR)/release/all
 RELEASE_DIR_LINUX := $(BUILD_DIR)/release/linux
-RELEASE_OBJ_ALL   := $(SRC_ALL:$(BASE)/src/all/%.cpp=$(RELEASE_DIR_ALL)/%.o)
-RELEASE_OBJ_LINUX := $(SRC_LINUX:$(BASE)/src/linux/%.cpp=$(RELEASE_DIR_LINUX)/%.o)
+RELEASE_OBJ_ALL   := $(SRC_ALL:$(BASE_DIR)/src/all/%.cpp=$(RELEASE_DIR_ALL)/%.o)
+RELEASE_OBJ_LINUX := $(SRC_LINUX:$(BASE_DIR)/src/linux/%.cpp=$(RELEASE_DIR_LINUX)/%.o)
 RELEASE_APP_DIR   := $(BUILD_DIR)/app/release
 RELEASE_APP       := $(RELEASE_APP_DIR)/$(APP_NAME)
-RELEASE_APP_OPTS  :=
+RELEASE_APP_OPTS  := -s
 
 # Default target
 .PHONY: all
@@ -105,7 +108,9 @@ vars-generate:
 vars:
 >echo "==== Linux vars ===="
 >echo "APP_NAME          = $(APP_NAME)"
->echo "BASE              = $(BASE)"
+>echo "MAKEFILE_PATH = $(MAKEFILE_PATH)"
+>echo "MAKEFILE_DIR = $(MAKEFILE_DIR)"
+>echo "BASE_DIR              = $(BASE_DIR)"
 >echo "INC               = $(INC)"
 >echo "SRC_ALL           = $(SRC_ALL)"
 >echo "SRC_LINUX         = $(SRC_LINUX)"

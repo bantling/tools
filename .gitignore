@@ -1,5 +1,4 @@
 .project
 asciidoc/top-level-readme/docs/readme/build
-cross-compile/*/make/linux/build
-cross-compile/*/make/windows/build
+cross-compile/*/make/*/build
 
