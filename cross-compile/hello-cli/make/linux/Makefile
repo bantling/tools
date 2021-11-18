@@ -6,76 +6,79 @@
 
 #docker run -it --rm -v $(pwd):/workdir -e CROSS_TRIPLE=x86_64-linux-gnu multiarch/crossbuild bash -c "make -f make/linux/Makefile; chown -R `id -u`:`id -g` make/linux/build"
 
-APP_NAME          := myapp
-MAKEFILE_PATH       := $(abspath $(lastword $(MAKEFILE_LIST)))
-MAKEFILE_DIR        := $(patsubst %/,%,$(dir $(MAKEFILE_PATH)))
-BASE_DIR            := $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(patsubst %/,%,$(MAKEFILE_DIR))))))
-INC               := $(wildcard $(BASE_DIR)/include/all/*.h) $(wildcard $(BASE_DIR)/include/linux/*.h)
-SRC_ALL           := $(wildcard $(BASE_DIR)/src/all/*.cpp)
-SRC_LINUX         := $(wildcard $(BASE_DIR)/src/linux/*.cpp)
-COMPILER          := c++
-CPP_OPTS          := -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -DLINUX
-BUILD_DIR         := $(MAKEFILE_DIR)/build
-DEBUG_CPP_OPTS    := -g -DDEBUG
-DEBUG_DIR_ALL     := $(BUILD_DIR)/debug/all
-DEBUG_DIR_LINUX   := $(BUILD_DIR)/debug/linux
-DEBUG_OBJ_ALL     := $(SRC_ALL:$(BASE_DIR)/src/all/%.cpp=$(DEBUG_DIR_ALL)/%.o)
-DEBUG_OBJ_LINUX   := $(SRC_LINUX:$(BASE_DIR)/src/linux/%.cpp=$(DEBUG_DIR_LINUX)/%.o)
-DEBUG_APP_DIR     := $(BUILD_DIR)/app/debug
-DEBUG_APP         := $(DEBUG_APP_DIR)/$(APP_NAME)
-DEBUG_APP_OPTS    :=
-RELEASE_CPP_OPTS  :=
-RELEASE_DIR_ALL   := $(BUILD_DIR)/release/all
-RELEASE_DIR_LINUX := $(BUILD_DIR)/release/linux
-RELEASE_OBJ_ALL   := $(SRC_ALL:$(BASE_DIR)/src/all/%.cpp=$(RELEASE_DIR_ALL)/%.o)
-RELEASE_OBJ_LINUX := $(SRC_LINUX:$(BASE_DIR)/src/linux/%.cpp=$(RELEASE_DIR_LINUX)/%.o)
-RELEASE_APP_DIR   := $(BUILD_DIR)/app/release
-RELEASE_APP       := $(RELEASE_APP_DIR)/$(APP_NAME)
-RELEASE_APP_OPTS  := -s
+PLATFORM_LC          := linux
+PLATFORM_UC          := $(guile (string-upcase "$(PLATFORM)"))
+
+APP_NAME             := myapp
+MAKEFILE_PATH        := $(abspath $(lastword $(MAKEFILE_LIST)))
+MAKEFILE_DIR         := $(patsubst %/,%,$(dir $(MAKEFILE_PATH)))
+BASE_DIR             := $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(patsubst %/,%,$(MAKEFILE_DIR))))))
+INC                  := $(wildcard $(BASE_DIR)/include/all/*.h) $(wildcard $(BASE_DIR)/include/$(PLATFORM_lC)/*.h)
+SRC_ALL              := $(wildcard $(BASE_DIR)/src/all/*.cpp)
+SRC_PLATFORM         := $(wildcard $(BASE_DIR)/src/$(PLATFORM_lC)/*.cpp)
+COMPILER             := c++
+CPP_OPTS             := -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -D$(PLATFORM_UC)
+BUILD_DIR            := $(MAKEFILE_DIR)/build
+DEBUG_CPP_OPTS       := -g -DDEBUG
+DEBUG_DIR_ALL        := $(BUILD_DIR)/debug/all
+DEBUG_DIR_PLATFORM   := $(BUILD_DIR)/debug/$(PLATFORM_LC)
+DEBUG_OBJ_ALL        := $(SRC_ALL:$(BASE_DIR)/src/all/%.cpp=$(DEBUG_DIR_ALL)/%.o)
+DEBUG_OBJ_PLATFORM   := $(SRC_PLATFORM:$(BASE_DIR)/src/$(PLATFORM_lC)/%.cpp=$(DEBUG_DIR_PLATFORM)/%.o)
+DEBUG_APP_DIR        := $(BUILD_DIR)/app/debug
+DEBUG_APP            := $(DEBUG_APP_DIR)/$(APP_NAME)
+DEBUG_APP_OPTS       :=
+RELEASE_CPP_OPTS     :=
+RELEASE_DIR_ALL      := $(BUILD_DIR)/release/all
+RELEASE_DIR_PLATFORM := $(BUILD_DIR)/release/$(PLATFORM_LC)
+RELEASE_OBJ_ALL      := $(SRC_ALL:$(BASE_DIR)/src/all/%.cpp=$(RELEASE_DIR_ALL)/%.o)
+RELEASE_OBJ_PLATFORM := $(SRC_PLATFORM:$(BASE_DIR)/src/$(PLATFORM_lC)/%.cpp=$(RELEASE_DIR_PLATFORM)/%.o)
+RELEASE_APP_DIR      := $(BUILD_DIR)/app/release
+RELEASE_APP          := $(RELEASE_APP_DIR)/$(APP_NAME)
+RELEASE_APP_OPTS     := -s
 
 # Default target
 .PHONY: all
 all: $(DEBUG_APP) $(RELEASE_APP)
 
 # Debug app
-$(DEBUG_APP): $(DEBUG_OBJ_ALL) $(DEBUG_OBJ_LINUX) $(DEBUG_APP_DIR)
+$(DEBUG_APP): $(DEBUG_OBJ_ALL) $(DEBUG_OBJ_PLATFORM) $(DEBUG_APP_DIR)
 	$(COMPILER) -o $@ $(DEBUG_OBJ_ALL) $(DEBUG_APP_OPTS)
 
 $(DEBUG_DIR_ALL)/%.o: $(SRC_ALL) $(DEBUG_DIR_ALL)
 	$(COMPILER) $(CPP_OPTS) $(DEBUG_CPP_OPTS) $< -o $@
 
-$(DEBUG_DIR_LINUX)/%.o: $(SRC_LINUX) $(DEBUG_DIR_LINUX)
+$(DEBUG_DIR_PLATFORM)/%.o: $(SRC_PLATFORM) $(DEBUG_DIR_PLATFORM)
 	$(COMPILER) $(CPP_OPTS) $(DEBUG_CPP_OPTS) $< -o $@
 
 $(DEBUG_DIR_ALL):
 	mkdir -p $@
 
-$(DEBUG_DIR_LINUX):
+$(DEBUG_DIR_PLATFORM):
 	mkdir -p $@
 
 $(DEBUG_APP_DIR):
 	mkdir -p $@
 
 # Release app
-$(RELEASE_APP): $(RELEASE_OBJ_ALL) $(RELEASE_OBJ_LINUX) $(RELEASE_APP_DIR)
+$(RELEASE_APP): $(RELEASE_OBJ_ALL) $(RELEASE_OBJ_PLATFORM) $(RELEASE_APP_DIR)
 	$(COMPILER) -o $@ $(RELEASE_OBJ_ALL) $(RELEASE_APP_OPTS)
 
 $(RELEASE_DIR_ALL)/%.o: $(SRC_ALL) $(RELEASE_DIR_ALL)
 	$(COMPILER) $(CPP_OPTS) $(RELEASE_CPP_OPTS) $< -o $@
 
-$(RELEASE_DIR_LINUX)/%.o: $(SRC_LINUX) $(RELEASE_DIR_LINUX)
+$(RELEASE_DIR_PLATFORM)/%.o: $(SRC_PLATFORM) $(RELEASE_DIR_PLATFORM)
 	$(COMPILER) $(CPP_OPTS) $(RELEASE_CPP_OPTS) $< -o $@
 
 $(RELEASE_DIR_ALL):
 	mkdir -p $@
 
-$(RELEASE_DIR_LINUX):
+$(RELEASE_DIR_PLATFORM):
 	mkdir -p $@
 
 $(RELEASE_APP_DIR):
 	mkdir -p $@
 
-# Copy the linux executables and required runtime files to a target folder.
+# Copy the platform executables and required runtime files to a target folder.
 # Set make var COPY to target location.
 .PHONY: copy
 copy:
@@ -95,9 +98,9 @@ clean:
 .PHONY: vars-generate
 .SILENT: vars-generate
 vars-generate:
-	mf='Makefile'; \
+	mf='$(lastword $(MAKEFILE_LIST))'; \
 	sed -i '/^>/,$$d' $$mf; \
-	echo '>echo "==== Linux vars ===="' >> $$mf; \
+	echo '>echo "==== $(PLATFORM_UC) vars ===="' >> $$mf; \
 	grep '^[A-Z].*:=' $$mf | \
 	sed -r 's/([^ ]*)( *):=.*/>echo "\1\2= \$$\(\1\)"/' >> $$mf; \
 	echo -e "\\n.RECIPEPREFIX =" >> $$mf
