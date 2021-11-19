@@ -1,4 +1,5 @@
 # FreeBSD Makefile
+# - docker build does not support -std=c++14
 
 PLATFORM_LC          := freebsd
 APP_NAME             := app
@@ -11,7 +12,7 @@ INC                  := $(wildcard $(BASE_DIR)/include/all/*.h) $(wildcard $(BAS
 SRC_ALL              := $(wildcard $(BASE_DIR)/src/all/*.cpp)
 SRC_PLATFORM         := $(wildcard $(BASE_DIR)/src/$(PLATFORM_lC)/*.cpp)
 COMPILER             := c++
-COMPILE_OPTS         := -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -D$(PLATFORM_UC)
+COMPILE_OPTS         := -std=c++98 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -D$(PLATFORM_UC)
 BUILD_DIR            := $(MAKEFILE_DIR)/build
 DEBUG_COMPILE_OPTS   := -g -DDEBUG
 DEBUG_DIR_ALL        := $(BUILD_DIR)/debug/all

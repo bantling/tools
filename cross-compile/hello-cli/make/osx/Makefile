@@ -1,4 +1,5 @@
 # OSX Makefile
+# - docker build does not support -s to strip release binary 
 
 PLATFORM_LC          := osx
 APP_NAME             := app
@@ -28,7 +29,7 @@ RELEASE_OBJ_ALL      := $(SRC_ALL:$(BASE_DIR)/src/all/%.cpp=$(RELEASE_DIR_ALL)/%
 RELEASE_OBJ_PLATFORM := $(SRC_PLATFORM:$(BASE_DIR)/src/$(PLATFORM_lC)/%.cpp=$(RELEASE_DIR_PLATFORM)/%.o)
 RELEASE_APP_DIR      := $(BUILD_DIR)/app/release
 RELEASE_APP          := $(RELEASE_APP_DIR)/$(APP_NAME)
-RELEASE_APP_OPTS     := -s
+RELEASE_APP_OPTS     := 
 
 # Default target
 .PHONY: all
