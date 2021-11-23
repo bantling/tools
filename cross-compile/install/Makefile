@@ -16,7 +16,5 @@ multiarch:
 .SILENT: freebsd
 freebsd:
 	docker images --format '{{.Repository}}:{{.Tag}}' | \
-	grep -q freebsd-cross-build:9.3 || { \
-		echo getit; \
-	}
+	grep -q freebsd-cross-build:13.0 || $(MAKE) -C freebsd
 	

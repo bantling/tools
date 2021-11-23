@@ -1,0 +1,117 @@
+#! /bin/sh
+
+# Spawn a subshell with a specific default compiler/toolchain target. If no
+# arguments are given beyond the target, an interactive shell is opened;
+# otherwise, the arguments are executed under the subshell (as if passed to
+# `/bin/sh -c`).
+#
+# After sanity-checking the target, the script sets the AR, AS, CC, CXX, CPP,
+# LD, and RANLIB environment variables to reflect the names of the respective
+# executables for that target. It also adds a path containing unprefixed tools
+# for the target (e.g., `gcc` instead of `$target-gcc`), if discovered, to the
+# front of your PATH.
+#
+# E.g., for target `x86_64-linux-gnu`, the script first checks for the
+# existence of a toolchain targeting that architecture in /usr/x86_64-linux-gnu
+# or /usr/local/x86_64-linux-gnu. Finding that /usr/local/x86_64-linux-gnu
+# exists, it then sets CC to `x86_64-linux-gnu-cc`, CXX to
+# `x86_64-linux-gnu-g++`, etc. Then, if /usr/local/x86_64-linux-gnu/bin also
+# exists, it adds it to the beginning of the PATH. Then it launches a subshell.
+
+POSSIBLE_LIB_PATHS="/usr /usr/local"
+
+SELF="$0"
+help () {
+    cat 1>&2 <<HELP
+$SELF: $1
+Usage: $SELF target [shell-arg ...]
+
+  target    the multiarch tuple for your desired compiler toolchain
+            (e.g., x86_64-freebsd9)
+HELP
+    exit 1
+}
+
+die () {
+    cat 1>&2 <<ERR
+$SELF: $1
+ERR
+    exit 2
+}
+
+if [ $# -lt 1 ]
+then
+    help "insufficient arguments"
+fi
+
+target="$1"
+shift
+
+libdir=
+for possible_lib_path in $POSSIBLE_LIB_PATHS
+do
+    if [ -d "$possible_lib_path"/"$target" ]
+    then
+        libdir="$possible_lib_path"/"$target"
+    fi
+done
+
+if [ -z "$libdir" ]
+then
+    die "could not locate library directory for target $target"
+fi
+
+export AR="$target"-ar
+export AS="$target"-as
+export CC="$target"-gcc
+export CXX="$target"-g++
+export CPP="$target"-cpp
+export LD="$target"-ld
+export RANLIB="$target"-ranlib
+
+# Add the bin directory for this target, if it exists, to the PATH.
+if [ -d "$libdir"/bin ]
+then
+    export PATH="$libdir"/bin:"$PATH"
+fi
+
+if [ $# -gt 0 ]
+then
+    # The use of "$*" instead of "$@" is very intentional here: we want to pass
+    # all remaining arguments to the subshell _as a single argument_ so that
+    # `-c` will see them all. This helps with the ergonomics of running things
+    # in the subshell:
+    #
+    #     $ settarget foo echo one two three
+    #     one two three
+    #
+    # http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_03_02.html#sect_03_02_05
+    #
+    # If we used "$@" and it passed our arguments along as separate arguments
+    # to /bin/sh, then to get the same effect as above, the caller would have
+    # to quote trailing arguments themselves:
+    #
+    #     $ settarget foo "echo one two three"
+    #     one two three
+    #
+    # Otherwise, those trailing arguments wouldn't be passed, and the behaviour
+    # would be quite confusing:
+    #
+    #     $ settarget foo gcc bar
+    #     gcc: fatal error: no input files
+    #     compilation terminated.
+    #
+    # This is particularly relevant in the context of Docker, where Docker
+    # automatically “collects up” stray arguments given to `docker run` in a
+    # similar manner:
+    #
+    #     $ docker run --rm alpine:3.12 echo one two three
+    #     one two three
+    #
+    # Given that we expect this script to be used as part of a `docker run` or
+    # `docker exec` invocation, I think maintaining the same argument-passing
+    # behaviour upholds the principle of least astonishment.
+    /bin/sh -c "$*"
+else
+    /bin/sh
+fi
