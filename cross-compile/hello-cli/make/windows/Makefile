@@ -1,7 +1,7 @@
 # Windows Makefile
 
 PLATFORM_LC          := windows
-APP_NAME             := app
+APP_NAME             := app.exe
 
 PLATFORM_UC          := $(shell echo $(PLATFORM_LC) | tr a-z A-Z)
 MAKEFILE_PATH        := $(abspath $(lastword $(MAKEFILE_LIST)))
