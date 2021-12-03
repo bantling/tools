@@ -11,8 +11,7 @@ all:
 	docker run -it --rm -u "`id -u`:`id -g`" -v $$(pwd):/workdir -e CROSS_TRIPLE=x86_64-linux-gnu multiarch/crossbuild make -f make/linux/Makefile
 	docker run -it --rm -u "`id -u`:`id -g`" -v $$(pwd):/workdir -e CROSS_TRIPLE=x86_64-w64-mingw32 multiarch/crossbuild make -f make/windows/Makefile
 	docker run -it --rm -u "`id -u`:`id -g`" -v $$(pwd):/workdir -e CROSS_TRIPLE=x86_64-apple-darwin multiarch/crossbuild make -f make/osx/Makefile
-	bsdtar cjf - make/freebsd src | ssh -p 5222 localhost 'rm -rf src build; sh -c "tar xjf -; gmake -f make/freebsd/Makefile"' && \
-		ssh -p 5222 localhost "tar cjf - make/freebsd/build" | bsdtar xjf - 
+	ssh -p 5222 localhost 'gmake -f /mnt/hello-cli/make/freebsd/Makefile' 
 
 # Copy all platform builds
 .PHONY: copy
