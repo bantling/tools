@@ -1,4 +1,5 @@
-# Linux Makefile
+# SPDX-License-Identifier: Apache-2.0
+# FreeBSD Makefile
 
 PLATFORM_LC          := freebsd
 APP_NAME             := app
@@ -7,9 +8,9 @@ PLATFORM_UC          := $(shell echo $(PLATFORM_LC) | tr a-z A-Z)
 MAKEFILE_PATH        := $(abspath $(lastword $(MAKEFILE_LIST)))
 MAKEFILE_DIR         := $(patsubst %/,%,$(dir $(MAKEFILE_PATH)))
 BASE_DIR             := $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(patsubst %/,%,$(MAKEFILE_DIR))))))
-INC                  := $(wildcard $(BASE_DIR)/include/all/*.h) $(wildcard $(BASE_DIR)/include/$(PLATFORM_LC)/*.h)
+INC                  := $(patsubst %/,-I%,$(dir $(wildcard $(BASE_DIR)/include/all/*.h) $(wildcard $(BASE_DIR)/include/$(PLATFORM_LC)/*.h)))
 SRC_ALL              := $(wildcard $(BASE_DIR)/src/all/*.cpp)
-SRC_PLATFORM         := $(wildcard $(BASE_DIR)/src/$(PLATFORM_lC)/*.cpp)
+SRC_PLATFORM         := $(wildcard $(BASE_DIR)/src/$(PLATFORM_LC)/*.cpp)
 COMPILER             := c++
 COMPILE_OPTS         := -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -D$(PLATFORM_UC)
 BUILD_DIR            := $(MAKEFILE_DIR)/build
@@ -25,7 +26,7 @@ RELEASE_COMPILE_OPTS :=
 RELEASE_DIR_ALL      := $(BUILD_DIR)/release/all
 RELEASE_DIR_PLATFORM := $(BUILD_DIR)/release/$(PLATFORM_LC)
 RELEASE_OBJ_ALL      := $(SRC_ALL:$(BASE_DIR)/src/all/%.cpp=$(RELEASE_DIR_ALL)/%.o)
-RELEASE_OBJ_PLATFORM := $(SRC_PLATFORM:$(BASE_DIR)/src/$(PLATFORM_lC)/%.cpp=$(RELEASE_DIR_PLATFORM)/%.o)
+RELEASE_OBJ_PLATFORM := $(SRC_PLATFORM:$(BASE_DIR)/src/$(PLATFORM_LC)/%.cpp=$(RELEASE_DIR_PLATFORM)/%.o)
 RELEASE_APP_DIR      := $(BUILD_DIR)/app/release
 RELEASE_APP          := $(RELEASE_APP_DIR)/$(APP_NAME)
 RELEASE_APP_OPTS     := -s
@@ -36,13 +37,13 @@ all: $(DEBUG_APP) $(RELEASE_APP)
 
 # Debug app
 $(DEBUG_APP): $(DEBUG_OBJ_ALL) $(DEBUG_OBJ_PLATFORM) $(DEBUG_APP_DIR)
-	$(COMPILER) -o $@ $(DEBUG_OBJ_ALL) $(DEBUG_APP_OPTS)
+	$(COMPILER) -o $@ $(DEBUG_OBJ_ALL) $(DEBUG_OBJ_PLATFORM) $(DEBUG_APP_OPTS)
 
 $(DEBUG_DIR_ALL)/%.o: $(SRC_ALL) $(DEBUG_DIR_ALL)
-	$(COMPILER) $(COMPILE_OPTS) $(DEBUG_COMPILE_OPTS) $< -o $@
+	$(COMPILER) $(COMPILE_OPTS) $(DEBUG_COMPILE_OPTS) $(INC) $< -o $@
 
 $(DEBUG_DIR_PLATFORM)/%.o: $(SRC_PLATFORM) $(DEBUG_DIR_PLATFORM)
-	$(COMPILER) $(COMPILE_OPTS) $(DEBUG_COMPILE_OPTS) $< -o $@
+	$(COMPILER) $(COMPILE_OPTS) $(DEBUG_COMPILE_OPTS) $(INC) $< -o $@
 
 $(DEBUG_DIR_ALL):
 	mkdir -p $@
@@ -55,13 +56,13 @@ $(DEBUG_APP_DIR):
 
 # Release app
 $(RELEASE_APP): $(RELEASE_OBJ_ALL) $(RELEASE_OBJ_PLATFORM) $(RELEASE_APP_DIR)
-	$(COMPILER) -o $@ $(RELEASE_OBJ_ALL) $(RELEASE_APP_OPTS)
+	$(COMPILER) -o $@ $(RELEASE_OBJ_ALL) $(RELEASE_OBJ_PLATFORM) $(RELEASE_APP_OPTS)
 
 $(RELEASE_DIR_ALL)/%.o: $(SRC_ALL) $(RELEASE_DIR_ALL)
-	$(COMPILER) $(COMPILE_OPTS) $(RELEASE_COMPILE_OPTS) $< -o $@
+	$(COMPILER) $(COMPILE_OPTS) $(RELEASE_COMPILE_OPTS) $(INC) $< -o $@
 
 $(RELEASE_DIR_PLATFORM)/%.o: $(SRC_PLATFORM) $(RELEASE_DIR_PLATFORM)
-	$(COMPILER) $(COMPILE_OPTS) $(RELEASE_COMPILE_OPTS) $< -o $@
+	$(COMPILER) $(COMPILE_OPTS) $(RELEASE_COMPILE_OPTS) $(INC) $< -o $@
 
 $(RELEASE_DIR_ALL):
 	mkdir -p $@

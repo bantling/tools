@@ -1,18 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
 #include <iostream>
+#include "message.h"
 
 int main() {
-	std::cout << "Hello";
-#if defined LINUX
-	std::cout << " Linux";
-#elif defined WINDOWS
-	std::cout << " Windows";
-#elif defined OSX
-	std::cout << " OSX";
-#elif defined FREEBSD
-	std::cout << " FreeBSD";
-#else
-#error Unsupported platform
-#endif
+	std::cout << "Hello " << message();
 
 #ifdef DEBUG
 	std::cout << " Debug";

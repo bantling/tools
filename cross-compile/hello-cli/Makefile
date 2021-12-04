@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Make for all platforms
 
 # Optional vars to set:
@@ -40,6 +41,8 @@ vars-generate:
 # Display vars for all platforms
 .PHONY: display-vars
 display-vars:
+	@echo "==== Top level Makefile ===="
+	@echo "MAKE_DIRS            = $(MAKE_DIRS)"
 	for d in $(MAKE_DIRS); do \
 	  $(MAKE) -C $$d vars; \
 	done
