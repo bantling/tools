@@ -60,13 +60,22 @@ the compiled object files and linked app are written to the host.
 
 This requires the following FreeBSD VM settings:
 
+* Install a host SSH public key in the VM
+* Install a VM SSH public key in the host
 * Install fuse ssh package  
 +
 ....
 pkg install fusefs-sshfs
 ....
 +
-* Allow user vfs mounting
+* Load fuse kernel module at boot, and load fuse service
++
+....
+Add kldlist="fusefs" to /etc/rc.conf
+Add fusefs_enable="YES" to /etc/rc.conf
+....
++
+*  Allow user vfs mounting at boot
 + 
 ....
 Add vfs.usermount=1 to /etc/sysctl.conf
