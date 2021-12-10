@@ -4,7 +4,8 @@
 # Optional vars to set:
 # COPY: if set, copy binaries to $(COPY)/{linux,windows}
 
-MAKE_DIRS := $(wildcard make/*)
+FREEBSD_PORT := 5222
+MAKE_DIRS    := $(wildcard make/*)
 
 # Build all platforms
 .PHONY: all
@@ -12,7 +13,7 @@ all:
 	docker run -it --rm -u "`id -u`:`id -g`" -v $$(pwd):/workdir -e CROSS_TRIPLE=x86_64-linux-gnu multiarch/crossbuild make -f make/linux/Makefile
 	docker run -it --rm -u "`id -u`:`id -g`" -v $$(pwd):/workdir -e CROSS_TRIPLE=x86_64-w64-mingw32 multiarch/crossbuild make -f make/windows/Makefile
 	docker run -it --rm -u "`id -u`:`id -g`" -v $$(pwd):/workdir -e CROSS_TRIPLE=x86_64-apple-darwin multiarch/crossbuild make -f make/osx/Makefile
-	ssh -p 5222 localhost 'gmake -f /mnt/hello-cli/make/freebsd/Makefile' 
+	ssh -p $(FREEBSD_PORT) localhost 'gmake -f /mnt/hello-cli/make/freebsd/Makefile'
 
 # Copy all platform builds
 .PHONY: copy
