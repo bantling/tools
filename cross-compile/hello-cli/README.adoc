@@ -84,13 +84,14 @@ Add vfs.usermount=1 to /etc/sysctl.conf
 * Create mount point
 +
 ....
-mkdir /mnt/hello-cli
+mkdir -p /mnt/hello-cli
+chown -R user:user /mnt/hello-cli
 ....
 +
 * Create /usr/local/etc/rc.d dir
 +
 ....
-mkdir -p /usr/local/etc/rc.d dir
+mkdir -p /usr/local/etc/rc.d
 ....
 +
 * Create /usr/local/etc/rc.d/sshfs script
@@ -257,13 +258,23 @@ run_rc_command "$1"
 | No
 | -I/home/user/git/tools/cross-compile/hello-cli/include/all
 
+| SRC_ALL_DIR
+| Absolute path of common cpp file dir
+| No
+| /home/user/git/tools/cross-compile/hello-cli/src/all
+
 | SRC_ALL
 | List of all absolute paths of common cpp files to compile
 | No
 | /home/user/git/tools/cross-compile/hello-cli/src/all/main.cpp
 
+| SRC_PLATFORM_DIR
+| Absolute paths platform specific cpp file dir
+| No
+| /home/user/git/tools/cross-compile/hello-cli/src/linux/message.cpp
+
 | SRC_PLATFORM
-| List of all absolute paths of cpp files to compile for this OS
+| List of all absolute paths of platform specific cpp files
 | No
 | /home/user/git/tools/cross-compile/hello-cli/src/linux/message.cpp
 

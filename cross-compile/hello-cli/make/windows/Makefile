@@ -9,8 +9,10 @@ MAKEFILE_PATH        := $(abspath $(lastword $(MAKEFILE_LIST)))
 MAKEFILE_DIR         := $(patsubst %/,%,$(dir $(MAKEFILE_PATH)))
 BASE_DIR             := $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(patsubst %/,%,$(MAKEFILE_DIR))))))
 INC                  := $(patsubst %/,-I%,$(dir $(wildcard $(BASE_DIR)/include/all/*.h) $(wildcard $(BASE_DIR)/include/$(PLATFORM_LC)/*.h)))
-SRC_ALL              := $(wildcard $(BASE_DIR)/src/all/*.cpp)
-SRC_PLATFORM         := $(wildcard $(BASE_DIR)/src/$(PLATFORM_LC)/*.cpp)
+SRC_ALL_DIR          := $(BASE_DIR)/src/all
+SRC_ALL              := $(wildcard $(SRC_ALL_DIR)/*.cpp)
+SRC_PLATFORM_DIR     := $(BASE_DIR)/src/$(PLATFORM_LC)
+SRC_PLATFORM         := $(wildcard $(SRC_PLATFORM_DIR)/*.cpp)
 COMPILER             := c++
 COMPILE_OPTS         := -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -D$(PLATFORM_UC)
 BUILD_DIR            := $(MAKEFILE_DIR)/build
@@ -39,10 +41,10 @@ all: $(DEBUG_APP) $(RELEASE_APP)
 $(DEBUG_APP): $(DEBUG_OBJ_ALL) $(DEBUG_OBJ_PLATFORM) $(DEBUG_APP_DIR)
 	$(COMPILER) -o $@ $(DEBUG_OBJ_ALL) $(DEBUG_OBJ_PLATFORM) $(DEBUG_APP_OPTS)
 
-$(DEBUG_DIR_ALL)/%.o: $(SRC_ALL) $(DEBUG_DIR_ALL)
+$(DEBUG_DIR_ALL)/%.o: $(SRC_ALL_DIR)/%.cpp $(DEBUG_DIR_ALL)
 	$(COMPILER) $(COMPILE_OPTS) $(DEBUG_COMPILE_OPTS) $(INC) $< -o $@
 
-$(DEBUG_DIR_PLATFORM)/%.o: $(SRC_PLATFORM) $(DEBUG_DIR_PLATFORM)
+$(DEBUG_DIR_PLATFORM)/%.o: $(SRC_PLATFORM_DIR)/%.cpp $(DEBUG_DIR_PLATFORM)
 	$(COMPILER) $(COMPILE_OPTS) $(DEBUG_COMPILE_OPTS) $(INC) $< -o $@
 
 $(DEBUG_DIR_ALL):
@@ -58,10 +60,10 @@ $(DEBUG_APP_DIR):
 $(RELEASE_APP): $(RELEASE_OBJ_ALL) $(RELEASE_OBJ_PLATFORM) $(RELEASE_APP_DIR)
 	$(COMPILER) -o $@ $(RELEASE_OBJ_ALL) $(RELEASE_OBJ_PLATFORM) $(RELEASE_APP_OPTS)
 
-$(RELEASE_DIR_ALL)/%.o: $(SRC_ALL) $(RELEASE_DIR_ALL)
+$(RELEASE_DIR_ALL)/%.o: $(SRC_ALL_DIR)/%.cpp $(RELEASE_DIR_ALL)
 	$(COMPILER) $(COMPILE_OPTS) $(RELEASE_COMPILE_OPTS) $(INC) $< -o $@
 
-$(RELEASE_DIR_PLATFORM)/%.o: $(SRC_PLATFORM) $(RELEASE_DIR_PLATFORM)
+$(RELEASE_DIR_PLATFORM)/%.o: $(SRC_PLATFORM_DIR)/%.cpp $(RELEASE_DIR_PLATFORM)
 	$(COMPILER) $(COMPILE_OPTS) $(RELEASE_COMPILE_OPTS) $(INC) $< -o $@
 
 $(RELEASE_DIR_ALL):
@@ -112,7 +114,9 @@ vars:
 >echo "MAKEFILE_DIR         = $(MAKEFILE_DIR)"
 >echo "BASE_DIR             = $(BASE_DIR)"
 >echo "INC                  = $(INC)"
+>echo "SRC_ALL_DIR          = $(SRC_ALL_DIR)"
 >echo "SRC_ALL              = $(SRC_ALL)"
+>echo "SRC_PLATFORM_DIR     = $(SRC_PLATFORM_DIR)"
 >echo "SRC_PLATFORM         = $(SRC_PLATFORM)"
 >echo "COMPILER             = $(COMPILER)"
 >echo "COMPILE_OPTS         = $(COMPILE_OPTS)"
