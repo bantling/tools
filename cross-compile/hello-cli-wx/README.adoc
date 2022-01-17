@@ -1,0 +1,469 @@
+// SPDX-License-Identifier: Apache-2.0
+:doctype: article
+
+= Hello CLI
+
+A simple console app that prints the following message:
+....
+"Hello {Linux|Windows|OSX|FreeBSD} {Debug|Release}"
+....
+
+== Strategy
+
+* Use multiarch/crossbuild docker container to compile for Linux, Windows, and OS X
+* Use a FreeBSD VM to commpile for FreeBSD
+* make/*/Makefile:
+** may be invoked by top Makefile to compile for all OSes, or directly to compile for a single OS
+** may be invoked within different paths:
+*** linux development machine path
+*** docker container path
+*** FreeBSD VM path
+ 
+The reason for doing it this way is that GCC and LLVM are both a giant bloody nightmare to compile and configure
+to cross compile for OS X or FreeBSD. Linux could be handled by OS packages, so can Windows by installing mingw group of packages.
+
+The expected development flow on a developer workstation is:
+
+* Compile for Linux using OS packages for speed.
+* Compile for Windows and OS X using docker.
+* Compile for FreeBSD using a VM.
+* Test Windows and FreeBSD using VMs.
+* Test OS X on a Mac.
+
+A Jenkins job should just use the docker container for Linux, Windows, and OS X.
+For FreeBSD it could use a qemu VM.
+
+If the Windows VM is an MS test VM that expires every 30 days and has to be reverted to a snapshot,
+then the following procedure can be used:
+
+* Create a sparse image file
+* Partition the file with one FAT partition
+* Create a loopback device for the file, scanning for partitions
+* Create the FAT filesystem
+* Destroy the loopback device
+* Create a VMDK raw hard disk file that simply points to the FAT image file
+* Setup VMDK as a second hard disk to VM
+* Go through following cycle to test on Windows:
+** Shut down VM, restoring to snapshot
+** Configure a loopback device for the sparse file, scanning for partitions
+** Mount the partition with uid and gid set to logged in user
+** Copy the new Windows app to the mounted partition
+** Unmount the partition
+** Destroy the loopback device
+** Start VM and test by accessing drive D: to run the app
+
+The FreeBSD VM requires some configuration.
+The VM mounts the host via ssh so it can directly access the host files.
+The host uses ssh to connect to the VM, and run the Makefile on the above ssh filesystem.
+This allows the host to invoke Make on the guest, and when Make runs the guest compiler and linker,
+the compiled object files and linked app are written to the host.
+
+This requires the following FreeBSD VM settings:
+
+* Install a host SSH public key in the VM
+* Install a VM SSH public key in the host
+* Install fuse ssh package  
++
+....
+pkg install fusefs-sshfs
+....
++
+* Load fuse kernel module at boot, and load fuse service
++
+....
+Add kldlist="fusefs" to /etc/rc.conf
+Add fusefs_enable="YES" to /etc/rc.conf
+....
++
+*  Allow user vfs mounting at boot
++ 
+....
+Add vfs.usermount=1 to /etc/sysctl.conf
+....
++
+* Create mount point
++
+....
+mkdir -p /mnt/hello-cli
+chown -R user:user /mnt/hello-cli
+....
++
+* Create /usr/local/etc/rc.d dir
++
+....
+mkdir -p /usr/local/etc/rc.d
+....
++
+* Create /usr/local/etc/rc.d/sshfs script
++
+....
+#!/bin/sh
+#
+# $FreeBSD$
+#
+
+# PROVIDE: sshfs
+# REQUIRE: LOGIN FILESYSTEMS sshd
+
+. /etc/rc.subr
+
+name="sshfs"
+rcvar="sshfs_enable"
+start_cmd="sshfs_start_cmd"
+
+: ${sshfs_enable:="yes"}
+
+sshfs_start_cmd()
+{
+	su user -c "/usr/local/bin/sshfs user@192.168.1.130:/home/user/git/tools/cross-compile/hello-cli /mnt/hello-cli"
+}
+
+load_rc_config $name
+run_rc_command "$1"
+....
++
+* Reboot
+
+==  Directory structure
+
+[cols=3*]
+|===
+| Path
+| Purpose
+| Checked In
+
+| README.adoc
+| Project README
+| Yes
+
+| Makefile
+| Top level Makefile
+| Yes
+
+| include
+| C++ header files
+| Yes
+
+| src
+| C++ source files
+| Yes
+
+| make/*/Makefile
+| Per OS Makefile
+| Yes
+
+| make/*/build
+| Per OS build dir
+| No
+|===
+
+== Top level Makefile
+
+=== Variables
+
+[cols=3*]
+|===
+| Name
+| Purpose
+| Example value
+
+| MAKE_DIRS
+| List of all make/* subdirs
+| make/freebsd make/linux make/osx make/windows
+|===
+
+=== Targets
+
+[cols=4*]
+|===
+| Name
+| Purpose
+| Intended for user
+| Example generated command
+
+| all
+| Default target
+| Yes
+| Compile all per OS default targets
+
+| copy
+| Copy each make/+++*/ dir to $(COPY)/*+++
+| Yes
+| cp make/linux/build/app/debug $(COPY)/linux
+
+| clean
+| Clean each make/* dir
+| Yes
+| make -C make/linux clean
+
+| vars-generate
+| Regenerate vars target for each make/*/Makefile
+| Yes
+| make -C make/linux vars-generate
+
+| display-vars
+| Collects vars from each make/*/Makefile
+| No
+| make -C make/linux vars
+
+| vars
+| Paginates vars from all Makefiles using more
+| Yes
+| make -s display-vars │ more
+|===
+
+== make/linux/Makefile
+
+=== Variables
+
+[cols=4*]
+|===
+| Name
+| Purpose
+| User may alter
+| Example value
+
+| PLATFORM_LC
+| Lowercase name of platform compiling for
+| Yes
+| linux
+
+| APP_NAME
+| Name of binary application
+| Yes
+| app
+
+| PLATFORM_UC
+| Uppercase name of platform compiling for
+| No
+| LINUX
+
+| MAKEFILE_PATH
+| Absolute path to this Makefile
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/Makefile
+
+| MAKEFILE_DIR
+| Absolute path of this Makefile parent dir
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux
+
+| BASE_DIR
+| Absolute path of dir containing include and src dirs
+| No
+| /home/user/git/tools/cross-compile/hello-cli
+
+| INC
+| List of all absolute gcc include dirs needed to compile code
+| No
+| -I/home/user/git/tools/cross-compile/hello-cli/include/all
+
+| SRC_ALL_DIR
+| Absolute path of common cpp file dir
+| No
+| /home/user/git/tools/cross-compile/hello-cli/src/all
+
+| SRC_ALL
+| List of all absolute paths of common cpp files to compile
+| No
+| /home/user/git/tools/cross-compile/hello-cli/src/all/main.cpp
+
+| SRC_PLATFORM_DIR
+| Absolute paths platform specific cpp file dir
+| No
+| /home/user/git/tools/cross-compile/hello-cli/src/linux/message.cpp
+
+| SRC_PLATFORM
+| List of all absolute paths of platform specific cpp files
+| No
+| /home/user/git/tools/cross-compile/hello-cli/src/linux/message.cpp
+
+| COMPILER
+| Name of compiler exe
+| Yes
+| c++
+
+| COMPILE_OPTS
+| Options to pass to compiler for every source file
+| Yes
+| -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -DLINUX
+
+| BUILD_DIR
+| Absolute path to per OS build dir
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build
+
+| DEBUG_COMPILE_OPTS
+| Options to pass to compiler for debug mode of every source file
+| Yes
+| -g -DDEBUG
+
+| DEBUG_DIR_ALL
+| Absolute path to build dir for compiled common debug code
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/debug/all
+
+| DEBUG_DIR_PLATFORM
+| Absolute path to build dir for compiled per OS debug code
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/debug/linux
+
+| DEBUG_OBJ_ALL
+| Absolute path to compiled common debug object files
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/debug/all/main.o
+
+| DEBUG_OBJ_PLATFORM
+| Absolute path to compiled per OS debug object files
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/debug/linux/message.o
+
+| DEBUG_APP_DIR
+| Absolute path to debug application dir
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/app/debug
+
+| DEBUG_APP
+| Absolute path to debug application dir
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/app/debug/app
+
+| DEBUG_APP_OPTS
+| Linker options to use when linking the debug application
+| Yes
+| 
+
+| RELEASE_COMPILE_OPTS
+| Options to pass to compiler for release mode of every source file
+| Yes
+| 
+
+| RELEASE_DIR_ALL
+| Absolute path to build dir for compiled common release code
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/release/all
+
+| RELEASE_DIR_PLATFORM
+| Absolute path to build dir for compiled per OS release code
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/release/linux
+
+| RELEASE_OBJ_ALL
+| Absolute path to compiled common release object files
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/release/all/main.o
+
+| RELEASE_OBJ_PLATFORM
+| Absolute path to compiled per OS release object files
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/release/linux/message.o
+
+| RELEASE_APP_DIR
+| Absolute path to release application dir
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/app/release
+
+| RELEASE_APP
+| Absolute path to release application dir
+| No
+| /home/user/git/tools/cross-compile/hello-cli/make/linux/build/app/release/app
+
+| RELEASE_APP_OPTS
+| Linker options to use when linking the release application
+| Yes
+| -s
+|===
+
+=== Targets
+
+[cols=4*]
+|===
+| Name
+| Purpose
+| Intended for user
+| Example generated command
+
+| all
+| Default target
+| Yes
+| Depends on debug and release applications
+
+| $(DEBUG_APP)
+| Link debug application
+| Yes
+| c++ -o /home/user/git/tools/cross-compile/hello-cli/make/linux/build/app/debug/app /home/user/git/tools/cross-compile/hello-cli/make/linux/build/debug/all/main.o /home/user/git/tools/cross-compile/hello-cli/make/linux/build/debug/linux/message.o
+
+| $(DEBUG_DIR_ALL)/%.o
+| Build common debug sources
+| Yes
+| c++ -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -DLINUX -g -DDEBUG -I/home/user/git/tools/cross-compile/hello-cli/include/all /home/user/git/tools/cross-compile/hello-cli/src/all/main.cpp -o /home/user/git/tools/cross-compile/hello-cli/make/linux/build/debug/all/main.o
+
+| $(DEBUG_DIR_PLATFORM)/%.o
+| Build per OS debug sources
+| Yes
+| c++ -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -DLINUX -g -DDEBUG -I/home/user/git/tools/cross-compile/hello-cli/include/all /home/user/git/tools/cross-compile/hello-cli/src/linux/message.cpp -o /home/user/git/tools/cross-compile/hello-cli/make/linux/build/debug/linux/message.o
+
+| $(DEBUG_DIR_ALL)
+| Create build directory for common debug objects
+| No
+| mkdir -p /home/user/git/tools/cross-compile/hello-cli/make/linux/build/debug/all
+
+| $(DEBUG_DIR_PLATFORM)
+| Create build directory for per OS debug objects
+| No
+| mkdir -p /home/user/git/tools/cross-compile/hello-cli/make/linux/build/debug/linux
+
+| $(DEBUG_APP_DIR)
+| Create directory for debug app
+| No
+| mkdir -p /home/user/git/tools/cross-compile/hello-cli/make/linux/build/app/debug
+
+| $(RELEASE_APP)
+| Link release application
+| Yes
+| c++ -o /home/user/git/tools/cross-compile/hello-cli/make/linux/build/app/debug/app /home/user/git/tools/cross-compile/hello-cli/make/linux/build/debug/all/main.o /home/user/git/tools/cross-compile/hello-cli/make/linux/build/release/linux/message.o
+
+| $(RELEASE_DIR_ALL)/%.o
+| Build common release sources
+| Yes
+| c++ -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -DLINUX -I/home/user/git/tools/cross-compile/hello-cli/include/all /home/user/git/tools/cross-compile/hello-cli/src/all/main.cpp -o /home/user/git/tools/cross-compile/hello-cli/make/linux/build/release/all/main.o
+
+| $(RELEASE_DIR_PLATFORM)/%.o
+| Build per OS release sources
+| Yes
+| c++ -std=c++14 -Wall -Wextra -pedantic -Wshadow -Weffc++ -Werror -c -MMD -DLINUX -I/home/user/git/tools/cross-compile/hello-cli/include/all /home/user/git/tools/cross-compile/hello-cli/src/linux/message.cpp -o /home/user/git/tools/cross-compile/hello-cli/make/linux/build/release/linux/message.o
+
+| $(RELEASE_DIR_ALL)
+| Create build directory for common release objects
+| No
+| mkdir -p /home/user/git/tools/cross-compile/hello-cli/make/linux/build/release/all
+
+| $(RELEASE_DIR_PLATFORM)
+| Create build directory for per OS release objects
+| No
+| mkdir -p /home/user/git/tools/cross-compile/hello-cli/make/linux/build/release/linux
+
+| $(RELEASE_APP_DIR)
+| Create directory for release app
+| No
+| mkdir -p /home/user/git/tools/cross-compile/hello-cli/make/linux/build/app/release
+
+| copy
+| Copy $(DEBUG_APP_DIR) and $(RELEASE_APP_DIR) to $(COPY)
+| Yes
+| cp -r $(DEBUG_APP_DIR) $(COPY); cp -r $(RELEASE_APP_DIR) $(COPY);
+
+| clean
+| Delete $(BUILD_DIR)
+| Yes
+| rm -rf /home/user/git/tools/cross-compile/hello-cli/make/linux/build
+
+| vars-generate
+| Regenerate vars target for per OS Makefile
+| Yes
+| Search for all NAME := VALUE lines in Makefile and replace lines beginning with > at end
+
+| vars
+| Print all per OS vars with a header identifying the OS
+| Yes
+| echo "PLATFORM_LC          = $(PLATFORM_LC)"
