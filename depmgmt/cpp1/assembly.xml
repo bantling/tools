@@ -1,0 +1,18 @@
+<assembly>
+  <id>library</id>
+  <formats>
+    <format>zip</format>
+  </formats>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <fileSets>
+    <fileSet>
+      <directory>build</directory>
+      <includes>
+        <include>cpp1</include>
+      </includes>
+      <outputDirectory>/</outputDirectory>
+      <fileMode>755</fileMode>
+    </fileSet>
+  </fileSets>
+</assembly>
+

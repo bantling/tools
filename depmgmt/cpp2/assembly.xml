@@ -1,0 +1,24 @@
+<assembly>
+  <id>library</id>
+  <formats>
+    <format>zip</format>
+  </formats>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <fileSets>
+    <fileSet>
+      <directory>include</directory>
+      <includes>
+        <include>*.h</include>
+      </includes>
+      <outputDirectory>/include</outputDirectory>
+    </fileSet>
+    <fileSet>
+      <directory>build</directory>
+      <includes>
+        <include>*.a</include>
+      </includes>
+      <outputDirectory>/lib</outputDirectory>
+    </fileSet>
+  </fileSets>
+</assembly>
+

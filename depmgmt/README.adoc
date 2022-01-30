@@ -1,0 +1,277 @@
+// SPDX-License-Identifier: Apache-2.0
+:doctype: article
+:include_h: build/*.h
+:build_a: build/*.a
+
+= Dependency Management for C++ using Maven and Nexus
+
+== How to test it
+
+=== Setup nexus docker container
+
+* docker pull sonatype/nexus3
+* docker create --name nexus -p 8081:8081 sonatype/nexus3
+* docker exec -it nexus cat /nexus-data/admin.password
+* Wait a minute or two for it to finish starting up, and then you can access it at localhost:8081 in a browser
+* Do admin tasks
+* Create a user deploy with password deploy and admin role
+
+=== Setup ~/.m2/settings.xml
+
+....
+echo "<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+          http://maven.apache.org/xsd/settings-1.0.0.xsd">
+  <servers>
+    <server>
+      <id>depmgmt</id>
+      <username>deploy</username>
+      <password>deploy</password>
+    </server>
+  </servers>
+</settings>
+" > ~/.m2/settings.xml
+....
+
+=== Compile and deploy dependencies in order
+
+* cpp1 depends on cpp2 depends on cpp3
+* Use following mvn commands to do stuff:
+** mvn clean: removes build dir
+** mvn generate-sources: pulls in deps for projects that have deps, does nothing for projects that have no deps
+** mvn compile: executes make, which uses Makefile
+** mvn package: creates build/cppX-1.0.0-SNAPSHOT.zip using assembly.xml
+** mvn deploy: deploys build/cppX-1.0.0-SNAPSHOT.zip to ca/my/company/project/cppX/1.0.0-SNAPSHOT
+
+Simplest shortest way to get all deps to compile and deploy:
+....
+for i in cpp3 cpp2 cpp1;do ( cd $i && mvn deploy ); done
+....
+
+=== Artifacts
+
+* cpp3/build/cpp3.a is a static lib
+* cpp2/build.cpp2.a is a static lib
+* cpp1/build/cpp1 is a binary that when run shows the string "Cpp1Cpp2-1Cpp3-2"
+
+=== How the build process works
+
+==== cpp3
+
+* Has no dependencies
+* Makefile
+** creates build dir
+** generates build/cpp3.o by compiling src/cpp3.cpp
+** generates build/cpp3.a static lib by adding cpp3.o to it
+
+==== cpp2
+
+* Depends on cpp3
+* Makefile
+** creates build/deps dir invoking mvn generate-sources
+** generates build/cpp2.o by compiling src/cpp2.cpp with -I build/deps/include to reference cpp3.h
+** generates build/cpp2.a static lib by adding build/cpp2.o to it
+
+==== cpp1
+
+* Depends on cpp2, which transitively depends on cpp3
+* Makefile
+** creates build/deps dir by invoking mvn generate-sources
+** generates build/cpp1.o by compiling src/cpp1.cpp with -I build/deps/include to reference cpp2.h
+** generates build/cpp1 executable by adding build/deps/lib/cpp2.a and build/deps/lib/cpp3.a to it
+
+=== How the Maven process works
+
+All poms have same settings for model version, group id, version, and packaging.
+The artifact id is cppX.
+The package type pom basically means "whatever I want, but I have to decribe how to create it.".
+By contrast, package type jar knows how to compile java code into class files, and create jars containing them.
+
+....
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>ca.my.company.project</groupId>
+  <artifactId>cpp1</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+....
+
+Dependencies for cpp1 and cpp2 are described mostly as usual, but with zip type and compile scope added.
+Technically, maven assembly plugin (shown farther down) can work with other compressed formats like gzip and bzip, but
+the dependency plugin only understands the zip compression format - there is no legal value of type for other formats.   
+
+....
+  <dependencies>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>cpp2</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
+      <type>zip</type>
+      <scope>compile</scope>
+    </dependency>
+  </dependencies>
+....
+
+A profile is necessary to configure maven var ${project.build.directory} needed elsewhere.
+
+....
+  <profiles>
+    <profile>
+        <id>build</id>
+        <activation>
+          <activeByDefault>true</activeByDefault>
+        </activation>
+        <build>
+            <directory>build</directory>
+        </build>
+    </profile>
+  </profiles>
+....
+
+The build is the most complex part, it has to describe:
+
+* execute generate-sources:unpack-dependencies, placing output into build/deps 
+* execute compile:exec using external make command
+* execute package:single using assembly.xml
+* execute deploy
+
+....
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.2.0</version>
+        <executions>
+          <execution>
+            <id>unpack dependencies</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>unpack-dependencies</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>
+                ${project.build.directory}/deps
+              </outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+          <execution>
+            <id>make</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <executable>make</executable>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.3.0</version>
+        <configuration>
+          <appendAssemblyId>false</appendAssemblyId>
+          <descriptors>
+            <descriptor>assembly.xml</descriptor>
+          </descriptors>
+        </configuration>
+        <executions>
+          <execution>
+            <id>make-assembly</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <version>2.8.2</version>
+      </plugin>
+    </plugins>
+  </build>
+....
+
+Finally, a repository has to be specified to deploy artifacts to and pull dependent artifacts from.
+
+....
+  <distributionManagement>
+    <repository>
+      <id>depmgmt</id>
+      <url>http://localhost:8081/repository/maven-snapshots</url>
+    </repository>
+  </distributionManagement>
+....
+
+The assembly.xml does the following:
+
+* Set the format to zip
+* Do not include base directory in zip
+* For cpp1:
+** add build/cpp1, file mode 755 to make it executable
+** Output directory within zip is /, which just means at the root of the zip  
+* For cpp2 and cpp3:
+** add {include_h} in zip directory include
+** add {build_a} in zip directory lib
+
+cpp1 assembly.xml:
+
+....
+<assembly>
+  <id>library</id>
+  <formats>
+    <format>zip</format>
+  </formats>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <fileSets>
+    <fileSet>
+      <directory>build</directory>
+      <includes>
+        <include>cpp1</include>
+      </includes>
+      <outputDirectory>/</outputDirectory>
+      <fileMode>755</fileMode>
+    </fileSet>
+  </fileSets>
+</assembly>
+....
+
+cpp2 assembly.xml (cpp3 is almost identical):
+
+....
+<assembly>
+  <id>library</id>
+  <formats>
+    <format>zip</format>
+  </formats>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <fileSets>
+    <fileSet>
+      <directory>include</directory>
+      <includes>
+        <include>*.h</include>
+      </includes>
+      <outputDirectory>/include</outputDirectory>
+    </fileSet>
+    <fileSet>
+      <directory>build</directory>
+      <includes>
+        <include>*.a</include>
+      </includes>
+      <outputDirectory>/lib</outputDirectory>
+    </fileSet>
+  </fileSets>
+</assembly>
+....
