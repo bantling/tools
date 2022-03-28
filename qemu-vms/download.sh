@@ -2,17 +2,23 @@
 
 # Show usage
 usage() {
-	echo "Usage: $0 -t freebsd [ -a | -d version | -c version ]
+	echo "Usage: $0 -t [ fbsd | wx ] [ -v version ] [ -a | -d | -c | -e ]
 
-Download an OS that requires manual installation or manipulation of a supplied image to make it
+Download an OS (or library for it) that requires manual installation or manipulation of a supplied image to make it
 possible to automate further changes to the OS with qemu.
 
-Currently, the only type of OS supported is FreeBSD, and only versions availabe at the this URL:
-https://download.freebsd.org/releases/VM-IMAGES
+Currently, the only type of OS supported is FreeBSD, and only versions available at the this URL:
+https://download.freebsd.org/releases/VM-IMAGES.
 
 By default, the latest version available is downloaded, which is the simply the last version
 listed on the above page. If a version is supplied with the -d or -c options, then it must one of the
 versions on the above page, or an error occurs.
+
+Currently, the only library supported is wxWidget, and only releases available at this URL:
+https://github.com/wxWidgets/wxWidgets/releases.
+
+If the -v option is passed, it selects a version, which may the word latest.
+If not passed, the default is latest.
 
 If the -a option is passed, it lists all versions available at above URL, to aid in deciding
 what version to pass with -d or -c on another execution. For each available version, it also shows
@@ -20,11 +26,12 @@ whether or not it is already downloaded.
 
 -d downloads the specified version and marks it read only unless it already exists.
 
--c create a child image, displays the commands to make the child image automatable via the console,
-and runs qemu to allow the user to manually execute the displayed commands. 
+-c creates a child image, displays the commands to make the child image automatable via the console,
+and runs qemu to allow the user to manually execute the displayed commands.
 
-If none of -a, -d, or -c are passed, the default action is -a.
-For -d and -c the version may be the word latest, in which case the latest version available is used. 
+-e runs the child image to see if it really is automatable  
+
+If none of -a, -d, -c, or -e are passed, the default action is -a. 
 "
 
 	exit 1  
@@ -32,25 +39,30 @@ For -d and -c the version may be the word latest, in which case the latest versi
 
 # Set vars
 vms_dir="$HOME/.qemu-vms"
-available="`curl -sL https://download.freebsd.org/releases/VM-IMAGES/ | grep -Po '(?<=href=")[^/]*' | sed '/^[^0-9]/d;s/-RELEASE//' | tac`"; \
-downloaded="`[ -d $vms_dir/freebsd ] && { cd $vms_dir/freebsd && ls *.qcow2 2> /dev/null; }`"
 type=
 version=latest
 
-# Display a simple report of available versions, and yes/no are they installed
-showAvailable() {
-	{
-		for a in $available; do
-			echo -n "$a "
-			for d in $downloaded; do
-			  [ "$a" = "$d" ] && { echo "Downloaded"; break; }
-			done
-			echo "Available"
-		done
-	}
+#### FreeBSD
+
+fbsd_getAvailable() {
+	fbsd_available="`curl -sL https://download.freebsd.org/releases/VM-IMAGES/ | grep -Po '(?<=href=")[^/]*' | sed '/^[^0-9]/d;s/-RELEASE//' | tac`";
 }
 
-saveVersion() {
+# Display a simple report of available versions, and yes/no are they installed
+fbsd_showAvailable() {
+	fbsd_getAvailable
+	fbsd_downloaded="`[ -d $vms_dir/freebsd ] && { cd $vms_dir/freebsd && ls *amd64.qcow2 2> /dev/null | sed -r 's/FreeBSD-([^-]*).*/\1/'; }`"
+	
+	for a in $fbsd_available; do
+		echo -n "$a Available"
+		for d in $fbsd_downloaded; do
+		  [ "$a" = "$d" ] && { echo -n " Downloaded "; break; }
+		done
+		echo
+	done
+}
+
+fbsd_saveVersion() {
 	# Create dir in case it does not exist
 	mkdir -p "$vms_dir/freebsd" || {
 		echo "Error: unable to create dir $vms_dir/freebsd"
@@ -59,7 +71,7 @@ saveVersion() {
 	
 	# Check if unarchived file exists. If so, we've already downloaded and extracted it.
 	if [ -f "$vms_dir/freebsd/FreeBSD-${version}-RELEASE-amd64.qcow2" ]; then
-		echo "That version is already downloaded and extracted"
+		echo "version ${version} is already downloaded and extracted"
 		return
 	fi
 	 
@@ -99,9 +111,9 @@ saveVersion() {
 	echo "Image downloaded, extracted, and marked as read only"
 }
 
-createAutomatedVersion() {
+fbsd_createAutomatedVersion() {
 	# Verify image we need to make automatable has been downloaded
-	[ "$vms_dir/freebsd/FreeBSD-${version}-RELEASE-amd64.qcow2" ] || {
+	[ -f "$vms_dir/freebsd/FreeBSD-${version}-RELEASE-amd64.qcow2" ] || {
 		echo "Error: that version has not been downloaded yet"
 		usage
 	}
@@ -116,8 +128,9 @@ createAutomatedVersion() {
 
 	# Provide user directions on how to change the automate image so it is suitable for automation
 	echo "Execute the following two commands in the automate image:
-echo 'console="comconsole"' > /boot/loader.conf
-echo 'autoboot_delay="0"' >> /boot/loader.conf"
+echo 'console="comconsole"' >> /boot/loader.conf
+echo 'autoboot_delay="0"' >> /boot/loader.conf
+halt -p"
 
 	# Run qemu with a separate window to allow user to manually boot and make changes
 	qemu-system-x86_64 \
@@ -129,35 +142,120 @@ echo 'autoboot_delay="0"' >> /boot/loader.conf"
 		-display gtk
 }
 
+fbsd_testAutomatedVersion() {
+	# Test automatable qemu image to see if it works
+	qemu-system-x86_64 \
+		-accel kvm \
+		-boot c \
+		-m 256 \
+		-drive file="$vms_dir/freebsd/FreeBSD-${version}-RELEASE-amd64-automate.qcow2",if=none,id=hd \
+		-device virtio-blk,drive=hd \
+		-display gtk
+}
+
+#### wxWidgets
+
+wx_getAvailable() {
+	wx_available="`
+		curl -sL https://api.github.com/repos/wxWidgets/wxWidgets/releases | jq -r '
+		  [
+		    .[].assets[]
+		    | {name, url: .browser_download_url}
+		    | select(.name | contains("wxWidgets"))
+		    | select(.name | contains("bz2"))
+		    | select(.name | contains("docs") | not)
+		    | . + {"name": .name | match("([0-9]+(?:[.][0-9]+)+)").captures[0].string}
+		  ] | sort_by(
+		        .name
+		        | split(".")
+		        | map(tonumber)
+		  ) | reverse
+		    | map(.name + "|" + .url)
+		    | @sh
+	    '
+	`" 
+}
+
+wx_showAvailable() {
+	wx_getAvailable 
+	wx_downloaded="`[ -d $vms_dir/wx ] && { cd $vms_dir/wx && ls *.tar.bz2 2> /dev/null; }`"
+	
+	for a in $wx_available; do
+	  # Strip single quotes jq provided around string
+	  a=${a#"'"}
+	  a=${a%"'"}
+	  
+	  # Seperate name|url into two vars
+	  name="${a%|*}"
+	  url="${a#*|}"
+	  
+	  echo "${name} Available"
+	done
+}
+
+#### Main
+
+type=
+op=
+fn="showAvailable"
+
+# Can only specify one operation 
+check_op() {
+	[ -z "${op}" ] || usage
+	
+	op="$1"
+}
+
 # Parse options
-fn=showAvailable
-while getopts "t:ad:c:" opt; do
+while getopts "t:v:adce" opt; do
   case "$opt" in
     t) type=$OPTARG;;
-    a) fn=showAvailable;;
-    d) fn=saveVersion; version=$OPTARG;;
-    c) fn=createAutomatedVersion; version=$OPTARG;;
+    v) version=$OPTARG;;
+    *) check_op "$opt";;
   esac
 done
 
-# Must specify type for future compatibility if other systems added
-[ -z "$type" ] && usage
+# Type must be freebsd or wx
+case "$type" in
+	freebsd) ;;
+	wx) ;;
+	*) usage;;
+esac
+
+# If no operation is provided, default to a (available)
+[ -n "${op}" ] || op="a"
+
+# Determine a function to call based on the op
+case "$op" in
+	a) fn=showAvailable;;
+	d) fn=saveVersion;;
+	c) fn=createAutomatedVersion;;
+	e) fn=testAutomatedVersion;;
+esac
 
 # If version is latest, choose first version available,
 # otherwise verify it is a valid version
 found=0
-for a in $available; do
-	if [ "$version" = "latest" -o "$version" = "$a" ]; then
-		version="$a"
-		found=1
-		break
-	fi
-done
-[ "$found" -eq 1 ] || {
-	echo "Error: version $version is not valid"
-	showAvailable
-	usage
-}
+case "$type" in
+	fbsd)
+		fbsd_getAvailable
+		for a in $fbsd_available; do
+			if [ "$version" = "latest" -o "$version" = "$a" ]; then
+				version="$a"
+				found=1
+				break
+			fi
+		done
+		
+		[ "$found" -eq 1 ] || {
+			echo "Error: version $version is not valid"
+			fbsd_showAvailable
+			usage
+		}
+		;;
+	wx)
+		;;
+esac
 
-# Execute chosen function, or showAvailable by default
-$fn
+# Execute function
+${type}_${fn}

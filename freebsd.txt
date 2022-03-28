@@ -1,0 +1,145 @@
+====
+User
+====
+- ensure newly created users don't show a random tip when logging in
+$ sed -i "" 's/\(.*fortune.*\)/#\1/' /usr/share/skel/dot.profile
+
+- create user "user" with password "user" in wheel group
+$ echo user | pw useradd -n user -c User -G wheel -h 0
+
+===
+SSH
+===
+- ssh is enabled by default
+$ pw
+ 
+- Host command to copy ssh key to machine
+$ cat ~/.ssh/id_ecdsa.pub | ssh -p 5222 localhost "mkdir ~/.ssh; chmod 0700 ~/.ssh; cat - > ~/.ssh/authorized_keys; chmod 0600 ~/.ssh/authorized_keys"
+
+- Disallow local login after testing ssh works
+$ pw usermod -n user -w no
+
+=============
+Modify a user
+=============
+- Use pw command
+- show user details
+$ pw usershow user -P
+
+- add a group
+$ pw usermod user -G <all secondary groups>
+
+===============
+Manage Packages
+===============
+- Use pkg command
+- First command will install pkg binary package list and configure it
+$ pkg search subversion
+
+- Update package list
+$ pkg update
+
+- Show package files
+$ pkg query '%Fp' postfix
+
+========
+Use bash
+========
+$ pkg install bash
+$ pw usermod -n root -s /usr/local/bin/bash
+$ pw usermod -n user -s /usr/local/bin/bash
+
+======================
+Initial system changes
+======================
+- Turn off auto boot delay
+$ echo -e '\nautoboot_delay=-1' >> /boot/loader.conf
+
+- Turn off all defaults
+$ echo >> /etc/rc.conf
+$ grep '="YES"' /etc/defaults.rc.conf | sed 's/="YES"/="NO"/' >> /etc/rc.conf
+- Review /etc/rc.conf and delete any NO lines of stuff that is wanted
+- reboot, and run "ps aux" to check running processes
+
+=======
+Postfix
+=======
+- Install postfix
+$ pkg install postfix
+
+- View install message
+$ pkg query %M postfix
+
+- Start postfix at boot
+$ sysrc postfix_enable="YES"
+
+- Disable sendmail stuff
+$ rm /etc/periodic/daily/150.clean-hoststat
+$ rm /etc/periodic/daily/460.status-mail-rejects
+$ rm /etc/periodic/daily/440.status-mailq
+$ rm /etc/periodic/daily/500.queuerun
+
+- Create regex access database
+$ echo '/[%!@].*[%!@]/ 550 Sender-specified routing rejected
+/[A-Za-z]+@bantling.me/ OK
+/.*/ REJECT' > /usr/local/etc/postfix/access.regex
+
+- Create hash virtual mailbox database
+$ echo 'greghall@bantling.me greghall/
+ann@bantling.me ann/' > /usr/local/etc/postfix/vmailbox.bantling.me
+$ postmap /usr/local/etc/postfix/vmailbox.bantling.me
+
+- Create hash virtual aliases database
+$ echo 'postmaster: greghall
+the.dude: greghall' > /usr/local/etc/postfix/valiases.bantling.me
+$ postalias /usr/local/etc/postfix/valiases.bantling.me
+
+- Create virtual mailbox dirs
+$ install -d -o postfix -g postfix -m 775 /var/mail/vhosts
+$ install -d -o postfix -g postfix -m 775 /var/mail/vhosts/greghall
+$ install -d -o postfix -g postfix -m 775 /var/mail/vhosts/ann
+
+- Create main.cf config file
+$ echo 'compatibility_level=3.6
+myorigin=bantling.me
+mydestination=localhost
+mynetworks_style=class
+smtpd_sender_restrictions=
+  reject_non_fqdn_sender
+smtpd_recipient_restrictions=
+  reject_non_fqdn_recipient,
+  check_recipient_access regexp:/usr/local/etc/postfix/access.regex
+virtual_mailbox_domains = bantling.me
+virtual_mailbox_base = /var/mail/vhosts
+virtual_mailbox_maps = hash:/usr/local/etc/postfix/vmailbox.bantling.me
+virtual_minimum_uid = 100
+virtual_uid_maps = static:125
+virtual_gid_maps = static:125
+virtual_alias_maps = hash:/usr/local/etc/postfix/valiases.bantling.me
+' > /usr/local/etc/postfix/main.cf
+
+- Create /etc/aliases.db
+$ postaliases
+
+- Reload postfix to pickup above changes
+$ postfix reload
+
+- Add bantling.me to /etc/hosts for 127.0.0.1
+
+- Test sending an email to user named "user"
+telnet localhost 25
+EHLO bob.me
+MAIL FROM: user@bob.me
+RCPT TO: user@bantling.me
+DATA
+Subject: testing
+
+This is a test
+.
+QUIT
+
+- To view mail queue to see if anything is waiting to be sent (shd show no mails, as it delivers very fast)
+$ postqueue -p
+
+- To delete mail queue
+$ postsuper -d ALL
