@@ -12,7 +12,7 @@ The following steps are required (the script has lots of comments for more detai
 
 * mkdir archlinux
 * cd archlinux
-* curl -LO https://github.com/bantling/tools/blob/master/qemu-vms/mac-m1-qemu-arch-arm.sh
+* curl -LO https://raw.githubusercontent.com/bantling/tools/master/qemu-vms/mac-m1-qemu-arch-arm.sh
 * chmod +x mac-m1-archlinux-arm.sh
 * ./mac-m1-archlinux-arm.sh
 * Wait for VM to complete booting and autologin, and enter next command sequence
