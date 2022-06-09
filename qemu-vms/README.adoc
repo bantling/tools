@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: Apache-2.0
+:doctype: article
+
+= QEMU VMs
+
+The files in this directory are related to creating QEMU VMs.
+
+== mac-m1-archlinux-arm.sh
+
+A self contained script to create an Arch Linux ARM 64 QEMU VM for an M1 Mac.
+The following steps are required (the script has lots of comments for more details):
+
+* mkdir archlinux
+* cd archlinux
+* curl -LO https://github.com/bantling/tools/blob/master/qemu-vms/mac-m1-archlinux-arm.sh
+* chmod +x mac-m1-archlinux-arm.sh
+* ./mac-m1-archlinux-arm.sh
+* Wait for VM to complete booting and autologin, and enter next command sequence
+* mount /dev/vda1 /mnt && /mnt/setup.sh
+* When the VM quits, enter next command on Mac host for first boot of new Arch Linux VM
+* ./run.sh
+* When VM starts, quickly hit ESC to enter EFI BIOS
+* Choose Boot Manager
+* Choose EFI Shell
+* Wait for 5 second delay, then startup.nsh executes
+* Login as root/root, and enter next few commands
+* First command alters EFI BIOS Boot Order so VM comes first
+* Second command resizes EXT4 filesystem to fill the unused space of the virtual HD
+* ./set-boot.sh
+* ./resize.sh
+* halt -p
+* On Mac host, execute ./run.sh again
+* The VM now boots into the Arch Linux VM without using the EFI BIOS
+* Once your satisfied it works, you can remove the temp directory to save some disk space
+* The set-boot.sh script can be executed anytime in the future if somehow the EFI boot order is wrong
+* The resize.sh script can be executed anytime in the future after expanding the size of the virtual hard disk on the host
+* The host virtual hard disk is initially 8GB (sparse and compressed to about 550MB), and can be expanded as follows:
+* qemu-img resize archlinux.qcow2 +8G
+
+Enjoy!
