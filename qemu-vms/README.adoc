@@ -45,6 +45,7 @@ If you drag the icon into the Dock, it may display some other icon, like the "se
 If you rerun the mac-m1-qemu-arch-arm.sh script, it will generate a new archlinux.qcow2 image.
 
 The run.sh script forwards two ports:
+
 * host port 2222 to guest port 22 for SSH (preconfigured in the VM)
 * host port 4445 to guest port 445 in case you want to run Samba (have to install yourself)
 
