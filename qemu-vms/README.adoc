@@ -30,11 +30,24 @@ The following steps are required (the script has lots of comments for more detai
 * ./resize.sh
 * halt -p
 * On Mac host, execute ./run.sh again
-* The VM now boots into the Arch Linux VM without using the EFI BIOS
+* The VM now boots into the Arch Linux VM without using the EFI Shell
 * Once your satisfied it works, you can remove the temp directory to save some disk space
 * The set-boot.sh script can be executed anytime in the future if somehow the EFI boot order is wrong
 * The resize.sh script can be executed anytime in the future after expanding the size of the virtual hard disk on the host
 * The host virtual hard disk is initially 8GB (sparse and compressed to about 550MB), and can be expanded as follows:
 * qemu-img resize archlinux.qcow2 +8G
+
+The script downloads an application bundle ArchLinux.app that can be run from the Finder or Dock.
+The correct icon for the bundle is a blue Arch Linux "A".
+The icon is probably not showing correctly after the download. To fix that, duplicate the bundle, delete the original bundle, and rename the duplicate to ArchLinux.app.
+If you drag the icon into the Dock, it may display some other icon, like the "sewing mat" icon (has lines and circles in it). To fix that, remove it from the Dock and copy it to the Dock again. You may need to restart and try removing/adding to the Dock again.
+
+If you rerun the mac-m1-qemu-arch-arm.sh script, it will generate a new archlinux.qcow2 image
+
+The run.sh script forwards two ports:
+host port 2222 to guest port 22 for SSH (preconfigured in the VM)
+host port 4445 to guest port 445 in case you want to run Samba (have to install yourself)
+
+The script uses the showcursor=on display option in case you want to run X windows.
 
 Enjoy!

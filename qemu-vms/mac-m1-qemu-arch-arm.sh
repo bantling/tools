@@ -45,10 +45,20 @@ set -eu
 # efivars.img     - EFI BIOS image needed to store persistent EFI vars like boot order
 # QEMU_EFI.img    - EFI BIOS image needed to boot Arch Linux ARM
 # run.sh          - script to run archlinux.qcow2 with QEMU
+# ArchLinux.app   - Mac OS Application Bundle to run the VM from the Finder or Dock
 
 # The following files are needed temporarily, and are deleted when the process completes:
 # temp/archlinuxinstall.img - Installer image needed to generate the bootable image
 # temp/install.sh           - script to run archlinuxinstall.img with QEMU to generate archlinux.qcow2
+
+cleanup() {
+	[ -z "$imgdev" ] || {
+		hdiutil detach "$imgdev"
+	}
+	imgdev=
+}
+
+trap cleanup EXIT INT
 
 # cd to dir of this script
 cd "`dirname "$0"`"
@@ -235,12 +245,15 @@ qemu-img resize archlinux.qcow2 8G
 
 echo Unmounting FAT filesystem...
 hdiutil detach "$imgdev"
+imgdev=
 
 echo Generating run.sh script to launch QEMU with generated archlinux.qcow2...
 cat << END > run.sh
 #!/bin/zsh
 
-qemu-system-aarch64 \\
+cd "\`dirname "\$0"\`"
+
+"`which qemu-system-aarch64`" \\
 	-cpu host \\
 	-accel hvf \\
 	-M virt \\
@@ -249,12 +262,34 @@ qemu-system-aarch64 \\
 	-drive if=pflash,media=disk,file=efivars.img,cache=writethrough,format=raw \\
 	-device virtio-gpu-pci \\
 	-drive file=archlinux.qcow2,if=virtio \\
+	-netdev user,id=vnet,hostfwd=tcp::2222-:22,hostfwd=tcp::4445-:445 \\
+	-device virtio-net-pci,netdev=vnet \\
 	-device qemu-xhci \\
 	-device usb-kbd \\
 	-device usb-tablet \\
-	-display cocoa
+	-display cocoa,show-cursor=on
 
 END
 chmod +x run.sh
 
-echo "Done. Execute run.sh to launch QEMU with generated archlinux.img"
+echo Downloading App Bundle...
+curl -Lo - https://raw.githubusercontent.com/bantling/tools/master/qemu-vms/ArchLinux.app.xz | tar xJf -
+
+echo "Done
+
+On first boot, do the following:
+- Execute run.sh to launch QEMU with generated archlinux.img
+- Quickly switch to the VM, hit Esc, and choose Boot Manager > EFI Internal Shell
+- Wait 5 second delay to run startup.nsh
+- Login as root/root, and execute the following commands:
+  ./set-boot.sh
+  ./resize.sh
+- Future boots will just boot up without having to use the EFI Internal Shell
+
+The run.sh script has the following useful features:
+- Forwards host port 2222 to guest port 22 for SSH (ssh is preconfigured to startup)
+- Forwards host port 4445 to guest port 445 for Samba (you have to install that yourself)
+- Uses the display option show-cursor=on in case you want to run a graphical X system
+
+There is a ArchLinux.app bundle that can be run from the Finder or Dock.
+See https://raw.githubusercontent.com/bantling/tools/master/qemu-vms/README.adoc for details."
