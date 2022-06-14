@@ -42,11 +42,11 @@ The correct icon for the bundle is a blue Arch Linux "A".
 The icon is probably not showing correctly after the download. To fix that, duplicate the bundle, delete the original bundle, and rename the duplicate to ArchLinux.app.
 If you drag the icon into the Dock, it may display some other icon, like the "sewing mat" icon (has lines and circles in it). To fix that, remove it from the Dock and copy it to the Dock again. You may need to restart and try removing/adding to the Dock again.
 
-If you rerun the mac-m1-qemu-arch-arm.sh script, it will generate a new archlinux.qcow2 image
+If you rerun the mac-m1-qemu-arch-arm.sh script, it will generate a new archlinux.qcow2 image.
 
 The run.sh script forwards two ports:
-host port 2222 to guest port 22 for SSH (preconfigured in the VM)
-host port 4445 to guest port 445 in case you want to run Samba (have to install yourself)
+* host port 2222 to guest port 22 for SSH (preconfigured in the VM)
+* host port 4445 to guest port 445 in case you want to run Samba (have to install yourself)
 
 The script uses the showcursor=on display option in case you want to run X windows.
 
