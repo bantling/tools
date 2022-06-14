@@ -51,6 +51,6 @@ The run.sh script forwards two ports:
 
 The script uses the showcursor=on display option in case you want to run X windows.
 
-The ArchLinux.app bundle runs the run.sh script, so any changes you make to run.sh affect the VM whether yor un it from the command line, Finder, or Dock.
+The ArchLinux.app bundle runs the run.sh script, so any changes you make to run.sh affect the VM whether yor run it from the command line, Finder, or Dock.
 
 Enjoy!
