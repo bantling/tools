@@ -7,6 +7,8 @@ The files in this directory are related to creating QEMU VMs.
 
 == mac-m1-archlinux-arm.sh
 
+Last Tested: Jan 4, 2023 on MacOS Ventura
+
 A self contained script to create an Arch Linux ARM 64 QEMU VM for an M1 Mac.
 The following steps are required (the script has lots of comments for more details):
 
