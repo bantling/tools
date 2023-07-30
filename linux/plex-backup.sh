@@ -12,7 +12,7 @@ Since the config dir contains a lot of symbolic links, and strange filenames tha
 it is always backd up as a tar file, which is always recreated even if no changes have occurred.
 
 The music/[everything except all] dirs are symbolic links used to create collections for each user without
-havingmto copy files. They are backed up as empty dirs.
+having to copy files. They are backed up as empty dirs.
 
 Some movies are larger than 4GB, the max file size on a FAT system. Such movies are split into max 4GB chunks
 that are named filename-0, filename-1, etc (eg movie.mkv-0, movie.mkv-1, ...).
@@ -75,7 +75,7 @@ rm -f /tmp/backup-ops.sh
 		#### Files whose names end in a dash and digit (eg .mkv-0) are the result of splitting a big file, skip them.
 		echo "Scanning $i..."
 		(cd /srv/plex; find "$i" -type f -size -4294967296c -printf '%p:%TY-%Tm-%TdT%TI:%TM:00\n' | sort > /tmp/plex.txt)
-		find "$i" -type f -size -4294967296c \! -name '*-[0-9]' -printf '%p:%TY-%Tm-%TdT%TI:%TM:00\n' | sort > /tmp/backup.txt
+		(cd /mnt/backup; find "$i" -type f -size -4294967296c \! -name '*-[0-9]' -printf '%p:%TY-%Tm-%TdT%TI:%TM:00\n' | sort > /tmp/backup.txt)
 
 		# New files - create copies of above files with timestamp stripped for existence comparison
 		awk -F: '{print $1}' /tmp/plex.txt > /tmp/plex-nodate.txt
@@ -96,7 +96,7 @@ rm -f /tmp/backup-ops.sh
 		#### Search plex for movie file and use name as is (eg *.mkv)
 		#### Search in backup for files exactly 4GB - 1 byte in size ending in -0 (eg *.mkv-0), which are the first chunk, and use that chunk's date, removing the -0 from the filename.
 		(cd /srv/plex; find "$i" -type f -size +4294967295c -printf '%p:%TY-%Tm-%TdT%TI:%TM:00\n' | sort > /tmp/plex-big.txt)
-		find "$i" -type f -size 4294967295c -name '*-0' -printf '%p:%TY-%Tm-%TdT%TI:%TM:00\n' | sed -r 's,(.*)-0:,\1:,' | sort > /tmp/backup-big.txt
+		(cd /mnt/backup; find "$i" -type f -size 4294967295c -name '*-0' -printf '%p:%TY-%Tm-%TdT%TI:%TM:00\n' | sed -r 's,(.*)-0:,\1:,' | sort > /tmp/backup-big.txt)
 
 		# New big files
 		awk -F: '{print $1}' /tmp/plex-big.txt > /tmp/plex-nodate-big.txt
@@ -133,6 +133,6 @@ rm -f /tmp/backup-ops.sh
 		sed -r 's,(.*),echo "Removing dir \1"; rm -f "\1",' >> /tmp/backup-ops.sh
 }
 
-# Execute generated script
-bash /tmp/backup-ops.sh
+# Echo command to Execute generated script
+echo bash /tmp/backup-ops.sh
 
