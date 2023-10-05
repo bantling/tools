@@ -1,0 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+:doctype: article
+
+= Cross compiling WX Widgets applications
+
+A Makefile and Dockerfile are provided for building a cross-compiling container

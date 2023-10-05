@@ -3,7 +3,7 @@
 
 = Cross compiling applications
 
-* <<docker-crossbuild-wx/Makefile#, cross compile WX Widgets library for Linux, Windows, MacOS, and FreeBSD>>
+* <<docker-crossbuild-wx/README.adoc#, cross compile WX Widgets library for Linux, Windows, MacOS, and FreeBSD>>
 * <<hello-cli/README.adoc#, cross compile Hello, World CLI app for Linux, Windows, MacOS, and FreeBSD>>
 * <<hello-cli-wx/README.adoc#, cross compile Hello, World WX CLI for Linux, Windows, MacOS, and FreeBSD>>
 
