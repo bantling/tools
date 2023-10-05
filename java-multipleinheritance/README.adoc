@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+:doctype: article
+
+= Java Multiple Inheritance
+
+Simple Java code that achieves multiple inheritance:
+
+* An interface can derive from multiple interfaces
+* An interface method can have a default implementation
