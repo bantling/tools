@@ -9,7 +9,7 @@ A collection of useful tools, see the following files:
 * <<cross-compile/README.adoc#, Cross Compile>>
 * <<depmgmt/README.adoc#, Dependency Management>>
 * <<java-multipleinheritance/README.adoc#, Java Multiple Inheritance>>
-* <<linux/plex-backup.sh#, A script to back up plex photos, music, videos, and movies to a backup device>>
+* link:linux/plex-backup.sh, A script to back up plex photos, music, videos, and movies to a backup device>>
 * <<podman-test/Makefile#, A Makefile to test podman, works on Windows, OS X, and Linux>>
 * <<postgresql/docs/README.adoc#, Single Table Storage>>
 * <<qemu-vms/README.adoc#, QEMU VM creation>>
