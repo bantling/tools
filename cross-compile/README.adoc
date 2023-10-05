@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+:doctype: article
+
+= Cross compiling applications
+
+* <<docker-crossbuild-wx#, cross compile WX Widgets library for Linux, Windows, MacOS, and FreeBSD>>
+* <<hello-cli/README.adoc#, cross compile Hello, World for Linux, Windows, MacOS, and FreeBSD>>
+* <<hello-cli-wx/README.adoc#, cross compile Hello, World for Linux, Windows, MacOS, and FreeBSD>>
+
+The cli-wx version does not actually use wx widgets yet.
