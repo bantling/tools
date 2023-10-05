@@ -5,5 +5,11 @@
 
 Simple Java code that achieves multiple inheritance:
 
+* An interface can have a getter method that returns an object that contains fields of data
+* An interface method can have a default implementation that calls above getter, and operates on the fields of it
 * An interface can derive from multiple interfaces
-* An interface method can have a default implementation
+* A class can implement the above multiple interfaces by satisfying their getter methods with appropriate object instances
+* The class IS each interface
+* The class HAS the behaviour of each interface
+* The class can resolve any conflicts where more than interface has the same method, by overriding it and choosing which
+  interface method(s) to call
