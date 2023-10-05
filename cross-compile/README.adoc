@@ -3,8 +3,8 @@
 
 = Cross compiling applications
 
-* <<docker-crossbuild-wx#, cross compile WX Widgets library for Linux, Windows, MacOS, and FreeBSD>>
-* <<hello-cli/README.adoc#, cross compile Hello, World for Linux, Windows, MacOS, and FreeBSD>>
-* <<hello-cli-wx/README.adoc#, cross compile Hello, World for Linux, Windows, MacOS, and FreeBSD>>
+* <<docker-crossbuild-wx/Makefile#, cross compile WX Widgets library for Linux, Windows, MacOS, and FreeBSD>>
+* <<hello-cli/README.adoc#, cross compile Hello, World CLI app for Linux, Windows, MacOS, and FreeBSD>>
+* <<hello-cli-wx/README.adoc#, cross compile Hello, World WX CLI for Linux, Windows, MacOS, and FreeBSD>>
 
 The cli-wx version does not actually use wx widgets yet.
