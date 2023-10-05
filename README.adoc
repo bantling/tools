@@ -10,6 +10,6 @@ A collection of useful tools, see the following files:
 * link:depmgmt/README.adoc[Dependency Management] for cpp code using Maven
 * link:java-multipleinheritance/README.adoc[Java Multiple Inheritance]
 * link:linux/plex-backup.sh[plex-backup.sh], A script to back up plex photos, music, videos, and movies to a backup device
-* link:podman-test/Makefile[A Makefile to test podman], works on Windows, OS X, and Linux
+* link:podman-test/Makefile[A Makefile] to test podman, works on Windows, OS X, and Linux
 * link:postgresql/docs/README.adoc[Single Table Storage] in Postgres
 * link:qemu-vms/README.adoc[QEMU VM creation]
