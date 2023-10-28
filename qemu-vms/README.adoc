@@ -56,3 +56,26 @@ The script uses the showcursor=on display option in case you want to run X windo
 The ArchLinux.app bundle runs the run.sh script, so any changes you make to run.sh affect the VM whether yor run it from the command line, Finder, or Dock.
 
 Enjoy!
+
+== qemu-arch-x86.sh and qemu-arch-x86_64-expect.sh
+
+A shell and expect script that generate a bootable Arch Linux image with the following features:
+
+* Uses UUID for mounting root
+* One partition for boot, bootloader, and root
+* Networking setup
+* Can use virtio or sata interface for disk image and network interface
+* Uses syslinux bootloader
+* Installs pacman packages from 1 week prior to date script is run, to avoid issues that occasionally occur with todays packages
+
+The qemu-arch-x86.sh script requires zsh shell, which Mac OS X  uses by default. The script should work on other systems,
+just change the shell to bash.
+
+Just run the qemu-arch-x86.sh, and it will:
+
+* Download latest iso installer
+* Download latest b2sum
+* Verify generated b2sum matches downloaded sum
+* Create an 8GB raw disk image named archlinux-x86_64.img
+
+Enjoy!
