@@ -4,7 +4,6 @@
 set prompt "*@archiso*~*#* "
 set chroot_prompt "*root@archiso* "
 set timeout -1
-#spawn qemu-system-x86_64 -cdrom /tmp/archlinux-x86_64.iso -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw -nic user -nographic
 spawn qemu-system-x86_64 -cdrom /tmp/archlinux-x86_64.iso -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci -nographic
 match_max 100000
 expect "*Automatic boot in*"
@@ -58,7 +57,7 @@ expect_before "*SubState=exited*" {
 }
 expect $prompt {
     sleep 10
-    send -- "systemctl show pacman-init.service | grep SubState | cat\r"
+    send -- "systemctl show pacman-init.service | grep SubState\r"
     exp_continue
 }
 expect $prompt
@@ -76,11 +75,11 @@ send -- "ln -sf /usr/share/zoneinfo/UTC /etc/localtime\r"
 expect $chroot_prompt
 send -- "hwclock --systohc\r"
 expect $chroot_prompt
-send -- "echo en_US.UTF-8 UTF-8 >> /etc/locale.gen\r"
+send -- "echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen\r"
 expect $chroot_prompt
 send -- "locale-gen\r"
 expect $chroot_prompt
-send -- "echo LANG=en_US.UTF-8 > /etc/locale.conf\r"
+send -- "echo 'LANG=en_US.UTF-8' > /etc/locale.conf\r"
 expect $chroot_prompt
 send -- "echo arch-qemu > /etc/hostname\r"
 expect $chroot_prompt
