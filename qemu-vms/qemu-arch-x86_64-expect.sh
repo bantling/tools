@@ -4,7 +4,7 @@
 set prompt "*@archiso*~*#* "
 set chroot_prompt "*root@archiso* "
 set timeout -1
-spawn qemu-system-x86_64 -cdrom /tmp/archlinux-x86_64.iso -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci -nographic
+spawn qemu-system-x86_64 -cdrom [lindex $argv 0] -cpu qemu64 -m 2048 -drive file=[lindex $argv 1],format=raw,if=virtio -nic user,model=virtio-net-pci -nographic
 match_max 100000
 expect "*Automatic boot in*"
 send -- "\t"
@@ -50,16 +50,10 @@ expect $prompt
 send -- "cat /tmp/pacman.conf\r"
 expect $prompt
 send -- "echo waiting for pacman keyring init to be done\r"
-# Found this snippet to wait for key ring init to complete at https://bbs.archlinux.org/viewtopic.php?id=283075
-expect_before "*SubState=exited*" {
-    expect $prompt
-    send -- "pacstrap -K -C /tmp/pacman.conf /mnt base linux linux-firmware syslinux networkmanager\r"
-}
-expect $prompt {
-    sleep 10
-    send -- "systemctl show pacman-init.service | grep SubState\r"
-    exp_continue
-}
+expect $prompt
+send -- "while \[ \! `systemctl show pacman-init.service | grep SubState=exited` \]; do echo ...; sleep 10; done\r"
+expect $prompt
+send -- "pacstrap -K -C /tmp/pacman.conf /mnt base linux linux-firmware syslinux networkmanager\r"
 expect $prompt
 send -- "genfstab -U /mnt >> /mnt/etc/fstab\r"
 expect $prompt
