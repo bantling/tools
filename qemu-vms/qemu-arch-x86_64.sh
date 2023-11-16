@@ -6,7 +6,7 @@ set -eu
 usage() {
   [ -z "$1" ] || { echo $1 }
 
-  echo "$0: [ -n hdImage ] [-e {extraFiles}* ] [-s hdSize ] [ -zfs ] [ -expand ]
+  echo "$0: [ -n hdImage ] [-e {extraFile}+ ] [-p {extraPackage}+ ] [-s hdSize ] [ -zfs ] [ -expand ]
 
 Arguments must be provided in above order.
 
@@ -19,7 +19,9 @@ If one or more extraFiles are provided, they are added to the generated image at
 
 -n hdImage: The name of the image to generate. The default name is archlinux-x86_64.img.
 
--e extraFiles: Optional additional files to place in /install.
+-e extraFile(s): Optional additional files to place in /install.
+
+-p extraPackage(s): Optional additional packages to install above minimum requried to boot and use networking
 
 -s hdSize: Specifies the size of image to create, default is 8GB. The hdSize value must be acceptable to qemu-img create.
   If extra files are provided with -e, the actual image size will be the given hdSize + the size of all extra files.
@@ -70,7 +72,7 @@ hdImage="archlinux-x86_64.img"
 }
 
 # Are there extra files?
-extraFiles=()
+set -A extraFiles
 [[ ! -v 1 ]] || [ "$1" != "-e" ] || {
   [[ -v 2 ]] || {
     usage "-e must be followed by at least one extra file"
@@ -78,9 +80,24 @@ extraFiles=()
 
   shift
 
-  while [[ -v 1 ]] && [ "$1" != "-s" -a "$1" != "-zfs" -a "$1" != "-expand" ]; do {
+  while [[ -v 1 ]] && [ "$1" != "-p" -a "$1" != "-s" -a "$1" != "-zfs" -a "$1" != "-expand" ]; do {
     [ -f "$1" ] || usage "-e: file \"$1\" does not exist"
-    extraFiles+=("$1")
+    extraFiles+="$1"
+    shift
+  }; done
+}
+
+# Are there extra packages?
+set -A extraPackages
+[[ ! -v 1 ]] || [ "$1" != "-p" ] || {
+  [[ -v 2 ]] || {
+    usage "-p must be followed by at least one extra package"
+  }
+
+  shift
+
+  while [[ -v 1 ]] && [ "$1" != "-s" -a "$1" != "-zfs" -a "$1" != "-expand" ]; do {
+    extraPackages+="$1"
     shift
   }; done
 }
@@ -104,7 +121,7 @@ zfs=0
   shift
 }
 
-# Are we copying an installer image into the new image?
+# Are we copying an expand script into the image?
 expand=0
 [[ ! -v 1 ]] || [ "$1" != "-expand" ] || {
   expand=1
@@ -116,6 +133,18 @@ expand=0
   usage "Unrecognized parameters: $@"
 }
 
+# Calculate size of any extra files to add to the image size
+extraSize=0
+for f in ${extraFiles}; do
+  ((extraSize += `du -k "$f" | awk '{print $1}'`))
+done
+
+# Generate a disk image name to contain the extra files
+extraImage="(no extra files image)"
+[ ${#extraFiles[@]} -eq 0 ] || {
+  extraImage="`echo -n "$hdImage" | awk -F. '{print $1}'`-extra.img"
+}
+
 # iso and checksum files
 isoImage="/tmp/archlinux-x86_64.iso"
 isoDlSum="/tmp/archlinux-x86_64.iso.b2sum"
@@ -123,11 +152,14 @@ isoGenSum="${isoDlSum}.gen"
 
 # Display parameters, ask user to confirm
 echo "Parameters:
-hdImage    = ${hdImage}
-extraFiles = ${extraFiles}
-hdSize     = ${hdSize}
-zfs        = `yn ${zfs}`
-expand     = `yn ${expand}`
+hdImage       = ${hdImage}`[ ! -f ${hdImage} ] || echo -n ' (overwrite)'`
+extraImage    = ${extraImage}
+extraFiles    = ${extraFiles}
+extraPackages = ${extraPackages}
+hdSize        = ${hdSize}
+extraSize     = ${extraSize}K (added to hdSize to ensure image is large enough for extraFiles)
+zfs           = `yn ${zfs}`
+expand        = `yn ${expand}`
 "
 
 proceed=
@@ -160,6 +192,35 @@ curl https://mirror.csclub.uwaterloo.ca/archlinux/iso/latest/b2sums.txt | grep a
 # Create a disk image to install arch into. Recreate each time in case a previous run failed.
 echo "Creating virtual disk image"
 qemu-img create -f raw "$hdImage" "$hdSize"
+
+[ ${extraSize} -eq 0 ] || {
+  echo "Adding ${extraSize}K to disk image for extra files"
+  qemu-img resize -f raw "$hdImage" "+${extraSize}K"
+
+  echo "Creating extra file disk image"
+  # The minimum size for OSX is more than 32MB (33MB fails, 34MB is ok)
+  # Make sure it is at least 64MB just to be safe
+  # 64MB = 65536K
+  
+  qemu-img create -f raw "$extraImage" "$((extraSize + 64))K"
+
+  echo "Creating a FAT filesystem in extra file disk image"
+  extraDev="`hdiutil attach -nomount ${extraImage} | tr -d " \t"`"
+  diskutil partitionDisk "$extraDev" MBR FAT32 EXTRA_FILES R
+  extraMountPoint="`diskutil info "${extraDev}s1" | grep "Mount Point" | awk '{print $3}'`"
+
+  echo -n "Copying extra files into extra file disk image"
+  for f in ${extraFiles}; do
+    cp "$f" "$extraMountPoint"
+    echo -n "."
+  done
+  echo
+
+  echo "Unmounting extra file disk image"
+  hdituil detach "${extraDev}"
+}
+
+exit
 
 # Fire up a VM to install arch, using downloaded ISO and generated disk image
 echo "Running expect script"
