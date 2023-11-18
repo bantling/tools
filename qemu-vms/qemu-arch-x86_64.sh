@@ -4,7 +4,7 @@ set -eu
 # Script to setup an Arch Linux x86_86 virtual image by scripting an ISO installer via the emulated serial port with an expect script
 
 usage() {
-  [ -z "$1" ] || { echo $1 }
+  [ -z "$1" ] || { echo -e "\nERROR: $1\n" }
 
   echo "$0: [ -n hdImage ] [-e {extraFile}+ ] [-p {extraPackage}+ ] [-s hdSize ] [ -zfs ] [ -expand ]
 
@@ -133,16 +133,33 @@ expand=0
   usage "Unrecognized parameters: $@"
 }
 
-# Calculate size of any extra files to add to the image size
-extraSize=0
-for f in ${extraFiles}; do
-  ((extraSize += `du -k "$f" | awk '{print $1}'`))
-done
-
 # Generate a disk image name to contain the extra files
-extraImage="(no extra files image)"
+extraImage=""
 [ ${#extraFiles[@]} -eq 0 ] || {
   extraImage="`echo -n "$hdImage" | awk -F. '{print $1}'`-extra.img"
+}
+
+# Ensure that the extraImage was not listed in the extra files.
+# Calculate size of any extra files to add to the image size.
+extraFileSize=0
+for f in ${extraFiles}; do
+  [ "$f" != "$extraImage" ] || {
+    usage "-e cannot specify the extra file disk image $extraImage"
+  }
+
+  ((extraFileSize += `du -k "$f" | awk '{print $1}'`))
+done
+
+# Round up extraFileSize to a multiple of 4K to be safe
+[ $((extraFileSize % 4)) -eq 0 ] || {
+  ((extraFileSize = (extraFileSize / 4 + 1) * 4))
+}
+
+# The minimum size for OSX to partition a FAT filesystem is more than 32MB (33MB fails, 34MB is ok).
+# Make sure it is at least 64MB (65536K) just to be safe.
+extraImageSize=$extraFileSize
+[ $extraImageSize -eq 0 -o $extraImageSize -ge 65536 ] || {
+  extraImageSize=65536
 }
 
 # iso and checksum files
@@ -151,23 +168,26 @@ isoDlSum="/tmp/archlinux-x86_64.iso.b2sum"
 isoGenSum="${isoDlSum}.gen"
 
 # Display parameters, ask user to confirm
-echo "Parameters:
-hdImage       = ${hdImage}`[ ! -f ${hdImage} ] || echo -n ' (overwrite)'`
-extraImage    = ${extraImage}
-extraFiles    = ${extraFiles}
-extraPackages = ${extraPackages}
-hdSize        = ${hdSize}
-extraSize     = ${extraSize}K (added to hdSize to ensure image is large enough for extraFiles)
-zfs           = `yn ${zfs}`
-expand        = `yn ${expand}`
+echo -n "Parameters:
+hdImage        = ${hdImage}`[ ! -f ${hdImage} ] || echo -n ' (overwrite)'`
+hdSize         = ${hdSize}"
+
+[ -z "$extraImage" ] || echo -n "
+extraImage     = ${extraImage}
+extraFiles     = ${extraFiles}
+extraFileSize  = ${extraFileSize}K (added to hdSize to ensure image is large enough for extraFiles)
+extraPackages  = ${extraPackages}
+extraImageSize = ${extraImageSize}K (minimum 65536K for partitioning)"
+
+echo "
+zfs            = `yn ${zfs}`
+expand         = `yn ${expand}`
 "
 
 proceed=
-
 while [[ ! "$proceed" =~ [YyNn] ]]; do {
   read -q "proceed?Do you want to continue? (y/n)"
 }; done
-
 [[ "$proceed" =~ [Yy] ]] || exit
 
 # Always download the b2sum for installer iso, there may be a newer installer
@@ -190,40 +210,38 @@ curl https://mirror.csclub.uwaterloo.ca/archlinux/iso/latest/b2sums.txt | grep a
 }
 
 # Create a disk image to install arch into. Recreate each time in case a previous run failed.
-echo "Creating virtual disk image"
+echo -e "\nCreating virtual disk image"
 qemu-img create -f raw "$hdImage" "$hdSize"
 
-[ ${extraSize} -eq 0 ] || {
-  echo "Adding ${extraSize}K to disk image for extra files"
-  qemu-img resize -f raw "$hdImage" "+${extraSize}K"
+[ ${extraFileSize} -eq 0 ] || {
+  echo -e "\nAdding ${extraFileSize}K to disk image for extra files"
+  qemu-img resize -f raw "$hdImage" "+${extraFileSize}K"
 
-  echo "Creating extra file disk image"
-  # The minimum size for OSX is more than 32MB (33MB fails, 34MB is ok)
-  # Make sure it is at least 64MB just to be safe
-  # 64MB = 65536K
-  
-  qemu-img create -f raw "$extraImage" "$((extraSize + 64))K"
+  echo -e "\nCreating extra file disk image"
+  qemu-img create -f raw "$extraImage" "$((extraImageSize + 64))K"
 
-  echo "Creating a FAT filesystem in extra file disk image"
+  echo -e "\nCreating a FAT filesystem in extra file disk image"
   extraDev="`hdiutil attach -nomount ${extraImage} | tr -d " \t"`"
   diskutil partitionDisk "$extraDev" MBR FAT32 EXTRA_FILES R
   extraMountPoint="`diskutil info "${extraDev}s1" | grep "Mount Point" | awk '{print $3}'`"
 
-  echo -n "Copying extra files into extra file disk image"
+  echo -en "\nCopying extra files into extra file disk image"
   for f in ${extraFiles}; do
     cp "$f" "$extraMountPoint"
     echo -n "."
   done
   echo
 
-  echo "Unmounting extra file disk image"
-  hdituil detach "${extraDev}"
+  echo -e "\nUnmounting extra file disk image"
+  hdiutil detach "${extraDev}"
 }
 
-exit
-
 # Fire up a VM to install arch, using downloaded ISO and generated disk image
-echo "Running expect script"
-./qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage"
+echo -e "\nRunning expect script"
+if [ -z "$extraImage" ]; then
+  ./qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage"
+else
+  ./qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage" "$extraImage"
+fi
 #qemu-system-x86_64 -cdrom "$isoImage" -cpu qemu64 -m 2048 -drive file="$hdimage",format=raw,if=virtio -nic user,model=virtio-net-pci
 #qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci
