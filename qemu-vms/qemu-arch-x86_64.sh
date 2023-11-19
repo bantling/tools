@@ -4,7 +4,7 @@ set -eu
 # Script to setup an Arch Linux x86_86 virtual image by scripting an ISO installer via the emulated serial port with an expect script
 
 usage() {
-  [ -z "$1" ] || { echo -e "\nERROR: $1\n" }
+  [ "$#" -eq 0 ] || { echo -e "\nERROR: $1\n" }
 
   echo "$0: [ -n hdImage ] [-e {extraFile}+ ] [-p {extraPackage}+ ] [-s hdSize ] [ -zfs ] [ -expand ]
 
@@ -243,5 +243,7 @@ if [ -z "$extraImage" ]; then
 else
   ./qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage" "$extraImage"
 fi
+
 #qemu-system-x86_64 -cdrom "$isoImage" -cpu qemu64 -m 2048 -drive file="$hdimage",format=raw,if=virtio -nic user,model=virtio-net-pci
+#qemu-system-x86_64 -cdrom /tmp/archlinux-x86_64.iso -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci
 #qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci

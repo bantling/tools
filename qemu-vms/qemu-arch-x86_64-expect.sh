@@ -32,21 +32,7 @@ send "root\r"
 
 # Partition disk to have one BIOS ext4 bootable partition
 expect $prompt
-send "fdisk /dev/vda\r"
-expect "Command (m for help): "
-send "n\r"
-expect "Select (default p): "
-send "\r"
-expect "Partition number (1-4, default 1): "
-send "\r"
-expect "First sector*: "
-send "\r"
-expect "Last sector*: "
-send "\r"
-expect "Command (m for help): "
-send "a\r"
-expect "Command (m for help): "
-send "w\r"
+send "sgdisk -n 1:0:0 -A 1:set:2 /dev/vda\r"
 
 # Make an ext4 filesystem
 expect $prompt
@@ -55,9 +41,6 @@ send "mkfs.ext4 /dev/vda1\r"
 # Mount ext4 filesystem
 expect $prompt
 send "mount /dev/vda1 /mnt\r"
-
-expect $prompt
-send "echo dude \r"
 
 # Generate pacman.conf file
 expect $prompt
@@ -86,8 +69,13 @@ expect $prompt
 send "while \[ \! `systemctl show pacman-init.service | grep SubState=exited` \]; do echo ...; sleep 10; done\r"
 
 # Run pacstrap to install basic system, just enough to get a bootable system with networking
+# Add:
+# gptfdisk (provides sgdisk)
+# e2fsprogs (provides resize2fs)
+# which (provides which command, very useful)
+# So that bootable system can resize partition and fs
 expect $prompt
-send "pacstrap -K -C /tmp/pacman.conf /mnt base linux linux-firmware syslinux networkmanager\r"
+send "pacstrap -K -C /tmp/pacman.conf /mnt base linux linux-firmware syslinux networkmanager gptfdisk e2fsprogs which\r"
 
 # Generate fstab file using partiton uuid for mounting root
 expect $prompt
@@ -137,7 +125,7 @@ send "syslinux-install_update -i -a -m\r"
 
 # Install MBR code
 expect $chroot_prompt
-send "dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/bios/mbr.bin of=/dev/vda\r"
+send "dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/bios/gptmbr.bin of=/dev/vda\r"
 
 # Modify default bootloader entry to point to the root partition UUID from the fstab file
 expect $chroot_prompt
