@@ -247,3 +247,4 @@ fi
 #qemu-system-x86_64 -cdrom "$isoImage" -cpu qemu64 -m 2048 -drive file="$hdimage",format=raw,if=virtio -nic user,model=virtio-net-pci
 #qemu-system-x86_64 -cdrom /tmp/archlinux-x86_64.iso -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci
 #qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci
+#qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -drive file=archlinux-x86_64-extra.img,format=raw,if=virtio -nic user,model=virtio-net-pci

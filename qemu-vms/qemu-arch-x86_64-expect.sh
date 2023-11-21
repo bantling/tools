@@ -70,12 +70,13 @@ send "while \[ \! `systemctl show pacman-init.service | grep SubState=exited` \]
 
 # Run pacstrap to install basic system, just enough to get a bootable system with networking
 # Add:
+# vim (editing text files)
 # gptfdisk (provides sgdisk)
 # e2fsprogs (provides resize2fs)
 # which (provides which command, very useful)
 # So that bootable system can resize partition and fs
 expect $prompt
-send "pacstrap -K -C /tmp/pacman.conf /mnt base linux linux-firmware syslinux networkmanager gptfdisk e2fsprogs which\r"
+send "pacstrap -K -C /tmp/pacman.conf /mnt base linux linux-firmware syslinux networkmanager vim gptfdisk e2fsprogs which\r"
 
 # Generate fstab file using partiton uuid for mounting root
 expect $prompt
