@@ -5,17 +5,8 @@ set prompt "*@archiso*~*#* "
 set chroot_prompt "*root@archiso* "
 set timeout -1
 
-# Start qemu with iso image to boot from, disk image to install Arch into, and possibly an extra files disk image
-puts "numargs = [llength $argv] [lindex $argv 2]"
-if { [llength $argv] == 2 } {
-  # Without extra files disk image
-  puts "no extra files"
-  spawn qemu-system-x86_64 -cdrom [lindex $argv 0] -cpu qemu64 -m 2048 -drive file=[lindex $argv 1],format=raw,if=virtio -nic user,model=virtio-net-pci -nographic
-} else {
-  # With extra files disk image
-  puts "extra files"
-  spawn qemu-system-x86_64 -cdrom [lindex $argv 0] -cpu qemu64 -m 2048 -drive file=[lindex $argv 1],format=raw,if=virtio -drive file=[lindex $argv 2],format=raw,if=virtio -nic user,model=virtio-net-pci -nographic
-}
+# Start qemu with iso image to boot from, disk image to install Arch into, and extra files disk image
+spawn qemu-system-x86_64 -cdrom [lindex $argv 0] -cpu qemu64 -m 2048 -drive file=[lindex $argv 1],format=raw,if=virtio -drive file=[lindex $argv 2],format=raw,if=virtio -nic user,model=virtio-net-pci -nographic
 
 # Wait for boot loader
 match_max 100000
@@ -69,14 +60,14 @@ expect $prompt
 send "while \[ \! `systemctl show pacman-init.service | grep SubState=exited` \]; do echo ...; sleep 10; done\r"
 
 # Run pacstrap to install basic system, just enough to get a bootable system with networking
-# Add:
+# Add a few other things:
 # vim (editing text files)
-# gptfdisk (provides sgdisk)
-# e2fsprogs (provides resize2fs)
 # which (provides which command, very useful)
-# So that bootable system can resize partition and fs
+# parted (provides parted needed by resize.sh)
+# expect (provides expect needed by resize.sh)
+# e2fsprogs (provides resize2fs needed by resize.sh)
 expect $prompt
-send "pacstrap -K -C /tmp/pacman.conf /mnt base linux linux-firmware syslinux networkmanager vim gptfdisk e2fsprogs which\r"
+send "pacstrap -K -C /tmp/pacman.conf /mnt base linux linux-firmware syslinux networkmanager vim which parted expect e2fsprogs\r"
 
 # Generate fstab file using partiton uuid for mounting root
 expect $prompt
@@ -150,20 +141,18 @@ send "root\r"
 expect "Retype new password: "
 send "root\r"
 
-# Copy extra files, if there are any
-if { [llength $argv] >= 3 } {
-  # mount second drive on /mnt - note this is /mnt inside ext4 system, not /mnt of iso system we booted from
-  expect $chroot_prompt
-  send "echo Copying files from extra files disk image to /install\r"
-  expect $chroot_prompt
-  send "mount /dev/vdb1 /mnt\r"
-  expect $chroot_prompt
-  send "mkdir /install\r"
-  expect $chroot_prompt
-  send "cp /mnt/* /install\r"
-  expect $chroot_prompt
-  send "umount /mnt\r"
-}
+# Copy extra files - there is always at least a resize.sh script
+# Mount second drive on /mnt - note this is /mnt inside new arch-chroot ext4 system, not /mnt of iso system we booted from
+expect $chroot_prompt
+send "echo Copying files from extra files disk image to /install\r"
+expect $chroot_prompt
+send "mount /dev/vdb1 /mnt\r"
+expect $chroot_prompt
+send "mkdir /install\r"
+expect $chroot_prompt
+send "cp -r /mnt/* /install\r"
+expect $chroot_prompt
+send "umount /mnt\r"
 
 # Exit arch-chroot
 expect $chroot_prompt

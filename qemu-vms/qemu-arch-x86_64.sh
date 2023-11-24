@@ -15,7 +15,7 @@ extensions, it is used as is, else the extension img is added. If hdImage exists
 image after verifying with a prompt.
 
 If one or more extraFiles are provided, they are added to the generated image at /install, otherwise there is no
-/install dir.
+/install dir. Files and directories can be provided.
 
 -n hdImage: The name of the image to generate. The default name is archlinux-x86_64.img.
 
@@ -81,7 +81,7 @@ set -A extraFiles
   shift
 
   while [[ -v 1 ]] && [ "$1" != "-p" -a "$1" != "-s" -a "$1" != "-zfs" -a "$1" != "-expand" ]; do {
-    [ -f "$1" ] || usage "-e: file \"$1\" does not exist"
+    [ -f "$1" -o -d "$1" ] || usage "-e: file od dir \"$1\" does not exist"
     extraFiles+="$1"
     shift
   }; done
@@ -133,18 +133,15 @@ expand=0
   usage "Unrecognized parameters: $@"
 }
 
-# Generate a disk image name to contain the extra files
-extraImage=""
-[ ${#extraFiles[@]} -eq 0 ] || {
-  extraImage="`echo -n "$hdImage" | awk -F. '{print $1}'`-extra.img"
-}
+# Always generate a disk image name to contain the extra files - there is always the resize.sh script.
+extraImage="`echo -n "$hdImage" | awk -F. '{print $1}'`-extra.img"
 
 # Ensure that the extraImage was not listed in the extra files.
 # Calculate size of any extra files to add to the image size.
 extraFileSize=0
 for f in ${extraFiles}; do
   [ "$f" != "$extraImage" ] || {
-    usage "-e cannot specify the extra file disk image $extraImage"
+    usage "-e cannot specify the extra file disk image itself ($extraImage)"
   }
 
   ((extraFileSize += `du -k "$f" | awk '{print $1}'`))
@@ -158,7 +155,7 @@ done
 # The minimum size for OSX to partition a FAT filesystem is more than 32MB (33MB fails, 34MB is ok).
 # Make sure it is at least 64MB (65536K) just to be safe.
 extraImageSize=$extraFileSize
-[ $extraImageSize -eq 0 -o $extraImageSize -ge 65536 ] || {
+[ $extraImageSize -ge 65536 ] || {
   extraImageSize=65536
 }
 
@@ -172,14 +169,14 @@ echo -n "Parameters:
 hdImage        = ${hdImage}`[ ! -f ${hdImage} ] || echo -n ' (overwrite)'`
 hdSize         = ${hdSize}"
 
-[ -z "$extraImage" ] || echo -n "
+[ ${#extraFiles[@]} -eq 0 ] || echo -n "
 extraImage     = ${extraImage}
 extraFiles     = ${extraFiles}
 extraFileSize  = ${extraFileSize}K (added to hdSize to ensure image is large enough for extraFiles)
-extraPackages  = ${extraPackages}
 extraImageSize = ${extraImageSize}K (minimum 65536K for partitioning)"
 
-echo "
+echo -n "
+extraPackages  = ${extraPackages}
 zfs            = `yn ${zfs}`
 expand         = `yn ${expand}`
 "
@@ -216,33 +213,35 @@ qemu-img create -f raw "$hdImage" "$hdSize"
 [ ${extraFileSize} -eq 0 ] || {
   echo -e "\nAdding ${extraFileSize}K to disk image for extra files"
   qemu-img resize -f raw "$hdImage" "+${extraFileSize}K"
+}
 
-  echo -e "\nCreating extra file disk image"
-  qemu-img create -f raw "$extraImage" "$((extraImageSize + 64))K"
+# Always create an extra files disk image, as we always have the expand.sh script
+echo -e "\nCreating extra files disk image"
+qemu-img create -f raw "$extraImage" "$((extraImageSize + 64))K"
 
-  echo -e "\nCreating a FAT filesystem in extra file disk image"
-  extraDev="`hdiutil attach -nomount ${extraImage} | tr -d " \t"`"
-  diskutil partitionDisk "$extraDev" MBR FAT32 EXTRA_FILES R
-  extraMountPoint="`diskutil info "${extraDev}s1" | grep "Mount Point" | awk '{print $3}'`"
+echo -e "\nCreating a FAT filesystem in extra files disk image"
+extraDev="`hdiutil attach -nomount ${extraImage} | tr -d " \t"`"
+diskutil partitionDisk "$extraDev" MBR FAT32 EXTRA_FILES R
+extraMountPoint="`diskutil info "${extraDev}s1" | grep "Mount Point" | awk '{print $3}'`"
 
-  echo -en "\nCopying extra files into extra file disk image"
+echo -e "\nCopying resize.sh script into extra files disk image"
+cp qemu-arch-x86_64-resize.sh "${extraMountPoint}/resize.sh"
+
+[ ${extraFileSize} -eq 0 ] || {
+  echo -en "\nCopying specified files into extra files disk image"
   for f in ${extraFiles}; do
-    cp "$f" "$extraMountPoint"
+    cp -r "${f}" "${extraMountPoint}"
     echo -n "."
   done
   echo
-
-  echo -e "\nUnmounting extra file disk image"
-  hdiutil detach "${extraDev}"
 }
 
-# Fire up a VM to install arch, using downloaded ISO and generated disk image
+echo -e "\nUnmounting extra files disk image"
+hdiutil detach "${extraDev}"
+
+# Fire up a VM to install arch, using downloaded ISO, generated disk image, and generated extra files image
 echo -e "\nRunning expect script"
-if [ -z "$extraImage" ]; then
-  ./qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage"
-else
-  ./qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage" "$extraImage"
-fi
+./qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage" "$extraImage"
 
 #qemu-system-x86_64 -cdrom "$isoImage" -cpu qemu64 -m 2048 -drive file="$hdimage",format=raw,if=virtio -nic user,model=virtio-net-pci
 #qemu-system-x86_64 -cdrom /tmp/archlinux-x86_64.iso -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci
