@@ -1,0 +1,22 @@
+\c mydb
+
+-- Helper functions
+/*
+-- Concat values with spaces using CONCAT_WS, but declare the result immutable
+CREATE OR REPLACE FUNCTION myapp_concat_ws(VALS VARIADIC TEXT[]) RETURNS TEXT
+LANGUAGE SQL
+IMMUTABLE
+PARALLEL SAFE
+RETURNS NULL ON NULL INPUT
+RETURN CONCAT_WS(', ', VARIADIC VALS);
+
+-- Concat values with spaces using CONCAT_WS, but declare the result immutable
+CREATE OR REPLACE FUNCTION myapp_ts_concat_ws(VALS VARIADIC TEXT[]) RETURNS TSVECTOR
+LANGUAGE SQL
+IMMUTABLE
+PARALLEL SAFE
+RETURNS NULL ON NULL INPUT
+RETURN TO_TSVECTOR('SIMPLE', CONCAT_WS(' ', VARIADIC VALS));
+*/
+
+\q
