@@ -13,3 +13,27 @@ A collection of useful tools, see the following files:
 * link:podman-test/Makefile[A Makefile] to test podman, works on Windows, OS X, and Linux
 * link:postgresql/docs/README.adoc[Single Table Storage] in Postgres
 * link:qemu-vms/README.adoc[QEMU VM creation]
+
+TODO:
+
+* For qemu-vms/qemu-arch-x86_64.sh:
+  * download files to current dir, not /tmp - /tmp gets deleted regularly, causing more downloads
+  * resize script shd optionally check for prompt about live filesystem, so it works for non-live filesystems
+  * set boot loader timeout to 1 second
+  * create user named user, with password user
+  * add ssh options
+    * copy existing SSH public key to /home/user/.ssh = 0700/authorized_keys = 0600
+    * generate new key at /home/user/.ssh/id_ecdsa.{pub,}
+  * add zfs support
+    * additional FAT 250MB partition for booting, fs label is BOOT1
+    * create zpool named zpool-(generated UUID)
+    * ensure it has autoexpand on so it can auto expand if disk image and partition size are increased
+    * zpool has one device of /dev/disk/by-partuuid/{part uuid}
+    * create dataset zpool-(generated UUID)/root with compression on using latest algorithm
+    * create zvol for swap space, 16GB in size (shows as /dev/zd0 at runtime)
+    * root has legacy mountpoint of /mnt/other
+    * fstab has no entry for root
+    * fstab has swap entry
+      /dev/zvol/zboot/swap    none            swap            discard                 0 0
+    * set bootloader to use zfs pool
+    * resize script supports zfs

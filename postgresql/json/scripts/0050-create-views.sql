@@ -30,12 +30,13 @@ $$ LANGUAGE SQL;
 
 -- myapp.save_customer_addresses
 --
--- save a customer and their addressses
+-- save aray of customers and their addressses
 -- each customer and all associated addresses must have an id that is a valid uuid
+--
 -- returns a json object containing the following:
 --   - numberOfErrors: the number of customers that failed to save
 --   - ids: array of ids for each failed save
-CREATE OR REPLACE PROCEDURE myapp.set_customer_addresses(p_data JSONB, OUT p_res JSONB) AS
+CREATE OR REPLACE PROCEDURE myapp.save_customer_addresses(p_data JSONB, OUT p_res JSONB) AS
 $$
 BEGIN
   -- Validate data is an array

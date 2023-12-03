@@ -26,23 +26,30 @@ usage() {
 # Get last partition number of device
 lastPart="`lsblk -nlo PARTN "$1" | tail -n 1 | awk '{print $1}'`"
 
-# Ensure last partition is an EXT4 filesystem
-[ "`lsblk -ndo FSTYPE "$1$lastPart"`" = "ext4" ] || usage "$1$lastPart is not an ext4 filesystem"
-
 # Automate parted resizing of mounted partition
 echo 'set timeout -1
 spawn parted '"$1"'
 match_max 100000
 expect "*(parted) "
 send "resizepart\r"
-expect "*Fix/Ignore? "
-send "f\r"
-expect "*Partition number? "
-send '"$lastPart\r"'
-expect "*Yes/No? "
-send "y\r"
-expect "*\]? "
-send "100%\r"
+expect {
+  "*Fix/Ignore? " {
+    send "f\r"
+    exp_continue
+  }
+  "*Partition number? " {
+    send '"$lastPart\r"'
+  }
+}
+expect {
+  "*Yes/No? " {
+    send "y\r"
+    exp_continue
+  }
+  "*\]? " {
+    send "100%\r"
+  }
+}
 expect "*(parted) "
 send "w\r"
 expect "*(parted) "
@@ -50,8 +57,16 @@ send "q\r"
 expect eof
 ' | expect
 
-# Resize filesystem
-resize2fs "$1$lastPart"
+# Is it an EXT4 filesystem?
+[ "`lsblk -ndo FSTYPE "$1$lastPart"`" != "ext4" ] || {
+  # If the fs is unmounted, check the filesystem to be certain resizing will work
+  [ -n "`lsblk -ndo MOUNTPOINTS "$1$lastpart"`" ] || {
+    e2fsck "$1$lastPart"
+  }
 
-# Show new size
-df -h "$1$lastPart"
+  # Resize filesystem
+  resize2fs "$1$lastPart"
+
+  # Show new size
+  df -h "$1$lastPart"
+}

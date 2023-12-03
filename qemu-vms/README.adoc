@@ -57,19 +57,36 @@ The ArchLinux.app bundle runs the run.sh script, so any changes you make to run.
 
 Enjoy!
 
-== qemu-arch-x86.sh and qemu-arch-x86_64-expect.sh
+== qemu-arch-x86*.sh
 
-A shell and expect script that generate a bootable Arch Linux image with the following features:
+[cols="1,1"]
+|===
+|File
+|Purpose
 
-* Uses UUID for mounting root
+
+|qemu-arch-x86_64.sh
+|Create a bootable Arch Linux x86_64 8GB image
+
+|qemu-arch-x86_64-expect.sh
+|Expect script used to automate the Arch Linux installer
+
+|qemu-arch-x86_64-resize.sh
+|Resize script located at /install/resize.sh inside generated image
+|===
+
+Scripts that generate a bootable Arch Linux x86_64 image with the following features:
+
+* Uses partition UUID for mounting root
 * One partition for boot, bootloader, and root
 * Networking setup
 * Can use virtio or sata interface for disk image and network interface
 * Uses syslinux bootloader
 * Installs pacman packages from 1 week prior to date script is run, to avoid issues that occasionally occur with todays packages
+* Installs packages needed for resize script
 
-The qemu-arch-x86.sh script requires zsh shell, which Mac OS X  uses by default. The script should work on other systems,
-just change the shell to bash.
+The qemu-arch-x86.sh script requires zsh shell, which Mac OS X uses by default. The script depends on some OS X commands
+for (un)mounting a filesystem in an image.
 
 Just run the qemu-arch-x86.sh, and it will:
 
