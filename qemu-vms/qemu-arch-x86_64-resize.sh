@@ -60,8 +60,8 @@ expect eof
 # Is it an EXT4 filesystem?
 [ "`lsblk -ndo FSTYPE "$1$lastPart"`" != "ext4" ] || {
   # If the fs is unmounted, check the filesystem to be certain resizing will work
-  [ -n "`lsblk -ndo MOUNTPOINTS "$1$lastpart"`" ] || {
-    e2fsck "$1$lastPart"
+  [ -n "`lsblk -ndo MOUNTPOINTS "$1$lastPart"`" ] || {
+    e2fsck -f "$1$lastPart"
   }
 
   # Resize filesystem
