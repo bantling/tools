@@ -6,22 +6,15 @@ set -eu
 usage() {
   [ "$#" -eq 0 ] || { echo -e "\nERROR: $1\n" }
 
-  echo "$0: [ -n hdImage ] [-e {extraFile}+ ] [-p {extraPackage}+ ] [-s hdSize ] [ -zfs ] [ -expand ]
+  echo "$0: [ -n hdImage ] [-s hdSize ] [ -zfs ]
 
 Arguments must be provided in above order.
 
 Generates a bootable Arch Linux x86_64 virtual image named {hdImage} using qemu. If hdImage already has one or more
-extensions, it is used as is, else the extension img is added. If hdImage exists, it is overwritten with a new blank
+extensions, it is used as is, else the extension .img is added. If hdImage exists, it is overwritten with a new blank
 image after verifying with a prompt.
 
-If one or more extraFiles are provided, they are added to the generated image at /install, otherwise there is no
-/install dir. Files and directories can be provided.
-
 -n hdImage: The name of the image to generate. The default name is archlinux-x86_64.img.
-
--e extraFile(s): Optional additional files to place in /install.
-
--p extraPackage(s): Optional additional packages to install above minimum requried to boot and use networking
 
 -s hdSize: Specifies the size of image to create, default is 8GB. The hdSize value must be acceptable to qemu-img create.
   If extra files are provided with -e, the actual image size will be the given hdSize + the size of all extra files.
@@ -30,12 +23,8 @@ If one or more extraFiles are provided, they are added to the generated image at
   guarantee that it will not conflict with any other generated zfs image. The root dataset will
   be zpool-{partitionUUID}/root.
 
--expand: Adds an /install/expand.sh script to automatically expand the last partition of a disk to the remaining space
-  on the disk, mount the partition, and expand the filesystem to fill the partition. This is particularly useful with
-  -e generatedImage, where generatedImage is another bootable image embedded inside this generated image. This image can
-  be copied to a USB stick, plugged into a physical machine, and the embedded generated image in /install can be copied
-  to the physical hard drive. The /install/expand.sh script can then be executed to expand the physical filesystem to
-  fill the remaining space.
+  A /root/resize.sh script is installed that can automatically expand the last partition of a disk to the remaining
+  space on the disk, and if the partition has an ext4 filesystem, expand it to fill the partition.
 "
   exit
 }
@@ -71,37 +60,6 @@ hdImage="archlinux-x86_64.img"
   shift
 }
 
-# Are there extra files?
-set -A extraFiles
-[[ ! -v 1 ]] || [ "$1" != "-e" ] || {
-  [[ -v 2 ]] || {
-    usage "-e must be followed by at least one extra file"
-  }
-
-  shift
-
-  while [[ -v 1 ]] && [ "$1" != "-p" -a "$1" != "-s" -a "$1" != "-zfs" -a "$1" != "-expand" ]; do {
-    [ -f "$1" -o -d "$1" ] || usage "-e: file od dir \"$1\" does not exist"
-    extraFiles+="$1"
-    shift
-  }; done
-}
-
-# Are there extra packages?
-set -A extraPackages
-[[ ! -v 1 ]] || [ "$1" != "-p" ] || {
-  [[ -v 2 ]] || {
-    usage "-p must be followed by at least one extra package"
-  }
-
-  shift
-
-  while [[ -v 1 ]] && [ "$1" != "-s" -a "$1" != "-zfs" -a "$1" != "-expand" ]; do {
-    extraPackages+="$1"
-    shift
-  }; done
-}
-
 # Is there a custom image size?
 hdSize="8G"
 [[ ! -v 1 ]] || [ "$1" != "-s" ] || {
@@ -121,42 +79,9 @@ zfs=0
   shift
 }
 
-# Are we copying an expand script into the image?
-expand=0
-[[ ! -v 1 ]] || [ "$1" != "-expand" ] || {
-  expand=1
-  shift
-}
-
 # Any more parameters are an error
 [ "$#" -eq 0 ] || {
   usage "Unrecognized parameters: $@"
-}
-
-# Always generate a disk image name to contain the extra files - there is always the resize.sh script.
-extraImage="`echo -n "$hdImage" | awk -F. '{print $1}'`-extra.img"
-
-# Ensure that the extraImage was not listed in the extra files.
-# Calculate size of any extra files to add to the image size.
-extraFileSize=0
-for f in ${extraFiles}; do
-  [ "$f" != "$extraImage" ] || {
-    usage "-e cannot specify the extra file disk image itself ($extraImage)"
-  }
-
-  ((extraFileSize += `du -k "$f" | awk '{print $1}'`))
-done
-
-# Round up extraFileSize to a multiple of 4K to be safe
-[ $((extraFileSize % 4)) -eq 0 ] || {
-  ((extraFileSize = (extraFileSize / 4 + 1) * 4))
-}
-
-# The minimum size for OSX to partition a FAT filesystem is more than 32MB (33MB fails, 34MB is ok).
-# Make sure it is at least 64MB (65536K) just to be safe.
-extraImageSize=$extraFileSize
-[ $extraImageSize -ge 65536 ] || {
-  extraImageSize=65536
 }
 
 # iso and checksum files
@@ -164,21 +89,20 @@ isoImage="/tmp/archlinux-x86_64.iso"
 isoDlSum="/tmp/archlinux-x86_64.iso.b2sum"
 isoGenSum="${isoDlSum}.gen"
 
+# Get the ssh public key
+sshPubKey=
+haveSSHPubKey=0
+[ ! -f $HOME/.ssh/id_ecdsa.pub ] || {
+  sshPubKey="`cat $HOME/.ssh/id_ecdsa.pub`"
+  haveSSHPubKey=1
+}
+
 # Display parameters, ask user to confirm
 echo -n "Parameters:
-hdImage        = ${hdImage}`[ ! -f ${hdImage} ] || echo -n ' (overwrite)'`
-hdSize         = ${hdSize}"
-
-[ ${#extraFiles[@]} -eq 0 ] || echo -n "
-extraImage     = ${extraImage}
-extraFiles     = ${extraFiles}
-extraFileSize  = ${extraFileSize}K (added to hdSize to ensure image is large enough for extraFiles)
-extraImageSize = ${extraImageSize}K (minimum 65536K for partitioning)"
-
-echo -n "
-extraPackages  = ${extraPackages}
-zfs            = `yn ${zfs}`
-expand         = `yn ${expand}`
+hdImage         = ${hdImage}`[ ! -f ${hdImage} ] || echo -n ' (overwrite)'`
+hdSize          = ${hdSize}
+zfs             = `yn ${zfs}`
+install SSH Key = `yn ${haveSSHPubKey}`
 "
 
 proceed=
@@ -189,12 +113,12 @@ while [[ ! "$proceed" =~ [YyNn] ]]; do {
 
 # Always download the b2sum for installer iso, there may be a newer installer
 echo -e "\n\nDownloading ISO checksum"
-curl https://mirror.csclub.uwaterloo.ca/archlinux/iso/latest/b2sums.txt | grep archlinux-x86_64.iso | awk '{print $1}' > "$isoDlSum"
+curl https://arch.mirror.winslow.cloud/iso/latest/b2sums.txt | grep archlinux-x86_64.iso | awk '{print $1}' > "$isoDlSum"
 
 # If there is already a generated checksum that differs from the downloaded one, then there is a newer installer
 { [ -f "$isoImage" -a -f "$isoGenSum" ] && diff "$isoDlSum" "$isoGenSum" > /dev/null } || {
   echo "Downloading ISO"
-  curl "https://mirror.csclub.uwaterloo.ca/archlinux/iso/latest/archlinux-x86_64.iso" -o "$isoImage"
+  curl "https://arch.mirror.winslow.cloud/iso/latest/archlinux-x86_64.iso" -o "$isoImage"
 
   echo "Generating checksum"
   b2sum "$isoImage" | awk '{print $1}' > "$isoGenSum"
@@ -210,40 +134,9 @@ curl https://mirror.csclub.uwaterloo.ca/archlinux/iso/latest/b2sums.txt | grep a
 echo -e "\nCreating virtual disk image"
 qemu-img create -f raw "$hdImage" "$hdSize"
 
-[ ${extraFileSize} -eq 0 ] || {
-  echo -e "\nAdding ${extraFileSize}K to disk image for extra files"
-  qemu-img resize -f raw "$hdImage" "+${extraFileSize}K"
-}
-
-# Always create an extra files disk image, as we always have the expand.sh script
-echo -e "\nCreating extra files disk image"
-qemu-img create -f raw "$extraImage" "$((extraImageSize + 64))K"
-
-echo -e "\nCreating a FAT filesystem in extra files disk image"
-extraDev="`hdiutil attach -nomount ${extraImage} | tr -d " \t"`"
-diskutil partitionDisk "$extraDev" MBR FAT32 EXTRA_FILES R
-extraMountPoint="`diskutil info "${extraDev}s1" | grep "Mount Point" | awk '{print $3}'`"
-
-echo -e "\nCopying resize.sh script into extra files disk image"
-cp qemu-arch-x86_64-resize.sh "${extraMountPoint}/resize.sh"
-
-[ ${extraFileSize} -eq 0 ] || {
-  echo -en "\nCopying specified files into extra files disk image"
-  for f in ${extraFiles}; do
-    cp -r "${f}" "${extraMountPoint}"
-    echo -n "."
-  done
-  echo
-}
-
-echo -e "\nUnmounting extra files disk image"
-hdiutil detach "${extraDev}"
-
 # Fire up a VM to install arch, using downloaded ISO, generated disk image, and generated extra files image
 echo -e "\nRunning expect script"
-./qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage" "$extraImage"
+./qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage" $sshPubKey
 
-#qemu-system-x86_64 -cdrom "$isoImage" -cpu qemu64 -m 2048 -drive file="$hdimage",format=raw,if=virtio -nic user,model=virtio-net-pci
 #qemu-system-x86_64 -cdrom /tmp/archlinux-x86_64.iso -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci
 #qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci
-#qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -drive file=archlinux-x86_64-extra.img,format=raw,if=virtio -nic user,model=virtio-net-pci

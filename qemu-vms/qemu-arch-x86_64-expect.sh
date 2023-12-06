@@ -6,7 +6,7 @@ set chroot_prompt "*root@archiso* "
 set timeout -1
 
 # Start qemu with iso image to boot from, disk image to install Arch into, and extra files disk image
-spawn qemu-system-x86_64 -cdrom [lindex $argv 0] -cpu qemu64 -m 2048 -drive file=[lindex $argv 1],format=raw,if=virtio -drive file=[lindex $argv 2],format=raw,if=virtio -nic user,model=virtio-net-pci -nographic
+spawn qemu-system-x86_64 -cdrom [lindex $argv 0] -cpu qemu64 -m 2048 -drive file=[lindex $argv 1],format=raw,if=virtio -nic user,model=virtio-net-pci -nographic
 
 # Wait for boot loader
 match_max 100000
@@ -60,14 +60,18 @@ expect $prompt
 send "while \[ \! `systemctl show pacman-init.service | grep SubState=exited` \]; do echo ...; sleep 10; done\r"
 
 # Run pacstrap to install basic system, just enough to get a bootable system with networking
-# Add a few other things:
+# Add some other things:
+# ntp (keep time in sync)
+# openssh (remotely connect to VM)
+# sudo (allow non-root user to run commands as root)
+# whois (provides mkpasswd for creating encrypted passwords suitable for useradd)
 # vim (editing text files)
 # which (provides which command, very useful)
-# parted (provides parted needed by resize.sh)
 # expect (provides expect needed by resize.sh)
+# parted (provides parted needed by resize.sh)
 # e2fsprogs (provides resize2fs needed by resize.sh)
 expect $prompt
-send "pacstrap -K -C /tmp/pacman.conf /mnt base linux linux-firmware syslinux networkmanager vim which parted expect e2fsprogs\r"
+send "pacstrap -K -C /tmp/pacman.conf /mnt linux linux-firmware base syslinux networkmanager ntp openssh sudo whois vim which expect parted e2fsprogs\r"
 
 # Generate fstab file using partiton uuid for mounting root
 expect $prompt
@@ -111,6 +115,13 @@ send "echo -e '127.0.0.1  localhost\\n::1  localhost' >> /etc/hosts\r"
 expect $chroot_prompt
 send "systemctl enable NetworkManager.service\r"
 
+# Enable ntpd
+send "systemctl enable ntpd.service\r"
+
+# Enable openssh
+expect $chroot_prompt
+send "systemctl enable sshd.service\r"
+
 # Install BIOS bootloader
 expect $chroot_prompt
 send "syslinux-install_update -i -a -m\r"
@@ -125,7 +136,7 @@ send "grep UUID /etc/fstab | awk -F= '{print \$2}' | awk '{print \"    APPEND ro
 expect $chroot_prompt
 send "cat /tmp/uuid.txt\r"
 expect $chroot_prompt
-send "sed -e '/root=\\/dev\\/sda3/r /tmp/uuid.txt' -e '/root=\\/dev\\/sda3/d' /boot/syslinux/syslinux.cfg > /tmp/syslinux.cfg\r"
+send "sed -e 's/TIMEOUT 50/TIMEOUT 10/' -e '/root=\\/dev\\/sda3/r /tmp/uuid.txt' -e '/root=\\/dev\\/sda3/d' /boot/syslinux/syslinux.cfg > /tmp/syslinux.cfg\r"
 expect $chroot_prompt
 send "mv /tmp/syslinux.cfg /boot/syslinux/syslinux.cfg\r"
 
@@ -141,18 +152,25 @@ send "root\r"
 expect "Retype new password: "
 send "root\r"
 
-# Copy extra files - there is always at least a resize.sh script
-# Mount second drive on /mnt - note this is /mnt inside new arch-chroot ext4 system, not /mnt of iso system we booted from
+# Add non-root user named user with password user
 expect $chroot_prompt
-send "echo Copying files from extra files disk image to /install\r"
+send "useradd -c User -G wheel -m -p `mkpasswd user` user\r"
+
+# Allow user to use sudo for all commands, password required
 expect $chroot_prompt
-send "mount /dev/vdb1 /mnt\r"
-expect $chroot_prompt
-send "mkdir /install\r"
-expect $chroot_prompt
-send "cp -r /mnt/* /install\r"
-expect $chroot_prompt
-send "umount /mnt\r"
+send "sed -i -r 's/# (%wheel ALL=\\(ALL:ALL\\) ALL)/\\1/' /etc/sudoers\r"
+
+# If there is an SSH key to install, copy it to ~USER
+if { $argc >= 3 } {
+  expect $chroot_prompt
+  send "install -d -o user -g user -m 0700 ~user/.ssh\r"
+  expect $chroot_prompt
+  send "echo [lindex $argv 2] >> ~user/.ssh/authorized_keys\r"
+  expect $chroot_prompt
+  send "chown user:user ~user/.ssh/authorized_keys\r"
+  expect $chroot_prompt
+  send "chmod 0600 ~user/.ssh/authorized_keys\r"
+}
 
 # Exit arch-chroot
 expect $chroot_prompt
