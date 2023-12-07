@@ -85,8 +85,9 @@ zfs=0
 }
 
 # iso and checksum files
-isoImage="/tmp/archlinux-x86_64.iso"
-isoDlSum="/tmp/archlinux-x86_64.iso.b2sum"
+thisDir="`dirname "$0"`"
+isoImage="$thisDir/archlinux-x86_64.iso"
+isoDlSum="$thisDir/archlinux-x86_64.iso.b2sum"
 isoGenSum="${isoDlSum}.gen"
 
 # Get the ssh public key
@@ -138,5 +139,9 @@ qemu-img create -f raw "$hdImage" "$hdSize"
 echo -e "\nRunning expect script"
 ./qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage" $sshPubKey
 
+echo -e "\nCopying resize script into virtual disk image"
+./qemu-arch-x86_64-copy.sh qemu-arch-x86_64-resize.sh resize.sh "$hdImage"
+
 #qemu-system-x86_64 -cdrom /tmp/archlinux-x86_64.iso -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci
-#qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci
+#qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci,hostfwd=tcp::9999-:22
+# scp -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" -P 9999 file user@localhost:

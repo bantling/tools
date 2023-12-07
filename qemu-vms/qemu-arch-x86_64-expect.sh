@@ -5,7 +5,7 @@ set prompt "*@archiso*~*#* "
 set chroot_prompt "*root@archiso* "
 set timeout -1
 
-# Start qemu with iso image to boot from, disk image to install Arch into, and extra files disk image
+# Start qemu with iso image to boot from, and disk image to install Arch into
 spawn qemu-system-x86_64 -cdrom [lindex $argv 0] -cpu qemu64 -m 2048 -drive file=[lindex $argv 1],format=raw,if=virtio -nic user,model=virtio-net-pci -nographic
 
 # Wait for boot loader
