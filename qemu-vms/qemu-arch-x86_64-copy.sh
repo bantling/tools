@@ -14,6 +14,8 @@ usage() {
   The qemu monitor is used to shut down, due to likely event that userName cannot shut down without a password.
   The name of the socket used for the monitor is qemu-monitor-{vmImage}-socket.
   "
+
+  exit 1
 }
 
 [ "$#" -eq 0 ] && usage "srcFile is required"
@@ -23,7 +25,6 @@ shift
 
 [ "$#" -eq 0 ] && usage "tgtFile is required"
 tgtFile="$1"
-[ -f "$tgtFile" ] || usage "file $tgtFile does not exist, or is not a file"
 shift
 
 [ "$#" -eq 0 ] && usage "vmImage is required"
@@ -32,14 +33,16 @@ vmImage="$1"
 shift
 
 userName=user
-[ "$#" -eq 0 ] || userName="$1"
-shift
+if [ "$#" -gt 0 ]; then
+  userName="$1"
+  shift
+fi
 
 socket="qemu-monitor-${vmImage}-socket"
 
 # Start qemu with freshly created image
 echo "Starting up guest"
-qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci,hostfwd=tcp::9999-:22 -monitor unix:${socket},server,nowait &
+qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci,hostfwd=tcp::9999-:22 -monitor unix:${socket},server,nowait -nographic > /dev/null 2> /dev/null &
 QEMU_PID=$!
 echo QEMU PID = $QEMU_PID
 
@@ -49,7 +52,7 @@ TRIES_LEFT=24
 while [ "$TRIES_LEFT" -gt 0 ]; do
   echo -n "."
   sleep 5
-  timeout 5 scp -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" -P 9999 ${srcFile} user@localhost:${tgtFile} > /dev/null 2> /dev/null
+  timeout 5 scp -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" -P 9999 ${srcFile} ${userName}@localhost:${tgtFile} > /dev/null 2> /dev/null
   if [ "$?" -eq 0 ]; then
     echo " copied"
     break

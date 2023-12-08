@@ -130,6 +130,10 @@ send "syslinux-install_update -i -a -m\r"
 expect $chroot_prompt
 send "dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/bios/gptmbr.bin of=/dev/vda\r"
 
+# Modify bootloader to support serial port logins
+expect $chroot_prompt
+send "sed -i -r 's/(DEFAULT arch)/SERIAL\\n\\n\\1/' /boot/syslinux/syslinux.cfg\r"
+
 # Modify default bootloader entry to point to the root partition UUID from the fstab file
 expect $chroot_prompt
 send "grep UUID /etc/fstab | awk -F= '{print \$2}' | awk '{print \"    APPEND root=UUID=\"\$1\" rw\"}' > /tmp/uuid.txt\r"

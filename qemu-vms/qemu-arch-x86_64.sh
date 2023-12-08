@@ -29,6 +29,8 @@ image after verifying with a prompt.
   exit
 }
 
+thisDir="`dirname "$0"`"
+
 # hasExt status code is 0 if argument has at least one dot, 1 if it has no dots
 # eg:
 # ext archlinux     returns 1
@@ -137,10 +139,10 @@ qemu-img create -f raw "$hdImage" "$hdSize"
 
 # Fire up a VM to install arch, using downloaded ISO, generated disk image, and generated extra files image
 echo -e "\nRunning expect script"
-./qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage" $sshPubKey
+"${thisDir}"/qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage" $sshPubKey
 
 echo -e "\nCopying resize script into virtual disk image"
-./qemu-arch-x86_64-copy.sh qemu-arch-x86_64-resize.sh resize.sh "$hdImage"
+"${thisDir}"/qemu-arch-x86_64-copy.sh "${thisDir}"/qemu-arch-x86_64-resize.sh resize.sh "$hdImage"
 
 #qemu-system-x86_64 -cdrom /tmp/archlinux-x86_64.iso -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci
 #qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci,hostfwd=tcp::9999-:22
