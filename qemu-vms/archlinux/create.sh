@@ -23,8 +23,14 @@ image after verifying with a prompt.
   guarantee that it will not conflict with any other generated zfs image. The root dataset will
   be zpool-{partitionUUID}/root.
 
+  A user named user with password user is created that can use sudo to run any command, where sudo will require
+  entering the password for user.
+
+  If the file \$HOME/.ssh/id_ecdsa.pub exists, it is copied into the ~user/.ssh/authorized_keys file.
+
   A /root/resize.sh script is installed that can automatically expand the last partition of a disk to the remaining
-  space on the disk, and if the partition has an ext4 filesystem, expand it to fill the partition.
+  space on the disk, and if the partition has an ext4 filesystem, expand it to fill the partition. The partition may be
+  mounted or unmounted.
 "
   exit
 }
@@ -33,8 +39,8 @@ thisDir="`dirname "$0"`"
 
 # hasExt status code is 0 if argument has at least one dot, 1 if it has no dots
 # eg:
-# ext archlinux     returns 1
-# ext archlinux.img returns 0
+# hasExt archlinux.img returns 0
+# hasExt archlinux     returns 1
 hasExt() {
   [ "`echo "$1" | awk -F. '{print NF-1}'`" -gt 0 ]
 }
@@ -139,11 +145,7 @@ qemu-img create -f raw "$hdImage" "$hdSize"
 
 # Fire up a VM to install arch, using downloaded ISO, generated disk image, and generated extra files image
 echo -e "\nRunning expect script"
-"${thisDir}"/qemu-arch-x86_64-expect.sh "$isoImage" "$hdImage" $sshPubKey
+"${thisDir}"/expect.sh "$isoImage" "$hdImage" $sshPubKey
 
 echo -e "\nCopying resize script into virtual disk image"
-"${thisDir}"/qemu-arch-x86_64-copy.sh "${thisDir}"/qemu-arch-x86_64-resize.sh resize.sh "$hdImage"
-
-#qemu-system-x86_64 -cdrom /tmp/archlinux-x86_64.iso -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci
-#qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci,hostfwd=tcp::9999-:22
-# scp -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" -P 9999 file user@localhost:
+"${thisDir}"/copy.sh "${thisDir}"/resize.sh resize.sh "$hdImage"

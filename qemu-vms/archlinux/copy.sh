@@ -42,7 +42,7 @@ socket="qemu-monitor-${vmImage}-socket"
 
 # Start qemu with freshly created image
 echo "Starting up guest"
-qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file=archlinux-x86_64.img,format=raw,if=virtio -nic user,model=virtio-net-pci,hostfwd=tcp::9999-:22 -monitor unix:${socket},server,nowait -nographic > /dev/null 2> /dev/null &
+qemu-system-x86_64 -cpu qemu64 -m 2048 -drive "file=$vmImage",format=raw,if=virtio -nic user,model=virtio-net-pci,hostfwd=tcp::9999-:22 -monitor unix:${socket},server,nowait -nographic > /dev/null 2> /dev/null &
 QEMU_PID=$!
 echo QEMU PID = $QEMU_PID
 
