@@ -39,7 +39,5 @@ else
   image="`ls *.img`"
 fi
 
-echo "Values are $serial $image"
-
 # Assume a single *.img file in this dir that is the image to run
 qemu-system-x86_64 -cpu qemu64 -m 2048 -drive file="$image",format=raw,if=virtio -nic user,model=virtio-net-pci,hostfwd=tcp::9999-:22 $serial
