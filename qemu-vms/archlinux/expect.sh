@@ -15,7 +15,7 @@ expect "*Automatic boot in*"
 # Modify default menu entry to use serial console
 send "\t"
 expect "*initramfs-linux.img*"
-send " console=ttyS0,38400\r"
+send " console=ttyS0,115200\r"
 
 # Wait for login prompt
 expect "archiso login: "

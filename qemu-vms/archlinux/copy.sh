@@ -60,14 +60,14 @@ QEMU_PID=$!
 echo QEMU PID = $QEMU_PID
 
 # Wait for SSH to respond until it succeeds, maximum wait of 2 minutes, which is 120 seconds / 5 seconds per try = 24 tries
-echo -n "Waiting for SSH to respond"
+echo -n "Waiting for SSH to respond:"
 TRIES_LEFT=24
 while [ "$TRIES_LEFT" -gt 0 ]; do
   echo -n "."
   sleep 5
   timeout 5 ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -p 9999 ${userName}@localhost "echo" > /dev/null 2> /dev/null
   if [ "$?" -eq 0 ]; then
-    echo " responded"
+    echo " done"
     break
   fi
 
@@ -84,7 +84,7 @@ if [ -f "$srcFile" ]; then
   echo -n "Waiting for scp to copy file:"
   scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -P 9999 "${srcFile}" ${userName}@localhost:"${tgtFile}" > /dev/null 2> /dev/null
   if [ "$?" -eq 0 ]; then
-    echo " copied"
+    echo " done"
   else
     echo " failed"
   fi
@@ -99,10 +99,10 @@ else
     cmd='tar -xJf -; mv "'${srcFile}'" "'${tgtFile}'"'
   fi
 
-  echo -n "Waiting for tar/ssh to copy dir "
+  echo -n "Waiting for tar/ssh to copy dir:"
   tar -cJf - "${srcFile}" | ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -p 9999 ${userName}@localhost "$cmd" > /dev/null 2> /dev/null
   if [ "$?" -eq 0 ]; then
-    echo " copied"
+    echo " done"
   else
     echo " failed"
   fi
@@ -112,7 +112,7 @@ fi
 echo "system_powerdown" | socat - unix-connect:${socket} > /dev/null 2> /dev/null
 
 # Keep checking that qemu has quit until it succeeds, maximum wait of 1 minute
-echo -n "Waiting for guest to quit"
+echo -n "Waiting for guest to quit: "
 TRIES_LEFT=60
 while [ "$TRIES_LEFT" -gt 0 ]; do
   echo -n "."
@@ -127,9 +127,10 @@ while [ "$TRIES_LEFT" -gt 0 ]; do
 done
 
 # Kill qemu if still running, must not be stopping for some reason
+echo -n "Killing guest: "
 kill -9 $QEMU_PID > /dev/null 2> /dev/null
 if [ "$?" -eq 0 ]; then
-  echo " killed"
+  echo " done"
 else
-  echo " could not kill"
+  echo " failed"
 fi
