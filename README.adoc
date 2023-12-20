@@ -16,24 +16,21 @@ A collection of useful tools, see the following files:
 
 TODO:
 
-* For qemu-vms/qemu-arch-x86_64.sh:
-  * download files to current dir, not /tmp - /tmp gets deleted regularly, causing more downloads
-  * resize script shd optionally check for prompt about live filesystem, so it works for non-live filesystems
-  * set boot loader timeout to 1 second
-  * create user named user, with password user
-  * add ssh options
-    * copy existing SSH public key to /home/user/.ssh = 0700/authorized_keys = 0600
-    * generate new key at /home/user/.ssh/id_ecdsa.{pub,}
+* For qemu-vms/create.sh:
   * add zfs support
-    * additional FAT 250MB partition for booting, fs label is BOOT1
+    * pacman -U can take a URL for a package, so try finding a version in https://archzfs.com/archive_archzfs that
+      matches ISO kernel version, need following packages:
+    ** zfs-linux-lts
+    ** zfs-utils
+    * use GRUB, only BIOS bootloader that can reside in ZFS partition
     * create zpool named zpool-(generated UUID)
-    * ensure it has autoexpand on so it can auto expand if disk image and partition size are increased
+    * use "zpool set autoexpand=on pool" to ensure it has autoexpand on so it can auto expand if disk image and partition size are increased
     * zpool has one device of /dev/disk/by-partuuid/{part uuid}
     * create dataset zpool-(generated UUID)/root with compression on using latest algorithm
     * create zvol for swap space, 16GB in size (shows as /dev/zd0 at runtime)
-    * root has legacy mountpoint of /mnt/other
+    * root has legacy mountpoint of /mnt/zfs
     * fstab has no entry for root
     * fstab has swap entry
       /dev/zvol/zboot/swap    none            swap            discard                 0 0
     * set bootloader to use zfs pool
-    * resize script supports zfs
+    * resize script should already work, by just expanding partition

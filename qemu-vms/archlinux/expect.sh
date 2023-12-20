@@ -24,6 +24,7 @@ send "root\r"
 # Partition disk to have one BIOS ext4 bootable partition
 expect $prompt
 send "sgdisk -n 1:0:0 -A 1:set:2 /dev/vda\r"
+# sgdisk -n 1:0:0 -A 1:set:2 -t 1:BF01 /dev/vda\r
 
 # Make an ext4 filesystem
 expect $prompt
@@ -33,21 +34,103 @@ send "mkfs.ext4 /dev/vda1\r"
 expect $prompt
 send "mount /dev/vda1 /mnt\r"
 
+# Install zfs packages
+# expect $prompt
+# send "curl -s https://raw.githubusercontent.com/eoli3n/archiso-zfs/master/init | bash\r"
+
+# Generate a UUID for zpool
+# expect $prompt
+# send "pool=\"zpool-`uuidgen`\"\r"
+
+# Create a zpool containing partition UUID for vda1
+# expect $prompt
+# send "zpool create \$pool \"/dev/disk/by-partuuid/`lsblk -no PARTUUID /dev/vda1`\"\r"
+
+# Auto expand pool if image is expanded in the future
+# expect $prompt
+# send "zpool set autoexpand=on \$pool\r"
+
+# Set pool to use compression
+# expect $prompt
+# send "zfs set compression=zstd \$pool\r"
+
+# Create the root dataset
+# expect $prompt
+# send "zfs create -o mountpoint=/mnt/misc \$pool/root\r"
+
+# Get latest zfs version number
+# expect $prompt
+# send "zfsVersion=\"`pacman -Sl archzfs | grep 'zfs-linux-lts ' | cut \"-d \" -f 3`\"\r"
+# expect $prompt
+# send "zfsUtilsVersion=\"`pacman -Sl archzfs | grep 'zfs-utils ' | cut \"-d \" -f 3`\"\r"
+
+# Get kernel version required by zfs
+# expect $prompt
+# send "zfsKernelVersion=\"`pacman --noconfirm -Sy zfs-linux-lts 2>&1 | grep \"cannot resolve\" | grep -Po '(?<=linux-lts=)(\[^"\]*)'`\\r"
+
+# Find most recent ALA day where there is a linux kernel whose version matches the version zfs requires
+# expect $prompt
+# send "echo \"==== Searching ALA for required kernel version: ${zfsKernelVersion} ====\"\r"
+# expect $prompt
+# send "alaPage=\"/tmp/alapage.html\"\r"
+# expect $prompt
+# send "numDays=0\r"
+# expect $prompt
+# send "while \[ \"\$\{numDays\}\" -lt 14 \]; do\r"
+# expect $prompt
+# send "  coreAlaUrl=\"`date -d "-\$\{numDays\} days\" +https://archive.archlinux.org/repos/%Y/%m/%d/core/os/x86_64`\"\r"
+# expect $prompt
+# send "  echo \"\$\{coreAlaUrl\}...\"\r"
+# expect $prompt
+# send "  : \$((numDays++))\r"
+# expect $prompt
+# send "  curl -fLso \"\$\{alaPage\}\" \"\$\{coreAlaUrl\}/\" || continue\r"
+# expect $prompt
+# send "  \[ `grep -c 'href="linux-lts-'\$\{zfsKernelVersion\}'-x86_64.pkg.tar.zst\"' \"\$\{alaPage\}\"` -eq 1 \] || continue\r"
+# expect $prompt
+# send "  echo \"==== Found required kernel ====\"\r"
+# expect $prompt
+# send "  break\r"
+# expect $prompt
+# send "done\r"
+
+# Generate pacman.conf file
+# expect $prompt
+# send "echo -e '\[options\]\\nHoldPkg = pacman glibc\\nSigLevel = DatabaseOptional\\nLocalFileSigLevel = Optional\\nDisableDownloadTimeout' > /tmp/pacman.conf\r"
+# expect $prompt
+# send "echo -e '\\n\[core\]' >> /tmp/pacman.conf\r"
+# expect $prompt
+# send "date -d '-\$\{numDays\} days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/\$repo/os/\$arch/' >> /tmp/pacman.conf\r"
+# expect $prompt
+# send "echo -e '\\n\[extra\]' >> /tmp/pacman.conf\r"
+# expect $prompt
+# send "date -d '-\$\{numDays\} days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/\$repo/os/\$arch/' >> /tmp/pacman.conf\r"
+# expect $prompt
+# send "echo -e '\\n\[community\]' >> /tmp/pacman.conf\r"
+# expect $prompt
+# send "date -d '-\$\{numDays\} days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/\$repo/os/\$arch/' >> /tmp/pacman.conf\r"
+# expect $prompt
+# send "echo -e "\n\n\[archzfs\]' >> /tmp/pacman.conf\r"
+# expect $prompt
+# send "echo -e "SigLevel = Never" >> /tmp/pacman.conf\r"
+# expect $prompt
+# send "echo -e "Server = http://archzfs.com/\$repo/\$arch" >> /tmp/pacman.conf\r"
+
 # Generate pacman.conf file
 expect $prompt
 send "echo -e '\[options\]\\nHoldPkg = pacman glibc\\nSigLevel = DatabaseOptional\\nLocalFileSigLevel = Optional\\nDisableDownloadTimeout' > /tmp/pacman.conf\r"
 expect $prompt
 send "echo -e '\\n\[core\]' >> /tmp/pacman.conf\r"
 expect $prompt
-send "date -d '-7 days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/core/os/x86_64/' >> /tmp/pacman.conf\r"
+send "date -d '-7 days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/\$repo/os/\$arch/' >> /tmp/pacman.conf\r"
 expect $prompt
 send "echo -e '\\n\[extra\]' >> /tmp/pacman.conf\r"
 expect $prompt
-send "date -d '-7 days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/extra/os/x86_64/' >> /tmp/pacman.conf\r"
+send "date -d '-7 days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/\$repo/os/\$arch/' >> /tmp/pacman.conf\r"
 expect $prompt
 send "echo -e '\\n\[community\]' >> /tmp/pacman.conf\r"
 expect $prompt
-send "date -d '-7 days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/community/os/x86_64/' >> /tmp/pacman.conf\r"
+send "date -d '-7 days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/\$repo/os/\$arch/' >> /tmp/pacman.conf\r"
 
 # Display contents of pacman.conf
 expect $prompt
