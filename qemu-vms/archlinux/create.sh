@@ -6,7 +6,7 @@ set -eu
 usage() {
   [ "$#" -eq 0 ] || { echo -e "\nERROR: $1\n" }
 
-  echo "$0: [ -n hdImage ] [-s hdSize ] [ -zfs ]
+  echo "$0: [ -n hdImage ] [-s hdSize ]
 
 Arguments must be provided in above order.
 
@@ -19,18 +19,25 @@ image after verifying with a prompt.
 -s hdSize: Specifies the size of image to create, default is 8GB. The hdSize value must be acceptable to qemu-img create.
   If extra files are provided with -e, the actual image size will be the given hdSize + the size of all extra files.
 
--zfs: Creates a bootable zfs filesystem instead of default ext4. The zpool name will be zpool-{partitionUUID},to
-  guarantee that it will not conflict with any other generated zfs image. The root dataset will
-  be zpool-{partitionUUID}/root.
+The latest installer and B2 checksum will be copied into the current directory as archlinux-x86_64.iso, and
+archlinux-x86_64.iso.b2sum. An additional file archlinux-x86_64.iso.b2sum.gen contains the generated checksum for
+comparison. If this script is run again, the latest checksum is downloaded, and if it differs from the previously
+generated sum, it is assumed that a new installer is available. The local iso and checksum are replaced with a new
+download, and a new generated checksum is compared.
 
-  A user named user with password user is created that can use sudo to run any command, where sudo will require
-  entering the password for user.
+A user named user is created that can use sudo to run any command, where sudo will require entering the password for
+user. Both root and user have a 16 character crytoprahically generated random password, which are stored in a file
+called {hdImage}.pwd. Every time this script is run with the same image name, a new {hdImage}.pwd is generated with
+new passwords.
 
-  If the file \$HOME/.ssh/id_ecdsa.pub exists, it is copied into the ~user/.ssh/authorized_keys file.
+If the file \$HOME/.ssh/id_ecdsa.pub exists on the host, it is copied into the ~user/.ssh/authorized_keys file on the
+image, where .ssh and .ssh/authorized_keys have correct privileges.
 
-  A /root/resize.sh script is installed that can automatically expand the last partition of a disk to the remaining
-  space on the disk, and if the partition has an ext4 filesystem, expand it to fill the partition. The partition may be
-  mounted or unmounted.
+A /root/resize.sh script is installed that can automatically expand the last partition of a disk to the remaining space
+on the disk, and if the partition has an ext4 filesystem, expand it to fill the partition. The partition may be mounted
+or unmounted.
+
+The script has a hard-coded mirror to download the iso from.
 "
   exit
 }
@@ -80,13 +87,6 @@ hdSize="8G"
   shift
 }
 
-# Are we making a ZFS image?
-zfs=0
-[[ ! -v 1 ]] || [ "$1" != "-zfs" ] || {
-  zfs=1
-  shift
-}
-
 # Any more parameters are an error
 [ "$#" -eq 0 ] || {
   usage "Unrecognized parameters: $@"
@@ -97,6 +97,11 @@ thisDir="`dirname "$0"`"
 isoImage="$thisDir/archlinux-x86_64.iso"
 isoDlSum="$thisDir/archlinux-x86_64.iso.b2sum"
 isoGenSum="${isoDlSum}.gen"
+
+# Generate 16 character root and user passwords
+hdPwd="${hdImage}.pwd"
+rootPwd="`openssl rand -base64 12`"
+userPwd="`openssl rand -base64 12`"
 
 # Get the ssh public key
 sshPubKey=
@@ -110,22 +115,22 @@ haveSSHPubKey=0
 echo -n "Parameters:
 hdImage         = ${hdImage}`[ ! -f ${hdImage} ] || echo -n ' (overwrite)'`
 hdSize          = ${hdSize}
-zfs             = `yn ${zfs}`
+hdPwd           = ${hdPwd}
 install SSH Key = `yn ${haveSSHPubKey}`
 "
 
 proceed=
 while [[ ! "$proceed" =~ [YyNn] ]]; do {
-  read -q "proceed?Do you want to continue? (y/n)"
+  read -q "proceed?Do you want to continue? (y/n) "
 }; done
 [[ "$proceed" =~ [Yy] ]] || exit
 
 # Always download the b2sum for installer iso, there may be a newer installer
-echo -e "\n\nDownloading ISO checksum"
+echo -e "\nDownloading ISO checksum"
 curl https://arch.mirror.winslow.cloud/iso/latest/b2sums.txt | grep archlinux-x86_64.iso | awk '{print $1}' > "$isoDlSum"
 
 # If there is already a generated checksum that differs from the downloaded one, then there is a newer installer
-{ [ -f "$isoImage" -a -f "$isoGenSum" ] && diff "$isoDlSum" "$isoGenSum" > /dev/null } || {
+{ [ -f "$isoImage" -a -f "$isoDlSum" -a -f "$isoGenSum" ] && diff "$isoDlSum" "$isoGenSum" > /dev/null } || {
   echo "Downloading ISO"
   curl "https://arch.mirror.winslow.cloud/iso/latest/archlinux-x86_64.iso" -o "$isoImage"
 
@@ -143,9 +148,13 @@ curl https://arch.mirror.winslow.cloud/iso/latest/b2sums.txt | grep archlinux-x8
 echo -e "\nCreating virtual disk image"
 qemu-img create -f raw "$hdImage" "$hdSize"
 
+# Generate pwd file
+echo -e "\nCreating password file"
+echo -e "root:$rootPwd\nuser:$userPwd" > "$hdPwd"
+
+# Generate base64 coded string of resize.sh script
+resizeScript="`base64 -i "${thisDir}/resize.sh"`"
+
 # Fire up a VM to install arch, using downloaded ISO, generated disk image, and generated extra files image
 echo -e "\nRunning expect script"
-"${thisDir}"/expect.sh "$isoImage" "$hdImage" $sshPubKey
-
-echo -e "\nCopying resize script into virtual disk image"
-"${thisDir}"/copy.sh "${thisDir}"/resize.sh resize.sh "$hdImage"
+"${thisDir}"/expect.sh "$isoImage" "$hdImage" "$rootPwd" "$userPwd" "$resizeScript" $sshPubKey

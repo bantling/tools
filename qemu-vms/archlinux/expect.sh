@@ -5,8 +5,18 @@ set prompt "*@archiso*~*#* "
 set chroot_prompt "*root@archiso* "
 set timeout -1
 
+set iso          [lindex $argv 0]
+set hd           [lindex $argv 1]
+set rootPwd      [lindex $argv 2]
+set userPwd      [lindex $argv 3]
+set resizeScript [lindex $argv 4]
+set sshKey ""
+if { $argc >= 6 } {
+  set sshKey     [lindex $argv 5]
+}
+
 # Start qemu with iso image to boot from, and disk image to install Arch into
-spawn qemu-system-x86_64 -cdrom [lindex $argv 0] -cpu qemu64 -m 2048 -drive file=[lindex $argv 1],format=raw,if=virtio -nic user,model=virtio-net-pci -nographic
+spawn qemu-system-x86_64 -cpu qemu64 -m 2048 -cdrom "$iso" -drive "file=$hd,format=raw,if=virtio" -nic user,model=virtio-net-pci -nographic
 
 # Wait for boot loader
 match_max 100000
@@ -24,7 +34,6 @@ send "root\r"
 # Partition disk to have one BIOS ext4 bootable partition
 expect $prompt
 send "sgdisk -n 1:0:0 -A 1:set:2 /dev/vda\r"
-# sgdisk -n 1:0:0 -A 1:set:2 -t 1:BF01 /dev/vda\r
 
 # Make an ext4 filesystem
 expect $prompt
@@ -34,91 +43,9 @@ send "mkfs.ext4 /dev/vda1\r"
 expect $prompt
 send "mount /dev/vda1 /mnt\r"
 
-# Install zfs packages
-# expect $prompt
-# send "curl -s https://raw.githubusercontent.com/eoli3n/archiso-zfs/master/init | bash\r"
-
-# Generate a UUID for zpool
-# expect $prompt
-# send "pool=\"zpool-`uuidgen`\"\r"
-
-# Create a zpool containing partition UUID for vda1
-# expect $prompt
-# send "zpool create \$pool \"/dev/disk/by-partuuid/`lsblk -no PARTUUID /dev/vda1`\"\r"
-
-# Auto expand pool if image is expanded in the future
-# expect $prompt
-# send "zpool set autoexpand=on \$pool\r"
-
-# Set pool to use compression
-# expect $prompt
-# send "zfs set compression=zstd \$pool\r"
-
-# Create the root dataset
-# expect $prompt
-# send "zfs create -o mountpoint=/mnt/misc \$pool/root\r"
-
-# Get latest zfs version number
-# expect $prompt
-# send "zfsVersion=\"`pacman -Sl archzfs | grep 'zfs-linux-lts ' | cut \"-d \" -f 3`\"\r"
-# expect $prompt
-# send "zfsUtilsVersion=\"`pacman -Sl archzfs | grep 'zfs-utils ' | cut \"-d \" -f 3`\"\r"
-
-# Get kernel version required by zfs
-# expect $prompt
-# send "zfsKernelVersion=\"`pacman --noconfirm -Sy zfs-linux-lts 2>&1 | grep \"cannot resolve\" | grep -Po '(?<=linux-lts=)(\[^"\]*)'`\\r"
-
-# Find most recent ALA day where there is a linux kernel whose version matches the version zfs requires
-# expect $prompt
-# send "echo \"==== Searching ALA for required kernel version: ${zfsKernelVersion} ====\"\r"
-# expect $prompt
-# send "alaPage=\"/tmp/alapage.html\"\r"
-# expect $prompt
-# send "numDays=0\r"
-# expect $prompt
-# send "while \[ \"\$\{numDays\}\" -lt 14 \]; do\r"
-# expect $prompt
-# send "  coreAlaUrl=\"`date -d "-\$\{numDays\} days\" +https://archive.archlinux.org/repos/%Y/%m/%d/core/os/x86_64`\"\r"
-# expect $prompt
-# send "  echo \"\$\{coreAlaUrl\}...\"\r"
-# expect $prompt
-# send "  : \$((numDays++))\r"
-# expect $prompt
-# send "  curl -fLso \"\$\{alaPage\}\" \"\$\{coreAlaUrl\}/\" || continue\r"
-# expect $prompt
-# send "  \[ `grep -c 'href="linux-lts-'\$\{zfsKernelVersion\}'-x86_64.pkg.tar.zst\"' \"\$\{alaPage\}\"` -eq 1 \] || continue\r"
-# expect $prompt
-# send "  echo \"==== Found required kernel ====\"\r"
-# expect $prompt
-# send "  break\r"
-# expect $prompt
-# send "done\r"
-
-# Generate pacman.conf file
-# expect $prompt
-# send "echo -e '\[options\]\\nHoldPkg = pacman glibc\\nSigLevel = DatabaseOptional\\nLocalFileSigLevel = Optional\\nDisableDownloadTimeout' > /tmp/pacman.conf\r"
-# expect $prompt
-# send "echo -e '\\n\[core\]' >> /tmp/pacman.conf\r"
-# expect $prompt
-# send "date -d '-\$\{numDays\} days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/\$repo/os/\$arch/' >> /tmp/pacman.conf\r"
-# expect $prompt
-# send "echo -e '\\n\[extra\]' >> /tmp/pacman.conf\r"
-# expect $prompt
-# send "date -d '-\$\{numDays\} days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/\$repo/os/\$arch/' >> /tmp/pacman.conf\r"
-# expect $prompt
-# send "echo -e '\\n\[community\]' >> /tmp/pacman.conf\r"
-# expect $prompt
-# send "date -d '-\$\{numDays\} days' +'Server = https://archive.archlinux.org/repos/%Y/%m/%d/\$repo/os/\$arch/' >> /tmp/pacman.conf\r"
-# expect $prompt
-# send "echo -e "\n\n\[archzfs\]' >> /tmp/pacman.conf\r"
-# expect $prompt
-# send "echo -e "SigLevel = Never" >> /tmp/pacman.conf\r"
-# expect $prompt
-# send "echo -e "Server = http://archzfs.com/\$repo/\$arch" >> /tmp/pacman.conf\r"
-
 # Generate pacman.conf file
 expect $prompt
-send "echo -e '\[options\]\\nHoldPkg = pacman glibc\\nSigLevel = DatabaseOptional\\nLocalFileSigLevel = Optional\\nDisableDownloadTimeout' > /tmp/pacman.conf\r"
+send "echo -e '\[options\]\\nArchitecture = auto\\nHoldPkg = pacman glibc\\nSigLevel = DatabaseOptional\\nLocalFileSigLevel = Optional\\nDisableDownloadTimeout' > /tmp/pacman.conf\r"
 expect $prompt
 send "echo -e '\\n\[core\]' >> /tmp/pacman.conf\r"
 expect $prompt
@@ -150,11 +77,12 @@ send "while \[ \! `systemctl show pacman-init.service | grep SubState=exited` \]
 # whois (provides mkpasswd for creating encrypted passwords suitable for useradd)
 # vim (editing text files)
 # which (provides which command, very useful)
+# coreutils (provides base64 command, used to create resize.sh script)
 # expect (provides expect needed by resize.sh)
 # parted (provides parted needed by resize.sh)
 # e2fsprogs (provides resize2fs needed by resize.sh)
 expect $prompt
-send "pacstrap -K -C /tmp/pacman.conf /mnt linux linux-firmware base syslinux networkmanager ntp openssh sudo whois vim which expect parted e2fsprogs\r"
+send "pacstrap -K -C /tmp/pacman.conf /mnt linux linux-firmware base syslinux networkmanager ntp openssh sudo whois vim which coreutils expect parted e2fsprogs\r"
 
 # Generate fstab file using partiton uuid for mounting root
 expect $prompt
@@ -235,24 +163,32 @@ send "cat /boot/syslinux/syslinux.cfg\r"
 expect $chroot_prompt
 send "passwd\r"
 expect "New password: "
-send "root\r"
+send "$rootPwd\r"
 expect "Retype new password: "
-send "root\r"
+send "$rootPwd\r"
 
 # Add non-root user named user with password user
 expect $chroot_prompt
-send "useradd -c User -G wheel -m -p `mkpasswd user` user\r"
+send "useradd -c User -G wheel -m -p `mkpasswd $userPwd` user\r"
 
 # Allow user to use sudo for all commands, password required
 expect $chroot_prompt
 send "sed -i -r 's/# (%wheel ALL=\\(ALL:ALL\\) ALL)/\\1/' /etc/sudoers\r"
 
+# Install resize script to /root/resize.sh
+expect $chroot_prompt
+send "touch /root/resize.sh\r"
+expect $chroot_prompt
+send "echo \"$resizeScript\" | base64 -d - > /root/resize.sh\r"
+expect $chroot_prompt
+send "chmod +x /root/resize.sh\r"
+
 # If there is an SSH key to install, copy it to ~USER
-if { $argc >= 3 } {
+if { $sshKey != "" } {
   expect $chroot_prompt
   send "install -d -o user -g user -m 0700 ~user/.ssh\r"
   expect $chroot_prompt
-  send "echo [lindex $argv 2] >> ~user/.ssh/authorized_keys\r"
+  send "echo $sshKey >> ~user/.ssh/authorized_keys\r"
   expect $chroot_prompt
   send "chown user:user ~user/.ssh/authorized_keys\r"
   expect $chroot_prompt
