@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -eu
 
-# Script to setup an Arch Linux x86_86 virtual image by scripting an ISO installer via the emulated serial port with an expect script
+# Script to setup a FreeBSD x86_86 virtual image by scripting an ISO installer via the emulated serial port with an expect script
 
 usage() {
   [ "$#" -eq 0 ] || { echo -e "\nERROR: $1\n" }
@@ -10,16 +10,16 @@ usage() {
 
 Arguments must be provided in above order.
 
-Generates a bootable Arch Linux x86_64 virtual image named {hdImage} using qemu. If hdImage already has one or more
+Generates a bootable FreeBSD x86_64 virtual image named {hdImage} using qemu. If hdImage already has one or more
 extensions, it is used as is, else the extension .img is added. If hdImage exists, it is overwritten with a new blank
 image after verifying with a prompt.
 
--n hdImage: The name of the image to generate. The default name is archlinux-x86_64.img.
+-n hdImage: The name of the image to generate. The default name is freebsd-x86_64.img.
 
 -s hdSize: Specifies the size of image to create, default is 8GB. The hdSize value must be acceptable to qemu-img create.
 
-The latest installer and B2 checksum will be copied into the current directory as archlinux-x86_64.iso, and
-archlinux-x86_64.iso.b2sum. An additional file archlinux-x86_64.iso.b2sum.gen contains the generated checksum for
+The latest installer and B2 checksum will be copied into the current directory as freebsd-x86_64.iso, and
+freebsd-x86_64.iso.b2sum. An additional file freebsd-x86_64.iso.b2sum.gen contains the generated checksum for
 comparison. If this script is run again, the latest checksum is downloaded, and if it differs from the previously
 generated sum, it is assumed that a new installer is available. The local iso and checksum are replaced with a new
 download, and a new generated checksum is compared.
@@ -58,7 +58,7 @@ yn() {
 }
 
 # imageName
-hdImage="archlinux-x86_64.img"
+hdImage="freebsd-x86_64.img"
 [[ ! -v 1 ]] || [ "$1" != "-n" ] || {
   [[ -v 2 ]] || {
     usage "-n must be followed by an image name"
@@ -91,12 +91,6 @@ hdSize="8G"
   usage "Unrecognized parameters: $@"
 }
 
-# iso and checksum files
-thisDir="`dirname "$0"`"
-isoImage="$thisDir/archlinux-x86_64.iso"
-isoDlSum="$thisDir/archlinux-x86_64.iso.b2sum"
-isoGenSum="${isoDlSum}.gen"
-
 # Generate 16 character root and user passwords
 hdPwd="${hdImage}.pwd"
 rootPwd="`openssl rand -base64 12`"
@@ -124,24 +118,42 @@ while [[ ! "$proceed" =~ [YyNn] ]]; do {
 }; done
 [[ "$proceed" =~ [Yy] ]] || exit
 
-# Always download the b2sum for installer iso, there may be a newer installer
-echo -e "\nDownloading ISO checksum"
-curl https://arch.mirror.winslow.cloud/iso/latest/b2sums.txt | grep archlinux-x86_64.iso | awk '{print $1}' > "$isoDlSum"
+# Get latest version number
+latestVersion="`curl -so - "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/" | grep "<a href" | tail -n 1 | grep -Eo '([0-9.]*)' | head -n 1`"
 
-# If there is already a generated checksum that differs from the downloaded one, then there is a newer installer
-{ [ -f "$isoImage" -a -f "$isoDlSum" -a -f "$isoGenSum" ] && diff "$isoDlSum" "$isoGenSum" > /dev/null } || {
-  echo "Downloading ISO"
-  curl "https://arch.mirror.winslow.cloud/iso/latest/archlinux-x86_64.iso" -o "$isoImage"
+# iso and checksum files
+thisDir="`dirname "$0"`"
+isoImage="$thisDir/FreeBSD-$latestVersion-RELEASE-amd64-disc1.iso"
+isoDlSum="${isoImage}.sha512"
+isoGenSum="${isoDlSum}.gen"
 
-  echo "Generating checksum"
-  b2sum "$isoImage" | awk '{print $1}' > "$isoGenSum"
+# Download iso if we don't have it
+[ -f "$isoImage" ] || {
+  echo "Removing any older iso images"
+  rm -f FreeBSD*disc1.iso*
 
-  echo "Comparing checksum"
-  diff "$isoDlSum" "$isoGenSum" > /dev/null || {
-    echo "Downloaded checksum does not match generated checksum"
-    exit 1
-  }
+  echo "Downloading the $latestVersion ISO"
+  curl --pregress-bar -so - "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/$latestVersion/FreeBSD-$latestVersion-RELEASE-amd64-disc1.iso.xz" | xz -d - > "$isoImage"
 }
+
+# Download the checksum if we don't have it
+[ -f "$isoDlSum" ] || {
+  echo "Downloading the $latestVersion checksum"
+  curl -so - "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/$latestVersion/CHECKSUM.SHA512-FreeBSD-$latestVersion-RELEASE-amd64" | grep disc1.iso.xz | awk '-F=' '{print $2}' | tr -d ' '
+}
+
+# Generate our own sha512 checksum for comparison
+[ -f "$isoGenSum" ] || {
+  sha512sum -b "$isoImage" | awk '{print $1}' > "$isoGenSum"
+}
+
+diff "$isoDlSum" "$isoGenSum" > /dev/null || {
+  echo "Downloaded checksum does not match generated checksum"
+  exit 1
+}
+
+echo "here"
+exit
 
 # Create a disk image to install arch into. Recreate each time in case a previous run failed.
 echo -e "\nCreating virtual disk image"
