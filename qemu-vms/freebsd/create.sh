@@ -18,10 +18,10 @@ image after verifying with a prompt.
 
 -s hdSize: Specifies the size of image to create, default is 8GB. The hdSize value must be acceptable to qemu-img create.
 
-The latest installer and B2 checksum will be copied into the current directory as freebsd-x86_64.iso, and
-freebsd-x86_64.iso.b2sum. An additional file freebsd-x86_64.iso.b2sum.gen contains the generated checksum for
-comparison. If this script is run again, the latest checksum is downloaded, and if it differs from the previously
-generated sum, it is assumed that a new installer is available. The local iso and checksum are replaced with a new
+The latest installer and B2 checksum will be copied into the current directory as freebsd-x86_64.boot, and
+freebsd-x86_64.boot.b2sum. An additional file freebsd-x86_64.boot.b2sum.gen contains the generated checksum for
+comparbootn. If this script is run again, the latest checksum is downloaded, and if it differs from the previously
+generated sum, it is assumed that a new installer is available. The local boot and checksum are replaced with a new
 download, and a new generated checksum is compared.
 
 A user named user is created that can use sudo to run any command, where sudo will require entering the password for
@@ -36,7 +36,7 @@ A /root/resize.sh script is installed that can automatically expand the last par
 on the disk, and if the partition has an ext4 filesystem, expand it to fill the partition. The partition may be mounted
 or unmounted.
 
-The script has a hard-coded mirror to download the iso from.
+The script has a hard-coded mirror to download the boot from.
 "
   exit
 }
@@ -118,44 +118,87 @@ while [[ ! "$proceed" =~ [YyNn] ]]; do {
 }; done
 [[ "$proceed" =~ [Yy] ]] || exit
 
+echo
+
 # Get latest version number
 latestVersion="`curl -so - "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/" | grep "<a href" | tail -n 1 | grep -Eo '([0-9.]*)' | head -n 1`"
 
-# iso and checksum files
-thisDir="`dirname "$0"`"
-isoImage="$thisDir/FreeBSD-$latestVersion-RELEASE-amd64-disc1.iso"
-isoDlSum="${isoImage}.sha512"
-isoGenSum="${isoDlSum}.gen"
+# boot image and checksum files
+bootImage="FreeBSD-$latestVersion-RELEASE-amd64-memstick.img"
+bootDlSum="${bootImage}.xz.sha512"
+bootGenSum="${bootDlSum}.gen"
+bootManSerial="${bootImage}.man.serial"
 
-# Download iso if we don't have it
-[ -f "$isoImage" ] || {
-  echo "Removing any older iso images"
-  rm -f FreeBSD*disc1.iso*
+# Download image if we don't have it
+[ -f "$bootImage" ] || {
+  ls "FreeBSD*disc1.boot*" > /dev/null 2> /dev/null && {
+    # Assume any existing boots (and checksums) are older versions
+    echo -e "\nRemoving older boot images"
+    rm FreeBSD*disc1.boot*
+  }
 
-  echo "Downloading the $latestVersion ISO"
-  curl --pregress-bar -so - "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/$latestVersion/FreeBSD-$latestVersion-RELEASE-amd64-disc1.iso.xz" | xz -d - > "$isoImage"
+  echo -e "\nDownloading the $latestVersion image"
+  curl --progress-bar -Lo - "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/$latestVersion/FreeBSD-$latestVersion-RELEASE-amd64-memstick.img.xz" > "$bootImage.xz"
 }
 
 # Download the checksum if we don't have it
-[ -f "$isoDlSum" ] || {
-  echo "Downloading the $latestVersion checksum"
-  curl -so - "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/$latestVersion/CHECKSUM.SHA512-FreeBSD-$latestVersion-RELEASE-amd64" | grep disc1.iso.xz | awk '-F=' '{print $2}' | tr -d ' '
+[ -f "$bootDlSum" ] || {
+  echo -e "\nDownloading the $latestVersion checksum"
+  curl -sLo - "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/$latestVersion/CHECKSUM.SHA512-FreeBSD-$latestVersion-RELEASE-amd64" | grep amd64-memstick.img.xz | awk '-F=' '{print $2}' | tr -d ' ' > "$bootDlSum"
 }
 
 # Generate our own sha512 checksum for comparison
-[ -f "$isoGenSum" ] || {
-  sha512sum -b "$isoImage" | awk '{print $1}' > "$isoGenSum"
+[ -f "$bootGenSum" ] || {
+  sha512sum -b "$bootImage.xz" | awk '{print $1}' > "$bootGenSum"
 }
 
-diff "$isoDlSum" "$isoGenSum" > /dev/null || {
-  echo "Downloaded checksum does not match generated checksum"
+diff "$bootDlSum" "$bootGenSum" > /dev/null || {
+  echo -e "\nDownloaded checksum does not match generated checksum"
   exit 1
 }
 
-echo "here"
-exit
+[ -f "$bootImage" ] || {
+  echo -e "\nExtracting boot"
+  xz -d "$bootImage.xz" || {
+    echo "Failed to decompress $bootImage.xz"
+    [ ! -f rm "$bootImage" ] || { rm "$bootImage" }
+  }
+}
 
-# Create a disk image to install arch into. Recreate each time in case a previous run failed.
+# Check if manual steps to "fix" boot to be able to boot with serial have been completed
+[ -f "$bootManSerial" ] || {
+  echo "
+Running FreeBSD graphically to alter boot menu to allow serial booting.
+
+Temporarily change root to rw:
+mount -u -w /
+
+vi /boot/loader.conf to add following lines:
+
+boot_multicons=”YES”
+boot_serial=”YES”
+comconsole_speed=”115200″
+console=”comconsole,vidconsole”
+
+Quit:
+halt -p
+"
+  qemu-system-x86_64 -cpu qemu64 -m 2048 -vga virtio -drive "file=${bootImage},format=raw,if=virtio"
+
+  echo -e "\n"
+  proceed=
+  while [[ ! "$proceed" =~ [YyNn] ]]; do {
+    read -q "proceed?Test that image boots in serial mode? (y/n) "
+  }; done
+  [[ "$proceed" =~ [Yy] ]] || exit
+
+  qemu-system-x86_64 -cpu qemu64 -m 2048 -nographic -drive "file=${bootImage},format=raw,if=virtio"
+
+  touch "$bootManSerial"
+  echo
+}
+
+# Create a disk image to install freebsd into. Recreate each time in case a previous run failed.
 echo -e "\nCreating virtual disk image"
 qemu-img create -f raw "$hdImage" "$hdSize"
 
@@ -164,8 +207,10 @@ echo -e "\nCreating password file"
 echo -e "root:$rootPwd\nuser:$userPwd" > "$hdPwd"
 
 # Generate base64 coded string of resize.sh script
-resizeScript="`base64 -i "${thisDir}/resize.sh"`"
+#resizeScript="`base64 -i "${thisDir}/resize.sh"`"
+resizeScript="blahdy"
 
 # Fire up a VM to install arch, using downloaded ISO, generated disk image, and generated extra files image
 echo -e "\nRunning expect script"
-"${thisDir}"/expect.sh "$isoImage" "$hdImage" "$rootPwd" "$userPwd" "$resizeScript" $sshPubKey
+qemu-system-x86_64 -cpu qemu64 -m 2048 -nographic -drive "file=${bootImage},format=raw" -drive "file=${hdImage},format=raw"
+#"${thisDir}"/expect.sh "$bootImage" "$hdImage" "$rootPwd" "$userPwd" "$resizeScript" $sshPubKey
