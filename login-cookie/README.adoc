@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: Apache-2.0
+:doctype: article
+
+= Login Cookie
+
+An example app that uses a cookie as a login method instead of a name and password.
+
+== Security
+
+* Browsers store persistent cookies on disk using encryption, just like password managers
+* Browsers choose cookies based on domain name, just like password managers
+* Browsers send cookies via TLS, just like password managers
+* Receiving a login cookie and comparing it is the same as receiving a user and pass and comparing them
+* Passwords are randomly different from site to site (allowed characters, length, etc), while cookies are generated
+* There never was a need for images or recovery questions, etc. It was always possible to just send a code by email,
+  let user copy and paste it, then create new account if email not recognized, or use existing account if it is.
+
+== Process
+
+. If no login cookie, show Connect page, else show Home page
+. Connect page has required Email field and Send Code button, which shows Enter Code page
+. Enter Code page has required Code field and Verify button
+. User receives code, copies it to Code field and hits Verify button
+. If timeout (30 minutes) is not exceeded and code matches, Verify button shows Home page, else circle back to Email
+  page with same email filled in
+. App lets user see all registered devices
+. Devices page lists:
+  . Device (OS X, Windows, Linux, iPhone, Android, ...)
+  . Browser (Chrome, Safari, Opera, Edge, Firefox, ...)
+  . Name (default "Main" for first device, default "Device N" where N >= 2 for more devices, required)
+  . For Device and Browser, unrecognized systems provide some information, even if not very readable
+  . User fills fields and hits Connect to show Home page

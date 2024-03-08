@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: Apache-2.0
+:doctype: article
+
+= Build a postgres OCI image with some third party extensions
+
+The following extensions are added:
+
+[cols="1,1"]
+|===
+|Source
+|Purpose
+
+|https://github.com/pramsey/pgsql-http
+|call remote http services
+
+|https://github.com/dr-jts/pg_svg
+|generate svg images
+|===

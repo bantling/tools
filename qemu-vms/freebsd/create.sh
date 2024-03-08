@@ -173,12 +173,17 @@ Running FreeBSD graphically to alter boot menu to allow serial booting.
 Temporarily change root to rw:
 mount -u -w /
 
-vi /boot/loader.conf to add following lines:
+vi /boot/loader.conf
+- add following lines for serial booting
 
 boot_multicons=”YES”
 boot_serial=”YES”
 comconsole_speed=”115200″
 console=”comconsole,vidconsole”
+
+- add following lines to allow creation of /dev/gptid entries
+kern.geom.label.disk_ident.enable="0"
+kern.geom.label.gptid.enable="1"
 
 Quit:
 halt -p
@@ -212,5 +217,98 @@ resizeScript="blahdy"
 
 # Fire up a VM to install arch, using downloaded ISO, generated disk image, and generated extra files image
 echo -e "\nRunning expect script"
-qemu-system-x86_64 -cpu qemu64 -m 2048 -nographic -drive "file=${bootImage},format=raw" -drive "file=${hdImage},format=raw"
+qemu-system-x86_64 -cpu qemu64 -m 2048 -nographic -drive "file=${bootImage},format=raw,if=virtio" -drive "file=${hdImage},format=raw,if=virtio" -nic user,model=virtio-net-pci
 #"${thisDir}"/expect.sh "$bootImage" "$hdImage" "$rootPwd" "$userPwd" "$resizeScript" $sshPubKey
+
+## Manual install steps - see https://forums.freebsd.org/threads/installing-freebsd-manually-no-installer.63201/
+
+## Create an empty GPT partition table
+# gpart create -s gpt vtbd1
+
+## Create boot and zfs partitions
+# gpart add -t freebsd-boot -s 512k vtbd1
+# gpart add -t freebsd-zfs vtbd1
+
+## Create temp moutpoint
+# mkdir /tmp/zfs
+
+## Create zfs pool
+# zpool create -m / -R /tmp/zfs zroot vtbd1p2
+## Set bootfs property
+# zpool set bootfs=zroot zroot
+
+## Create swap space
+# zfs create -V 4G zroot/swap
+# zfs set org.freebsd:swap=on zroot/swap
+
+## Install base system
+# cd /tmp/zfs
+# tar xvJf /usr/freebsd-dist/base.txz
+# tar xvJf /usr/freebsd-dist/kernel.txz
+# tar xvJf /usr/freebsd-dist/lib32.txz
+
+## Install boot code
+# gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 vtbd1
+
+## Configure loader.conf settings
+# echo 'zfs_load="YES"' >> boot/loader.conf
+# echo 'vfs.root.mountfrom="zfs:zroot"' >> boot/loader.conf
+
+## Configure rc.conf settings
+# echo 'zfs_enable="YES"' >> etc/rc.conf
+
+## Chroot and set up some stuff
+# chroot .
+## Set timezone to UTC
+# cp usr/share/zoneinfo/UTC etc/localtime
+# adjkerntz -a
+## Set hostname
+# hostname freebsd
+# echo 'hostname="freebsd"' >> etc/rc.conf
+
+# sysrc ifconfig_vtnet0="DHCP"
+
+# geom disk list identifies the relationship between /dev/diskid/NAME entries and /dev/adaX entries
+# Look at Geom name: ada0 which contains line ident: QM00001, which means /dev/diskid/QM00001 = /dev/ada0
+# EG:
+# Geom name: cd0
+# Providers:
+# 1. Name: cd0
+#    Mediasize: 0 (0B)
+#    Sectorsize: 2048
+#    Mode: r0w0e0
+#    descr: QEMU QEMU DVD-ROM
+#    ident: (null)
+#    rotationrate: unknown
+#    fwsectors: 0
+#    fwheads: 0
+#
+# Geom name: ada0
+# Providers:
+# 1. Name: ada0
+#    Mediasize: 1360155136 (1.3G)
+#    Sectorsize: 512
+#    Mode: r1w0e1
+#    descr: QEMU HARDDISK
+#    ident: QM00001
+#    rotationrate: unknown
+#    fwsectors: 63
+#    fwheads: 16
+#
+# Geom name: ada1
+# Providers:
+# 1. Name: ada1
+#    Mediasize: 8589934592 (8.0G)
+#    Sectorsize: 512
+#    Mode: r0w0e0
+#    descr: QEMU HARDDISK
+#    ident: QM00002
+#    rotationrate: unknown
+#    fwsectors: 63
+#    fwheads: 16
+
+# QEMU add options for raw disk sector sizes: physical_block_size=4096,logical_block_size=512
+
+# Server sda is PHYS 4096 LOG 512
+# Server sdb is PHYS  512 LOG 512
+# Server ashift is 12 = 4096
