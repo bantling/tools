@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # We need to append a line to the end of postgresql.conf to load the cron shared library
-echo -e "shared_preload_libraries='pg_cron'\ncron.database_name = 'mydb'" >> ${PGDATA}/postgresql.conf
+printf "shared_preload_libraries='pg_cron'\ncron.database_name = 'mydb'\n" >> ${PGDATA}/postgresql.conf
 
 # Dump the postgres.conf file for debugging
 cat ${PGDATA}/postgresql.conf

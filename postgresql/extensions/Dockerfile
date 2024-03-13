@@ -26,7 +26,7 @@ RUN apt-get update && \
 RUN echo en_US.UTF-8 UTF-8 > /etc/locale.gen; \
     locale-gen
 
-# Compile and install extensions
+# Compile and install extensions using /workdir directory
 RUN mkdir /workdir
 
 # Compile and install the pgsql-http extension
@@ -38,7 +38,8 @@ RUN cd /workdir; \
     cd ..; \
     rm -rf pgsql-http
 
-# Get the pg_svg functions, and copy the file to the /docker-entrypoint-initdb.d dir as file 0001 (0000 will create database).
+# Get the pg_svg functions, and copy the file to the /docker-entrypoint-initdb.d dir as file 0003
+# - Note that 0000 thru 0002 are already used.
 # The script is simplistic, and just launches into loading functions into current database.
 # Modify it to add a "\c mydb" line at the top, so functions are created in mydb, not postgres database.
 # The version of echo on this system does not recognize the -e option for escapes, so use printf instead.
