@@ -3,6 +3,3 @@ SELECT 'CREATE DATABASE mydb encoding = ''UTF8'' locale = ''en_US.utf8'''
 \gexec
 
 \c mydb
-
-CREATE EXTENSION http;
-CREATE EXTENSION pg_cron;

@@ -1,0 +1,5 @@
+\c mydb
+
+CREATE EXTENSION postgis;
+CREATE EXTENSION http;
+CREATE EXTENSION pg_cron;
