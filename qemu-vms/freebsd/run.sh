@@ -8,11 +8,8 @@ usage() {
 $0: [ -m ] [ -s ] [ image ]
 
 Use qemu to run an x86_64 image. Arguments must be passed in the order described.
-
 -m: Use the current memory stick image as the boot device
-
 -s: use serial port booting rather than default windowed mode
-
 image: The image name to run, the default is the only file in the current dir that matches *.img but does not match
        *memstick*.img.
   "

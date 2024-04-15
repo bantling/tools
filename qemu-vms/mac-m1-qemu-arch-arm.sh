@@ -155,9 +155,9 @@ cd "\`dirname "\$0"\`"
 
 img=arch.img
 
-# Create a 200MB EFI System partition and fill rest with an EXT4 partition
+# Create a 400MB EFI System partition and fill rest with an EXT4 partition
 echo Partitioning disk image...
-sgdisk -n 1:0:+200M -t 1:EF00 -c 1:AARCH64BOOT -A 1:set:2 -n 2:0:0 -t 2:8300 -c 2:AARCH64ROOT \$img
+sgdisk -n 1:0:+400M -t 1:EF00 -c 1:AARCH64BOOT -A 1:set:2 -n 2:0:0 -t 2:8300 -c 2:AARCH64ROOT \$img
 
 echo Creating loopback device for disk image...
 lodev="\`losetup --show -Pf \$img\`"
@@ -199,8 +199,8 @@ echo "Image root=UUID=\$root_id rw initrd=\initramfs-linux.img" > /archlinux/boo
 
 END
 
-echo "Downloading QEMU EFI bios image..."
-[ -f QEMU_EFI.img ] || curl -Lo - http://snapshots.linaro.org/components/kernel/leg-virt-tianocore-edk2-upstream/latest/QEMU-AARCH64/RELEASE_GCC5/QEMU_EFI.img.gz | gzip -dc > QEMU_EFI.img
+# echo "Downloading QEMU EFI bios image..."
+# [ -f QEMU_EFI.img ] || curl -Lo - https://releases.linaro.org/components/kernel/uefi-linaro/15.10/release/qemu64/QEMU_EFI.img.gz | gzip -dc > QEMU_EFI.img
 
 echo "Downloading Arch ISO image..."
 [ -f Arch.Linux.Arm--aarch64.iso ] || curl -LO https://github.com/IComplainInComments/archiso/releases/download/v2.0/Arch.Linux.Arm--aarch64.iso

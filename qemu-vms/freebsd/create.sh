@@ -20,7 +20,7 @@ image after verifying with a prompt.
 
 The latest installer and B2 checksum will be copied into the current directory as freebsd-x86_64.boot, and
 freebsd-x86_64.boot.b2sum. An additional file freebsd-x86_64.boot.b2sum.gen contains the generated checksum for
-comparbootn. If this script is run again, the latest checksum is downloaded, and if it differs from the previously
+comparison. If this script is run again, the latest checksum is downloaded, and if it differs from the previously
 generated sum, it is assumed that a new installer is available. The local boot and checksum are replaced with a new
 download, and a new generated checksum is compared.
 
@@ -33,7 +33,7 @@ If the file \$HOME/.ssh/id_ecdsa.pub exists on the host, it is copied into the ~
 image, where .ssh and .ssh/authorized_keys have correct privileges.
 
 A /root/resize.sh script is installed that can automatically expand the last partition of a disk to the remaining space
-on the disk, and if the partition has an ext4 filesystem, expand it to fill the partition. The partition may be mounted
+on the disk, and if the partition has as ufs filesystem, expand it to fill the partition. The partition may be mounted
 or unmounted.
 
 The script has a hard-coded mirror to download the boot from.
@@ -45,8 +45,8 @@ thisDir="`dirname "$0"`"
 
 # hasExt status code is 0 if argument has at least one dot, 1 if it has no dots
 # eg:
-# hasExt archlinux.img returns 0
-# hasExt archlinux     returns 1
+# hasExt freebsd.img returns 0
+# hasExt freebsd     returns 1
 hasExt() {
   [ "`echo "$1" | awk -F. '{print NF-1}'`" -gt 0 ]
 }
@@ -127,7 +127,7 @@ latestVersion="`curl -so - "https://download.freebsd.org/releases/amd64/amd64/IS
 bootImage="FreeBSD-$latestVersion-RELEASE-amd64-memstick.img"
 bootDlSum="${bootImage}.xz.sha512"
 bootGenSum="${bootDlSum}.gen"
-bootManSerial="${bootImage}.man.serial"
+bootManSerial="${bootImage}.serial"
 
 # Download image if we don't have it
 [ -f "$bootImage" ] || {
@@ -183,6 +183,7 @@ console=”comconsole,vidconsole”
 
 - add following lines to allow creation of /dev/gptid entries
 kern.geom.label.disk_ident.enable="0"
+kern.geom.label.gpt.enable="1"
 kern.geom.label.gptid.enable="1"
 
 Quit:
@@ -226,14 +227,18 @@ qemu-system-x86_64 -cpu qemu64 -m 2048 -nographic -drive "file=${bootImage},form
 # gpart create -s gpt vtbd1
 
 ## Create boot and zfs partitions
-# gpart add -t freebsd-boot -s 512k vtbd1
-# gpart add -t freebsd-zfs vtbd1
+# gpart add -t freebsd-boot -l zboot -s 512k vtbd1
+# gpart add -t freebsd-zfs  -l zroot vtbd1
 
 ## Create temp moutpoint
 # mkdir /tmp/zfs
 
+## Get gpt ids for zboot and zroot labels
+# zboot_dev="/dev/gptid/`glabel status | grep 'gptid.*vtbd1p1' | awk '{print $1}' | awk -F/ '{print $2}'`"
+# zroot_dev="/dev/gptid/`glabel status | grep 'gptid.*vtbd1p2' | awk '{print $1}' | awk -F/ '{print $2}'`"
+
 ## Create zfs pool
-# zpool create -m / -R /tmp/zfs zroot vtbd1p2
+# zpool create -m / -R /tmp/zfs zroot $zroot_dev
 ## Set bootfs property
 # zpool set bootfs=zroot zroot
 
