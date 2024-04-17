@@ -5,7 +5,7 @@
 # - Download latest release and hash file
 # - Use packer to automate basic install steps
 #   - Verify known hash of memstick image matches generated hash of memstick image
-#   - Create target qcow2 formatted image
+#   - Create target raw formatted image
 #   - Use QEMU to launch a VM with one of mac (hvf), windows (whpx,kernel-irqchip=off), linux (kvm), or none (tcg) accelerators
 #   - Boot up and enter shell
 #   - Execute a provided shell script
@@ -33,3 +33,7 @@
 #   - Install a base system (base, kernel)
 #   - Set hostname, timezone, and DHCP
 #   - Install podman
+
+.PHONY: download-latest-amd64
+download-latest-amd64:
+	./download-latest-amd64.sh
