@@ -7,9 +7,9 @@ dlSum="${image}.xz.sha512"
 genSum="${dlSum}.gen"
 
 [ -f "$image" ] || {
-  # Assume any existing files (and checksums) are older versions
-  echo "Removing older  images"
-  find . -maxdepth 1 -type f -name 'FreeBSD*' -print0 | xargs -0 rm
+  # Remove any existing files (and checksums) except current version
+  echo "Removing older images"
+  find . -maxdepth 1 -type f -name 'FreeBSD*' \! -name "FreeBSD-$latestVersion*" -print0 | xargs -0 rm
 
   # Download latest image
   echo "Downloading the $latestVersion image"

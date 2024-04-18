@@ -34,6 +34,44 @@
 #   - Set hostname, timezone, and DHCP
 #   - Install podman
 
-.PHONY: download-latest-amd64
-download-latest-amd64:
-	./download-latest-amd64.sh
+ISO_BASE_URL_AMD64       = https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES
+LATEST_AMD64_VERSION     = $(shell curl -so - $(ISO_BASE_URL_AMD64)/ | grep "<a href" | tail -n 1 | grep -Eo "[0-9.]*" | head -n 1)
+LATEST_AMD64_XZ_MEMSTICK = FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64-memstick.img.xz
+LATEST_AMD64_XZ_URL      = $(ISO_BASE_URL_AMD64)/$(LATEST_AMD64_VERSION)/$(LATEST_AMD64_XZ_MEMSTICK)
+LATEST_AMD64_CKSUM       = $(LATEST_AMD64_XZ_MEMSTICK).sha512
+LATEST_AMD64_CKSUM_URL   = $(ISO_BASE_URL_AMD64)/$(LATEST_AMD64_VERSION)/CHECKSUM.SHA512-FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64
+
+# Silent by default
+# Run "make VERBOSE=1 ..." to show output of each recipe invoked
+ifndef VERBOSE
+.SILENT:
+endif
+
+# Default target
+.PHONY:
+all: $(LATEST_AMD64_CKSUM)
+
+# Download latest image if we don't have it
+$(LATEST_AMD64_XZ_MEMSTICK):
+	echo "Removing older images"; \
+	find . -maxdepth 1 -type f -name 'FreeBSD-*-RELEASE-amd64-memstick.img*' \! -name "FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64-memstick.img*" -print0 | xargs -0 rm; \
+	echo "Downloading the $(LATEST_AMD64_VERSION) image"; \
+	curl --progress-bar -LO $(LATEST_AMD64_XZ_URL)
+
+# Download latest image checksum if we don't have it
+$(LATEST_AMD64_CKSUM): $(LATEST_AMD64_XZ_MEMSTICK)
+	echo "Downloading checksum"; \
+	curl -sLo - $(LATEST_AMD64_CKSUM_URL) | grep amd64-memstick.img.xz | awk '-F=' '{print $$2}' | tr -d ' ' > $@
+
+.PHONY: clean
+clean:
+	find . -maxdepth 1 -type f -name 'FreeBSD-*-RELEASE-amd64-memstick.img*' -print0 | xargs -0 rm;
+
+.PHONY: vars
+vars:
+	echo "ISO_BASE_URL_AMD64       = $(ISO_BASE_URL_AMD64)"
+	echo "LATEST_AMD64_VERSION     = $(LATEST_AMD64_VERSION)"
+	echo "LATEST_AMD64_XZ_MEMSTICK = $(LATEST_AMD64_XZ_MEMSTICK)"
+	echo "LATEST_AMD64_XZ_URL      = $(LATEST_AMD64_XZ_URL)"
+	echo "LATEST_AMD64_CKSUM       = $(LATEST_AMD64_CKSUM)"
+	echo "LATEST_AMD64_CKSUM_URL   = $(LATEST_AMD64_CKSUM_URL)"
