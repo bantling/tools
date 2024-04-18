@@ -36,10 +36,13 @@
 
 ISO_BASE_URL_AMD64       = https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES
 LATEST_AMD64_VERSION     = $(shell curl -so - $(ISO_BASE_URL_AMD64)/ | grep "<a href" | tail -n 1 | grep -Eo "[0-9.]*" | head -n 1)
-LATEST_AMD64_XZ_MEMSTICK = FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64-memstick.img.xz
+LATEST_AMD64_MEMSTICK    = FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64-memstick.img
+LATEST_AMD64_XZ_MEMSTICK = $(LATEST_AMD64_MEMSTICK).xz
 LATEST_AMD64_XZ_URL      = $(ISO_BASE_URL_AMD64)/$(LATEST_AMD64_VERSION)/$(LATEST_AMD64_XZ_MEMSTICK)
 LATEST_AMD64_CKSUM       = $(LATEST_AMD64_XZ_MEMSTICK).sha512
 LATEST_AMD64_CKSUM_URL   = $(ISO_BASE_URL_AMD64)/$(LATEST_AMD64_VERSION)/CHECKSUM.SHA512-FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64
+LATEST_AMD64_CKSUM_GEN   = $(LATEST_AMD64_CKSUM).gen
+LATEST_AMD64_CKSUM_CMP   = $(LATEST_AMD64_CKSUM).cmp
 
 # Silent by default
 # Run "make VERBOSE=1 ..." to show output of each recipe invoked
@@ -49,12 +52,12 @@ endif
 
 # Default target
 .PHONY:
-all: $(LATEST_AMD64_CKSUM)
+all: $(LATEST_AMD64_MEMSTICK)
 
 # Download latest image if we don't have it
 $(LATEST_AMD64_XZ_MEMSTICK):
 	echo "Removing older images"; \
-	find . -maxdepth 1 -type f -name 'FreeBSD-*-RELEASE-amd64-memstick.img*' \! -name "FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64-memstick.img*" -print0 | xargs -0 rm; \
+	find . -maxdepth 1 -type f -name 'FreeBSD-*-RELEASE-amd64-memstick.img*' -print0 | xargs -0 rm; \
 	echo "Downloading the $(LATEST_AMD64_VERSION) image"; \
 	curl --progress-bar -LO $(LATEST_AMD64_XZ_URL)
 
@@ -62,6 +65,28 @@ $(LATEST_AMD64_XZ_MEMSTICK):
 $(LATEST_AMD64_CKSUM): $(LATEST_AMD64_XZ_MEMSTICK)
 	echo "Downloading checksum"; \
 	curl -sLo - $(LATEST_AMD64_CKSUM_URL) | grep amd64-memstick.img.xz | awk '-F=' '{print $$2}' | tr -d ' ' > $@
+
+# Generate a checksum to compare against downloaded checksum
+$(LATEST_AMD64_CKSUM_GEN): $(LATEST_AMD64_CKSUM)
+	echo "Generating checksum"; \
+	sha512sum -b $(LATEST_AMD64_XZ_MEMSTICK) | awk '{print $$1}' > $@
+
+# Compare checksums
+$(LATEST_AMD64_CKSUM_CMP): $(LATEST_AMD64_CKSUM) $(LATEST_AMD64_CKSUM_GEN)
+	echo "Comparing checksums"; \
+	diff $^ > /dev/null || { \
+	  echo "Downloaded checksum does not match generated checksum"; \
+	  exit 1; \
+	}; \
+	touch $@
+
+# Decompress image
+# For some reason, we need to touch the extracted file after extracting it, to ensure it has a date newer than
+# the prerequisite. Otherwise, it keeps extracting.
+$(LATEST_AMD64_MEMSTICK): $(LATEST_AMD64_CKSUM_CMP)
+	echo "Extracting image"; \
+	xz --verbose -kd $@.xz; \
+	touch $@
 
 .PHONY: clean
 clean:
