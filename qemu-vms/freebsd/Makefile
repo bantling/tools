@@ -34,23 +34,23 @@
 #   - Set hostname, timezone, and DHCP
 #   - Install podman
 
-COMMA                     := ,
-QEMU_ACCEL_HVF            = $(shell qemu-system-x86_64 -accel help | grep hvf)
-QEMU_ACCEL_WHPX           = $(shell qemu-system-x86_64 -accel help | grep whpx)
-QEMU_ACCEL_KVM            = $(shell qemu-system-x86_64 -accel help | grep kvm)
-QEMU_ACCEL                = $(if $(QEMU_ACCEL_HVF),hvf,$(if $(QEMU_ACCEL_WHPX),whpx$(COMMA)kernel-irqchip=off,$(if $(QEMU_ACCEL_KVM),kvm,tcg)))
-ISO_BASE_URL_AMD64        = https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES
-LATEST_AMD64_VERSION      = $(shell curl -so - $(ISO_BASE_URL_AMD64)/ | grep "<a href" | tail -n 1 | grep -Eo "[0-9.]*" | head -n 1)
-LATEST_AMD64_MEMSTICK     = FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64-memstick.img
-LATEST_AMD64_XZ_MEMSTICK  = $(LATEST_AMD64_MEMSTICK).xz
-LATEST_AMD64_XZ_URL       = $(ISO_BASE_URL_AMD64)/$(LATEST_AMD64_VERSION)/$(LATEST_AMD64_XZ_MEMSTICK)
-LATEST_AMD64_CKSUM        = $(LATEST_AMD64_XZ_MEMSTICK).sha512
-LATEST_AMD64_CKSUM_URL    = $(ISO_BASE_URL_AMD64)/$(LATEST_AMD64_VERSION)/CHECKSUM.SHA512-FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64
-LATEST_AMD64_CKSUM_GEN    = $(LATEST_AMD64_CKSUM).gen
-LATEST_AMD64_CKSUM_CMP    = $(LATEST_AMD64_CKSUM).cmp
-LATEST_AMD64_MEMSTICK_SSH = $(LATEST_AMD64_MEMSTICK).ssh
-IMAGE_AMD64               = FreeBSD-$(LATEST_AMD64_VERSION).img
-IMAGE_AMD64_INSTALL       = $(IMAGE_AMD64).install
+COMMA                        := ,
+QEMU_ACCEL_HVF               := $(shell qemu-system-x86_64 -accel help | grep hvf)
+QEMU_ACCEL_WHPX              := $(shell qemu-system-x86_64 -accel help | grep whpx)
+QEMU_ACCEL_KVM               := $(shell qemu-system-x86_64 -accel help | grep kvm)
+QEMU_ACCEL                   := $(if $(QEMU_ACCEL_HVF),hvf,$(if $(QEMU_ACCEL_WHPX),whpx$(COMMA)kernel-irqchip=off,$(if $(QEMU_ACCEL_KVM),kvm,tcg)))
+ISO_BASE_URL_AMD64           := https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES
+LATEST_AMD64_VERSION         := $(shell curl -so - $(ISO_BASE_URL_AMD64)/ | grep "<a href" | tail -n 1 | grep -Eo "[0-9.]*" | head -n 1)
+LATEST_AMD64_MEMSTICK        := FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64-memstick.img
+LATEST_AMD64_XZ_MEMSTICK     := $(LATEST_AMD64_MEMSTICK).xz
+LATEST_AMD64_XZ_URL          := $(ISO_BASE_URL_AMD64)/$(LATEST_AMD64_VERSION)/$(LATEST_AMD64_XZ_MEMSTICK)
+LATEST_AMD64_CKSUM           :=  $(LATEST_AMD64_XZ_MEMSTICK).sha512
+LATEST_AMD64_CKSUM_URL       := $(ISO_BASE_URL_AMD64)/$(LATEST_AMD64_VERSION)/CHECKSUM.SHA512-FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64
+LATEST_AMD64_CKSUM_GEN       := $(LATEST_AMD64_CKSUM).gen
+LATEST_AMD64_CKSUM_CMP       := $(LATEST_AMD64_CKSUM).cmp
+LATEST_AMD64_MEMSTICK_SERIAL := $(LATEST_AMD64_MEMSTICK).serial
+IMAGE_AMD64                  := FreeBSD-$(LATEST_AMD64_VERSION).img
+IMAGE_AMD64_INSTALL          := $(IMAGE_AMD64).install
 
 # Silent by default
 # Run "make VERBOSE=1 ..." to show output of each recipe invoked
@@ -96,25 +96,40 @@ $(LATEST_AMD64_MEMSTICK): $(LATEST_AMD64_CKSUM_CMP)
 	xz --verbose -kd $@.xz; \
 	touch $@
 
-# Modify the memstick image to enable ssh
-$(LATEST_AMD64_MEMSTICK_SSH): $(LATEST_AMD64_MEMSTICK)
-	echo 'Use the following steps to enable SSH in the memstick image:'; \
-	echo 'adduser'; \
-	echo 'echo sshd_enable="YES" >> /etc/rc.conf'; \
-	echo 'poweroff'; \
-	qemu-system-x86_64 -accel "$(QEMU_ACCEL)" -boot c -cpu qemu64 -m 1024 -drive file=$(LATEST_AMD64_MEMSTICK),format=raw,if=virtio -nic user,model=virtio-net-pci; \
-	exit 1; \
+# Modify the memstick image to enable serial port booting
+$(LATEST_AMD64_MEMSTICK_SERIAL): $(LATEST_AMD64_MEMSTICK)
+	echo 'Use the following steps to enable serial port booting in the memstick image:'
+	echo 'mount -u -w /'
+	echo 'vi /boot/loader.conf'
+	echo 'add the folllwing lines:'
+	echo 'autoboot_delay="-1"'
+	echo 'boot_multicons="YES"'
+	echo 'boot_serial="YES"'
+	echo 'comconsole_speed="115200"'
+	echo 'console="comconsole,vidconsole"'
+	echo 'poweroff'
+	qemu-system-x86_64 \
+	  -accel "$(QEMU_ACCEL)" \
+	  -boot c \
+	  -cpu qemu64 \
+	  -m 1024 \
+	  -drive file=$(LATEST_AMD64_MEMSTICK),format=raw,if=virtio
 	touch $@
 
 # Create the target image
-$(IMAGE_AMD64): $(LATEST_AMD64_MEMSTICK_SSH)
+$(IMAGE_AMD64): $(LATEST_AMD64_MEMSTICK_SERIAL)
 	qemu-img create -f raw $@ 8G
 
 # Run the memstick image with the target image to partition, format, and install FreeBSD as zfs root
 $(IMAGE_AMD64_INSTALL): $(IMAGE_AMD64)
-	qemu-system-x86_64 -accel "$(QEMU_ACCEL)" -boot c -cpu qemu64 -m 1024 -drive file=$(LATEST_AMD64_MEMSTICK),format=raw,if=virtio -drive file=$(IMAGE_AMD64),format=raw,if=virtio -nic user,model=virtio-net-pci,hostfwd=tcp::2222-:22; \
-
-#	touch $@
+	autoexpect qemu-system-x86_64 \
+	  -accel "$(QEMU_ACCEL)" \
+	  -boot c \
+	  -cpu qemu64 \
+	  -m 1024 \
+	  -drive file=$(LATEST_AMD64_MEMSTICK),format=raw,if=virtio \
+	  -drive file=$(IMAGE_AMD64),format=raw,if=virtio \
+	  -nographic
 
 .PHONY: clean
 clean:
@@ -122,19 +137,19 @@ clean:
 
 .PHONY: vars
 vars:
-	echo "QEMU_ACCEL_HVF            = $(QEMU_ACCEL_HVF)"
-	echo "QEMU_ACCEL_WHPX           = $(QEMU_ACCEL_WHPX)"
-	echo "QEMU_ACCEL_KVM            = $(QEMU_ACCEL_KVM)"
-	echo "QEMU_ACCEL                = $(QEMU_ACCEL)"
-	echo "ISO_BASE_URL_AMD64        = $(ISO_BASE_URL_AMD64)"
-	echo "LATEST_AMD64_VERSION      = $(LATEST_AMD64_VERSION)"
-	echo "LATEST_AMD64_MEMSTICK     = $(LATEST_AMD64_MEMSTICK)"
-	echo "LATEST_AMD64_XZ_MEMSTICK  = $(LATEST_AMD64_XZ_MEMSTICK)"
-	echo "LATEST_AMD64_XZ_URL       = $(LATEST_AMD64_XZ_URL)"
-	echo "LATEST_AMD64_CKSUM        = $(LATEST_AMD64_CKSUM)"
-	echo "LATEST_AMD64_CKSUM_URL    = $(LATEST_AMD64_CKSUM_URL)"
-	echo "LATEST_AMD64_CKSUM_GEN    = $(LATEST_AMD64_CKSUM_GEN)"
-	echo "LATEST_AMD64_CKSUM_CMP    = $(LATEST_AMD64_CKSUM_CMP)"
-	echo "LATEST_AMD64_MEMSTICK_SSH = $(LATEST_AMD64_MEMSTICK_SSH)"
-	echo "IMAGE_AMD64               = $(IMAGE_AMD64)"
-	echo "IMAGE_AMD64_INSTALL       = $(IMAGE_AMD64_INSTALL)"
+	echo "QEMU_ACCEL_HVF               = $(QEMU_ACCEL_HVF)"
+	echo "QEMU_ACCEL_WHPX              = $(QEMU_ACCEL_WHPX)"
+	echo "QEMU_ACCEL_KVM               = $(QEMU_ACCEL_KVM)"
+	echo "QEMU_ACCEL                   = $(QEMU_ACCEL)"
+	echo "ISO_BASE_URL_AMD64           = $(ISO_BASE_URL_AMD64)"
+	echo "LATEST_AMD64_VERSION         = $(LATEST_AMD64_VERSION)"
+	echo "LATEST_AMD64_MEMSTICK        = $(LATEST_AMD64_MEMSTICK)"
+	echo "LATEST_AMD64_XZ_MEMSTICK     = $(LATEST_AMD64_XZ_MEMSTICK)"
+	echo "LATEST_AMD64_XZ_URL          = $(LATEST_AMD64_XZ_URL)"
+	echo "LATEST_AMD64_CKSUM           = $(LATEST_AMD64_CKSUM)"
+	echo "LATEST_AMD64_CKSUM_URL       = $(LATEST_AMD64_CKSUM_URL)"
+	echo "LATEST_AMD64_CKSUM_GEN       = $(LATEST_AMD64_CKSUM_GEN)"
+	echo "LATEST_AMD64_CKSUM_CMP       = $(LATEST_AMD64_CKSUM_CMP)"
+	echo "LATEST_AMD64_MEMSTICK_SERIAL = $(LATEST_AMD64_MEMSTICK_SERIAL)"
+	echo "IMAGE_AMD64                  = $(IMAGE_AMD64)"
+	echo "IMAGE_AMD64_INSTALL          = $(IMAGE_AMD64_INSTALL)"
