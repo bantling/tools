@@ -98,15 +98,18 @@ $(LATEST_AMD64_MEMSTICK): $(LATEST_AMD64_CKSUM_CMP)
 
 # Modify the memstick image to enable serial port booting
 $(LATEST_AMD64_MEMSTICK_SERIAL): $(LATEST_AMD64_MEMSTICK)
-	echo 'Use the following steps to enable serial port booting in the memstick image:'
+	echo '1. Enable serial port booting:'
 	echo 'mount -u -w /'
 	echo 'vi /boot/loader.conf'
-	echo 'add the folllwing lines:'
-	echo 'autoboot_delay="-1"'
+	echo 'add the following lines:'
 	echo 'boot_multicons="YES"'
 	echo 'boot_serial="YES"'
 	echo 'comconsole_speed="115200"'
 	echo 'console="comconsole,vidconsole"'
+	echo '2. Disable booting up installer'
+	echo 'vi /etc/rc.local'
+	echo 'Add an exit command after comments'
+	echo '3. Quit'
 	echo 'poweroff'
 	qemu-system-x86_64 \
 	  -accel "$(QEMU_ACCEL)" \
@@ -122,14 +125,7 @@ $(IMAGE_AMD64): $(LATEST_AMD64_MEMSTICK_SERIAL)
 
 # Run the memstick image with the target image to partition, format, and install FreeBSD as zfs root
 $(IMAGE_AMD64_INSTALL): $(IMAGE_AMD64)
-	autoexpect qemu-system-x86_64 \
-	  -accel "$(QEMU_ACCEL)" \
-	  -boot c \
-	  -cpu qemu64 \
-	  -m 1024 \
-	  -drive file=$(LATEST_AMD64_MEMSTICK),format=raw,if=virtio \
-	  -drive file=$(IMAGE_AMD64),format=raw,if=virtio \
-	  -nographic
+	./expect.sh "$(QEMU_ACCEL)" "$(LATEST_AMD64_MEMSTICK)" "$(IMAGE_AMD64)"
 
 .PHONY: clean
 clean:
