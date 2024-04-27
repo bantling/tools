@@ -131,6 +131,12 @@ $(IMAGE_AMD64_INSTALL): $(IMAGE_AMD64)
 clean:
 	find . -maxdepth 1 -type f -name 'FreeBSD-*-RELEASE-amd64-memstick.img*' -print0 | xargs -0 rm;
 
+.PHONY: push
+push:
+	git add -A
+	git commit -m Changes
+	git push
+
 .PHONY: vars
 vars:
 	echo "QEMU_ACCEL_HVF               = $(QEMU_ACCEL_HVF)"
