@@ -221,7 +221,8 @@ echo -e "\nRunning expect script"
 qemu-system-x86_64 -cpu qemu64 -m 2048 -nographic -drive "file=${bootImage},format=raw,if=virtio" -drive "file=${hdImage},format=raw,if=virtio" -nic user,model=virtio-net-pci
 #"${thisDir}"/expect.sh "$bootImage" "$hdImage" "$rootPwd" "$userPwd" "$resizeScript" $sshPubKey
 
-## Manual install steps - see https://forums.freebsd.org/threads/installing-freebsd-manually-no-installer.63201/
+## Manual install steps
+## See https://forums.freebsd.org/threads/installing-freebsd-manually-no-installer.63201/ for basic ZFS install steps
 
 ## Create an empty GPT partition table
 # gpart create -s gpt vtbd1

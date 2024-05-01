@@ -44,13 +44,13 @@ LATEST_AMD64_VERSION         := $(shell curl -so - $(ISO_BASE_URL_AMD64)/ | grep
 LATEST_AMD64_MEMSTICK        := FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64-memstick.img
 LATEST_AMD64_XZ_MEMSTICK     := $(LATEST_AMD64_MEMSTICK).xz
 LATEST_AMD64_XZ_URL          := $(ISO_BASE_URL_AMD64)/$(LATEST_AMD64_VERSION)/$(LATEST_AMD64_XZ_MEMSTICK)
-LATEST_AMD64_CKSUM           :=  $(LATEST_AMD64_XZ_MEMSTICK).sha512
+LATEST_AMD64_CKSUM           := .$(LATEST_AMD64_XZ_MEMSTICK).sha512
 LATEST_AMD64_CKSUM_URL       := $(ISO_BASE_URL_AMD64)/$(LATEST_AMD64_VERSION)/CHECKSUM.SHA512-FreeBSD-$(LATEST_AMD64_VERSION)-RELEASE-amd64
 LATEST_AMD64_CKSUM_GEN       := $(LATEST_AMD64_CKSUM).gen
 LATEST_AMD64_CKSUM_CMP       := $(LATEST_AMD64_CKSUM).cmp
-LATEST_AMD64_MEMSTICK_SERIAL := $(LATEST_AMD64_MEMSTICK).serial
+LATEST_AMD64_MEMSTICK_SERIAL := .$(LATEST_AMD64_MEMSTICK).serial
 IMAGE_AMD64                  := FreeBSD-$(LATEST_AMD64_VERSION).img
-IMAGE_AMD64_INSTALL          := $(IMAGE_AMD64).install
+IMAGE_AMD64_INSTALL          := .$(IMAGE_AMD64).install
 
 # Silent by default
 # Run "make VERBOSE=1 ..." to show output of each recipe invoked
@@ -60,7 +60,7 @@ endif
 
 # Default target
 .PHONY:
-all: $(LATEST_AMD64_MEMSTICK)
+all: $(IMAGE_AMD64_INSTALL)
 
 # Download latest image if we don't have it
 $(LATEST_AMD64_XZ_MEMSTICK):
@@ -98,17 +98,27 @@ $(LATEST_AMD64_MEMSTICK): $(LATEST_AMD64_CKSUM_CMP)
 
 # Modify the memstick image to enable serial port booting
 $(LATEST_AMD64_MEMSTICK_SERIAL): $(LATEST_AMD64_MEMSTICK)
-	echo '1. Enable serial port booting:'
+	echo '1. Remount root as read/write:'
 	echo 'mount -u -w /'
+	echo
+	echo '2. Modify boot looader config:'
 	echo 'vi /boot/loader.conf'
-	echo 'add the following lines:'
+	echo 'Add the following lines to enable serial booting:'
+	echo
 	echo 'boot_multicons="YES"'
 	echo 'boot_serial="YES"'
 	echo 'comconsole_speed="115200"'
 	echo 'console="comconsole,vidconsole"'
+	echo
+	echo 'Add the following lines to enable /dev/gpt and /dev/gptid:'
+	echo 'kern.geom.label.disk_ident.enable="0"'
+	echo 'kern.geom.label.gpt.enable="1"'
+	echo 'kern.geom.label.gptid.enable="1"'
+	echo
 	echo '2. Disable booting up installer'
 	echo 'vi /etc/rc.local'
 	echo 'Add an exit command after comments'
+	echo
 	echo '3. Quit'
 	echo 'poweroff'
 	qemu-system-x86_64 \
@@ -126,6 +136,22 @@ $(IMAGE_AMD64): $(LATEST_AMD64_MEMSTICK_SERIAL)
 # Run the memstick image with the target image to partition, format, and install FreeBSD as zfs root
 $(IMAGE_AMD64_INSTALL): $(IMAGE_AMD64)
 	./expect.sh "$(QEMU_ACCEL)" "$(LATEST_AMD64_MEMSTICK)" "$(IMAGE_AMD64)"
+	#touch $@
+
+# Run the above install target with a more convenient target name
+.PHONY: install
+install: $(IMAGE_AMD64_INSTALL)
+
+# Run the target image, after ensuring it has been installed
+.PHONY: run
+run: $(IMAGE_AMD64)
+	qemu-system-x86_64 \
+	  -accel "$(QEMU_ACCEL)" \
+	  -boot c \
+	  -cpu qemu64 \
+	  -m 1024 \
+	  -drive file=$(IMAGE_AMD64),format=raw,if=virtio \
+	  -nic user,model=virtio-net-pci
 
 .PHONY: clean
 clean:
