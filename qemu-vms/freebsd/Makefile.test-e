@@ -110,11 +110,17 @@ $(LATEST_AMD64_MEMSTICK_CONFIG): $(LATEST_AMD64_MEMSTICK)
 	echo '4. Run bootstrap.sh:'
 	echo 'sh bootstrap.sh'
 	echo
-	echo 'The bootstrap should do the following:'
-	echo '- Set a few values and reboot so they take effect'
-	echo '- The next boot should auto exec bootstrap.sh'
-	echo '- bootstrap.sh will download and execute setup.sh'
-	echo '- setup.sh configures second drive with a bootable zfs system'
+	echo 'Add the following lines to enable /dev/gpt and /dev/gptid:'
+	echo 'kern.geom.label.disk_ident.enable="0"'
+	echo 'kern.geom.label.gpt.enable="1"'
+	echo 'kern.geom.label.gptid.enable="1"'
+	echo
+	echo '2. Disable booting up installer'
+	echo 'vi /etc/rc.local'
+	echo 'Add an exit command after comments'
+	echo
+	echo '3. Quit'
+	echo 'poweroff'
 	qemu-system-x86_64 \
 	  -accel "$(QEMU_ACCEL)" \
 	  -boot c \

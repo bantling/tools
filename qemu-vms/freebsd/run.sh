@@ -37,7 +37,7 @@ fi
 
 # Check if there are no more args, and not exactly one *.img file
 if [ "$#" -eq 0 -a "`ls *.img | grep -v '.*memstick.*.img' | wc -l`" -ne 1 ]; then
-  usage "The image name must be provided, unless there is exactly one image named *.img"
+  usage "The image name must be provided, unless there is exactly one image named *.img (other than memstick*.img)"
 fi
 
 # Get image passed, or use only *.img file
