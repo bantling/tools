@@ -1,5 +1,11 @@
 #!/bin/sh
 
+## Is there a second drive to setup?
+ls /dev/vtbd1 || {
+  echo "No second drive to configure"
+  exit
+}
+
 ## Destroy any existing gpt partition
 echo 'Destroying gpt partition table'
 gpart destroy -F vtbd1

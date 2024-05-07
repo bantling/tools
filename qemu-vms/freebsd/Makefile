@@ -50,7 +50,6 @@ LATEST_AMD64_CKSUM_GEN       := $(LATEST_AMD64_CKSUM).gen
 LATEST_AMD64_CKSUM_CMP       := $(LATEST_AMD64_CKSUM).cmp
 LATEST_AMD64_MEMSTICK_CONFIG := .$(LATEST_AMD64_MEMSTICK).config
 IMAGE_AMD64                  := FreeBSD-$(LATEST_AMD64_VERSION).img
-IMAGE_AMD64_INSTALL          := .$(IMAGE_AMD64).install
 
 # Silent by default
 # Run "make VERBOSE=1 ..." to show output of each recipe invoked
@@ -60,7 +59,7 @@ endif
 
 # Default target
 .PHONY:
-all: $(IMAGE_AMD64_INSTALL)
+all: run
 
 # Download latest image if we don't have it
 $(LATEST_AMD64_XZ_MEMSTICK):
@@ -114,7 +113,7 @@ $(LATEST_AMD64_MEMSTICK_CONFIG): $(LATEST_AMD64_MEMSTICK)
 	echo '- Set a few values and reboot so they take effect'
 	echo '- The next boot should auto exec bootstrap.sh'
 	echo '- bootstrap.sh will download and execute setup.sh'
-	echo '- setup.sh configures second drive with a bootable zfs system'
+	echo '- setup.sh configures second drive (if there is one) with a bootable zfs system'
 	qemu-system-x86_64 \
 	  -accel "$(QEMU_ACCEL)" \
 	  -boot c \
@@ -123,18 +122,15 @@ $(LATEST_AMD64_MEMSTICK_CONFIG): $(LATEST_AMD64_MEMSTICK)
 	  -drive file=$(LATEST_AMD64_MEMSTICK),format=raw,if=virtio
 	touch $@
 
+# Reconfig just removes the LATEST_AMD64_MEMSTICK_CONFIG, then makes it
+.PHONY: reconfig
+reconfig:
+	rm -f $(LATEST_AMD64_MEMSTICK_CONFIG)
+	$(MAKE) $(LATEST_AMD64_MEMSTICK_CONFIG)
+
 # Create the target image
 $(IMAGE_AMD64): $(LATEST_AMD64_MEMSTICK_SERIAL)
 	qemu-img create -f raw $@ 8G
-
-# Run the memstick image with the target image to partition, format, and install FreeBSD as zfs root
-$(IMAGE_AMD64_INSTALL): $(IMAGE_AMD64)
-	./expect.sh "$(QEMU_ACCEL)" "$(LATEST_AMD64_MEMSTICK)" "$(IMAGE_AMD64)"
-	#touch $@
-
-# Run the above install target with a more convenient target name
-.PHONY: install
-install: $(IMAGE_AMD64_INSTALL)
 
 # Run the target image, after ensuring it has been installed
 .PHONY: run
@@ -175,4 +171,3 @@ vars:
 	echo "LATEST_AMD64_CKSUM_CMP       = $(LATEST_AMD64_CKSUM_CMP)"
 	echo "LATEST_AMD64_MEMSTICK_SERIAL = $(LATEST_AMD64_MEMSTICK_SERIAL)"
 	echo "IMAGE_AMD64                  = $(IMAGE_AMD64)"
-	echo "IMAGE_AMD64_INSTALL          = $(IMAGE_AMD64_INSTALL)"
