@@ -48,7 +48,7 @@ grep -q bootstrap.sh /etc/rc.local || {
 
 # Download setup.sh script, in case it has changed
 echo 'Downloading latest setup.sh via ftp'
-(printf "GET /bantling/tools/master/qemu-vms/freebsd/setup.sh HTTP/1.0\r\nHOST: raw.githubusercontent.com\r\n\r\n"; sleep 3) | openssl s_client -connect raw.githubusercontent.com:443 -quiet | sed -n '/#!/,$p' > setup.sh
+(printf "GET /bantling/tools/master/qemu-vms/freebsd/setup.sh HTTP/1.0\r\nHOST: raw.githubusercontent.com\r\n\r\n"; sleep 2) | openssl s_client -connect raw.githubusercontent.com:443 -quiet | sed -n '/#!/,$p' > setup.sh
 
 # Execute setup script
 echo 'Executing setup.sh'

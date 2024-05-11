@@ -145,7 +145,7 @@ $(LATEST_AMD64_MEMSTICK_CONF_F): $(IMAGE_AMD64) $(IMAGE_AMD64_PHYS)
 	echo 'dhclient vtnet0'
 	echo
 	echo '3. Download bootstrap script:'
-	echo '(printf "GET /bantling/tools/master/qemu-vms/freebsd/bootstrap.sh HTTP/1.0\r\nHOST: raw.githubusercontent.com\r\n\r\n"; sleep 3) | openssl s_client -connect raw.githubusercontent.com:443 -quiet | sed -n \'/#!/,$p\' > bootstrap.sh'
+	echo '{printf "GET /bantling/tools/master/qemu-vms/freebsd/bootstrap.sh HTTP/1.0\r\nHOST: raw.githubusercontent.com\r\n\r\n"; sleep 2} | openssl s_client -connect raw.githubusercontent.com:443 -quiet | sed -n \'/#!/,$p\' > bootstrap.sh'
 	echo ''
 	echo
 	echo '4. Run bootstrap.sh:'
