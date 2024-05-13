@@ -1,6 +1,12 @@
 #!/bin/sh
 set -eu
 
+# Remount root fs read/write - we always need this, as we always download latest setup.sh script
+mount -u -w /
+
+# Ensure we have networking running
+dhclient "`ifconfig -a | sed -r 's,([^:]*):.*,\1,;/[ /t]/d'`"
+
 # Do we need to reboot?
 reboot=0
 
@@ -8,9 +14,6 @@ reboot=0
 grep -q 'kern.geom.label' /boot/loader.conf || {
   # We need to reboot for these settings to take effect
   reboot=1
-
-  # Remount root fs read/write
-  mount -u -w /
 
   # Inform user
   echo 'Configuring gptid disk identification'
@@ -27,9 +30,6 @@ grep -q 'kern.geom.label' /boot/loader.conf || {
 grep -q bootstrap.sh /etc/rc.local || {
   # Rebooting allows user to manually test this script launches automatically
   reboot=1
-
-  # Remount root fs read/write
-  mount -u -w /
 
   # Inform user
   echo 'Ensuring bootstrap.sh runs automatically at boot'
