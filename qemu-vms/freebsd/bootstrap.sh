@@ -5,7 +5,7 @@ set -eu
 mount -u -w /
 
 # Ensure we have networking running
-dhclient "`ifconfig -a | sed -r 's,([^:]*):.*,\1,;/[ /t]/d'`"
+dhclient "`ifconfig -a | sed -r '/^\t/d;s/^([^:]*).*/\1/' | grep -v lo\"
 
 # Do we need to reboot?
 reboot=0
