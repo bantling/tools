@@ -21,7 +21,7 @@ gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 vtbd1
 echo 'Retrieving gpt root partition id'
 zroot_dev="/dev/gptid/`glabel status | grep 'gptid.*vtbd1p2' | awk '{print $1}' | awk -F/ '{print $2}'`"
 
-## Create temp moutpoint
+## Create temp mountpoint
 echo 'Creating temp mount point'
 mkdir /tmp/zfs
 
@@ -50,7 +50,7 @@ echo 'Installing kernel'
 tar xvJf /usr/freebsd-dist/kernel.txz > /dev/null
 
 echo 'Creating fstab'
-echo -e '\t#Device\t\tMountpoint\tFSType\tOptions\t\tDump\tPass\nzroot\t\t/\t\tzfs\trw,noatime\t0\t0' > etc/fstab
+echo -e '#Device\t\tMountpoint\tFSType\tOptions\t\tDump\tPass\nzroot\t\t/\t\tzfs\trw,noatime\t0\t0' > etc/fstab
 
 echo 'Creating rc.local to start DHCP for first non-loop network device at boot'
 cat <<-EOF > etc/rc.local
