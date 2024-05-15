@@ -27,6 +27,7 @@ mkdir /tmp/zfs
 
 ## Create zfs pool
 echo 'Creating zpool'
+zpool labelclear -f $zroot_dev
 zpool create -m / -R /tmp/zfs zroot $zroot_dev
 
 ## Set bootfs property
@@ -44,10 +45,10 @@ echo 'Entering temp mount point'
 cd /tmp/zfs
 
 echo 'Installing base'
-tar xvJf /usr/freebsd-dist/base.txz > /dev/null
+tar xvJf /usr/freebsd-dist/base.txz
 
 echo 'Installing kernel'
-tar xvJf /usr/freebsd-dist/kernel.txz > /dev/null
+tar xvJf /usr/freebsd-dist/kernel.txz
 
 echo 'Creating fstab'
 echo -e '#Device\t\tMountpoint\tFSType\tOptions\t\tDump\tPass\nzroot\t\t/\t\tzfs\trw,noatime\t0\t0' > etc/fstab
@@ -55,7 +56,7 @@ echo -e '#Device\t\tMountpoint\tFSType\tOptions\t\tDump\tPass\nzroot\t\t/\t\tzfs
 echo 'Creating rc.local to start DHCP for first non-loop network device at boot'
 cat <<-EOF > etc/rc.local
 #!/bin/sh
-dhclient "`ifconfig -a | sed -r '/^\t/d;s,^([^:]*).*,\1,' | grep -v lo | head -1`"
+dhclient "\`ifconfig -a | sed -r '/^\t/d;s,^([^:]*).*,\1,' | grep -v lo | head -1\`"
 EOF
 chmod +x etc/rc.local
 
@@ -65,8 +66,8 @@ echo 'Chrooting into temp mount point'
 cat <<-EOF | chroot .
 ## Configure loader.conf settings
 echo 'Configuring boot loader to use zfs'
-sysrc -f boot/loader.conf zfs_load="YES"
-sysrc -f boot/loader.conf vfs.root.mountfrom="zfs:zroot"
+echo 'zfs_load="YES"' > boot/loader.conf
+echo 'vfs.root.mountfrom="zfs:zroot"' >> boot/loader.conf 
 
 ## Configure rc.conf settings
 echo 'Configuring rc.conf'
