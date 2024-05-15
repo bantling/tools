@@ -131,7 +131,8 @@ $(LATEST_AMD64_MEMSTICK_F): $(LATEST_AMD64_XZ_CKSUM_CMP_F)
 	xz --verbose -kd $@.xz; \
 	touch $@
 
-# Create the target images
+# Create the target images, always recreate them so we can keep running the process to test installation scripts
+#.PHONY: $(IMAGE_AMD64) $(IMAGE_AMD64_PHYS)
 $(IMAGE_AMD64) $(IMAGE_AMD64_PHYS): $(LATEST_AMD64_MEMSTICK_F)
 	qemu-img create -f raw $@ 8G
 
@@ -145,13 +146,11 @@ $(LATEST_AMD64_MEMSTICK_CONF_F): $(IMAGE_AMD64) $(IMAGE_AMD64_PHYS)
 	echo 'dhclient vtnet0'
 	echo
 	echo '3. Download bootstrap script:'
-	echo '{printf "GET /bantling/tools/master/qemu-vms/freebsd/bootstrap.sh HTTP/1.0\r\nHOST: raw.githubusercontent.com\r\n\r\n"; sleep 2} | openssl s_client -connect raw.githubusercontent.com:443 -quiet | sed -n \'/#!/,$p\' > bootstrap.sh'
-	echo ''
+	echo "{printf \"GET /bantling/tools/master/qemu-vms/freebsd/bootstrap.sh HTTP/1.0\\\r\\\nHOST: raw.githubusercontent.com\\\r\\\n\\\r\\\n\"; sleep 2} | openssl s_client -connect raw.githubusercontent.com:443 -quiet | sed -n '/#\!/,\$p' > /bootstrap.sh"
 	echo
 	echo '4. Run bootstrap.sh:'
-	echo 'sh bootstrap.sh'
+	echo 'sh /bootstrap.sh'
 	echo
-	[ ps aux | grep 'sudo vsftpd' | grep -v grep ] || sudo vsftpd &
 	qemu-system-x86_64 \
 	  -accel "$(QEMU_ACCEL)" \
 	  -boot c \
@@ -161,9 +160,7 @@ $(LATEST_AMD64_MEMSTICK_CONF_F): $(IMAGE_AMD64) $(IMAGE_AMD64_PHYS)
 	  -drive file=$(IMAGE_AMD64),format=raw,if=virtio \
 	  -drive file=$(IMAGE_AMD64_PHYS),format=raw,if=virtio \
 	  -nic user,model=virtio-net-pci
-	pid="`ps aux | grep vsftpd | grep -v grep | awk '{print $$2}'`"; \
-	[ -z "$$pid" ] || kill -9 "$$pid"
-	#touch $@
+	touch $@
 
 # Run the target image, after ensuring it has been installed
 .PHONY: run

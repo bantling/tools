@@ -4,8 +4,8 @@ set -eu
 # Remount root fs read/write - we always need this, as we always download latest setup.sh script
 mount -u -w /
 
-# Ensure we have networking running
-dhclient "`ifconfig -a | sed -r '/^\t/d;s,^([^:]*).*,\1,' | grep -v lo`"
+# Ensure we have networking running on first non-loop network device
+dhclient "`ifconfig -a | sed -r '/^\t/d;s,^([^:]*).*,\1,' | grep -v lo | head -1`"
 
 # Do we need to reboot?
 reboot=0
