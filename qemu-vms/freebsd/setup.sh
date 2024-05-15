@@ -67,7 +67,7 @@ cat <<-EOF | chroot .
 ## Configure loader.conf settings
 echo 'Configuring boot loader to use zfs'
 echo 'zfs_load="YES"' > boot/loader.conf
-echo 'vfs.root.mountfrom="zfs:zroot"' >> boot/loader.conf 
+echo 'vfs.root.mountfrom="zfs:zroot"' >> boot/loader.conf
 
 ## Configure rc.conf settings
 echo 'Configuring rc.conf'
