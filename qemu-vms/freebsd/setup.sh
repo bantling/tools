@@ -1,25 +1,40 @@
 #!/bin/sh
 
+usage {
+  echo "$0 { device }
+
+Setup a bootable ZFS filesystem on the specified device:
+- A 4G swap zvol
+- /etc/rc.local starts up DHCP on first non-loop network device
+- A copy of this script at /usr/freebsd-dist/setup.sh
+- A copy of /usr/freebsd-dist/base.txz and /usr/freebsd-dist/kernel.txz
+  "
+  exit 1
+}
+
+## Verify we have a parameter passed for which device to setup
+[ -n "$1" ] || usage
+
 ## Destroy any existing gpt partition on second drive
 echo 'Destroying gpt partition table'
-gpart destroy -F vtbd1
+gpart destroy -F "$1"
 
 ## Create an empty GPT partition table
 echo 'Creating gpt partiton table'
-gpart create -s gpt vtbd1
+gpart create -s gpt "$1"
 
 ## Create boot and zfs partitions
 echo 'Creating gpt boot and root partitions'
-gpart add -t freebsd-boot -l zboot -s 512k vtbd1
-gpart add -t freebsd-zfs  -l zroot vtbd1
+gpart add -t freebsd-boot -l zboot -s 512k "$1"
+gpart add -t freebsd-zfs  -l zroot "$1"
 
 ## Install boot code
 echo 'Installing gpt boot sector and gpt partition boot loader'
-gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 vtbd1
+gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 "$1"
 
 ## Get gpt id for zroot label
 echo 'Retrieving gpt root partition id'
-zroot_dev="/dev/gptid/`glabel status | grep 'gptid.*vtbd1p2' | awk '{print $1}' | awk -F/ '{print $2}'`"
+zroot_dev="/dev/gptid/`glabel status | grep "gptid.*${1}p2" | awk '{print $1}' | awk -F/ '{print $2}'`"
 
 ## Create temp mountpoint
 echo 'Creating temp mount point'
@@ -60,13 +75,20 @@ dhclient "\`ifconfig -a | sed -r '/^\t/d;s,^([^:]*).*,\1,' | grep -v lo | head -
 EOF
 chmod +x etc/rc.local
 
+echo 'Copying this script and base and kernel sets to /usr/freebsd-dist'
+mkdir -p usr/freebsd-dist
+cp "$0" usr/freebsd-dist
+chmod +x usr/freebsd-dist
+cp /usr/freebsd-dist/base.txz usr/freebsd-dist
+cp /usr/freebsd-dist/kernel.txz usr/freebsd-dist
+
 ## Chroot and set up some stuff
 echo 'Chrooting into temp mount point'
 
 cat <<-EOF | chroot .
 ## Configure loader.conf settings
 echo 'Configuring boot loader to use zfs'
-echo 'zfs_load="YES"' > boot/loader.conf
+echo 'zfs_load="YES"' >> boot/loader.conf
 echo 'vfs.root.mountfrom="zfs:zroot"' >> boot/loader.conf
 
 ## Configure rc.conf settings
