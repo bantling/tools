@@ -68,40 +68,45 @@ tar xvJf /usr/freebsd-dist/kernel.txz
 echo 'Creating fstab'
 echo -e '#Device\t\tMountpoint\tFSType\tOptions\t\tDump\tPass\nzroot\t\t/\t\tzfs\trw,noatime\t0\t0' > etc/fstab
 
-echo 'Creating rc.local to start DHCP for first non-loop network device at boot'
+echo 'Creating rc.local to start DHCP for first non-loop network device at boot, tuned for podman'
 cat <<-EOF > etc/rc.local
 #!/bin/sh
-dhclient "\`ifconfig -a | sed -r '/^\t/d;s,^([^:]*).*,\1,' | grep -v lo | head -1\`"
+netdev="\`ifconfig -a | sed -r '/^\t/d;s,^([^:]*).*,\1,' | grep -v lo | head -1\`"
+ifconfig \$netdev -rxcsum
+dhclient \$netdev
 EOF
 chmod +x etc/rc.local
 
-echo 'Copying this script and base and kernel sets to /usr/freebsd-dist'
+echo 'Copying this script to /setup.sh and base and kernel sets to /usr/freebsd-dist'
 mkdir -p usr/freebsd-dist
-cp "$0" usr/freebsd-dist
+cp "$0" setup.sh
 chmod +x usr/freebsd-dist
 cp /usr/freebsd-dist/base.txz usr/freebsd-dist
 cp /usr/freebsd-dist/kernel.txz usr/freebsd-dist
+
+echo 'Configuring boot loader to use zfs'
+echo 'zfs_load="YES"' >> boot/loader.conf
+echo 'vfs.root.mountfrom="zfs:zroot"' >> boot/loader.conf
+
+echo 'Tuning boot loader for podmman network performance'
+echo 'hw.vtnet.X.csum_disable=1' >> boot/loader.conf
+echo 'hw.vtnet.lro_disable=1' >> boot/loader.conf
+echo 'net.link.bridge.pfil_member=0' >> etc/sysctl.conf
+echo 'net.link.bridge.pfil_bridge=0' >> etc/sysctl.conf
+echo 'net.link.bridge.pfil_onlyip=0' >> etc/sysctl.conf
 
 ## Chroot and set up some stuff
 echo 'Chrooting into temp mount point'
 
 cat <<-EOF | chroot .
-## Configure loader.conf settings
-echo 'Configuring boot loader to use zfs'
-echo 'zfs_load="YES"' >> boot/loader.conf
-echo 'vfs.root.mountfrom="zfs:zroot"' >> boot/loader.conf
-
-## Configure rc.conf settings
 echo 'Configuring rc.conf'
 sysrc zfs_enable="YES"
 sysrc hostname="freebsd"
 
-## Set timezone to UTC
 echo 'Setting timezone to UTC'
 cp usr/share/zoneinfo/UTC etc/localtime
 echo 'Adjusting kernel time zone'
 adjkerntz -a
 
-## Exit chroot
 exit
 EOF

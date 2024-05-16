@@ -132,7 +132,6 @@ $(LATEST_AMD64_MEMSTICK_F): $(LATEST_AMD64_XZ_CKSUM_CMP_F)
 	touch $@
 
 # Create the target images, always recreate them so we can keep running the process to test installation scripts
-#.PHONY: $(IMAGE_AMD64) $(IMAGE_AMD64_PHYS)
 $(IMAGE_AMD64) $(IMAGE_AMD64_PHYS): $(LATEST_AMD64_MEMSTICK_F)
 	qemu-img create -f raw $@ 8G
 
