@@ -5,8 +5,10 @@ usage {
 
 Setup a bootable ZFS filesystem on the specified device:
 - A 4G swap zvol
+- Networking tuned for podman performance
+- Use UTC timezone
 - /etc/rc.local starts up DHCP on first non-loop network device
-- A copy of this script at /usr/freebsd-dist/setup.sh
+- An executable copy of this script at /setup.sh
 - A copy of /usr/freebsd-dist/base.txz and /usr/freebsd-dist/kernel.txz
   "
   exit 1
