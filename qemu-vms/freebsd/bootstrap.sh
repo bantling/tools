@@ -4,33 +4,8 @@ set -eu
 # Remount root fs read/write - we always need this, as we always download latest setup.sh script
 mount -u -w /
 
-# Ensure we have networking running on first non-loop network device
-dhclient "`ifconfig -a | sed -r '/^\t/d;s,^([^:]*).*,\1,' | grep -v lo | head -1`"
-
-# Do we need to reboot?
-reboot=0
-
-# Check if /boot/loader.conf contains lines for disk identification settings (not present by default)
-grep -q 'kern.geom.label' /boot/loader.conf || {
-  # We need to reboot for these settings to take effect
-  reboot=1
-
-  # Inform user
-  echo 'Configuring gptid disk identification'
-
-  # Append lines to the end
-  {
-    echo 'kern.geom.label.disk_ident.enable="0"'
-    echo 'kern.geom.label.gpt.enable="0"'
-    echo 'kern.geom.label.gptid.enable="1"'
-  } >> /boot/loader.conf
-}
-
 # Check if /etc/rc.local runs this script automatically at boot
 grep -q bootstrap.sh /etc/rc.local || {
-  # Rebooting allows user to manually test this script launches automatically
-  reboot=1
-
   # Inform user
   echo 'Ensuring bootstrap.sh runs automatically at boot'
 
@@ -38,13 +13,8 @@ grep -q bootstrap.sh /etc/rc.local || {
   sed -rie '1s,(.*),\1\n\nsh /bootstrap.sh\nexit,' /etc/rc.local
 }
 
-# Reboot if necessary
-[ "$reboot" -eq 0 ] || {
-  # Inform user
-  echo 'Rebooting'
-
-  reboot
-}
+# Get network running, this script only ever runs in QEMU with a single virtio nic
+dhclient vtnet0
 
 # Download setup.sh script, in case it has changed
 echo 'Downloading latest setup.sh'
@@ -54,5 +24,14 @@ echo 'Downloading latest setup.sh'
 echo 'Executing setup.sh'
 sh /setup.sh
 
+echo 'Copying setup.sh and base and kernel sets to new zfs filesystem'
+cp /setup.sh /tmp/zfs
+chmod +x /tmp/zfs/setup.sh
+
+mkdir -p /tmp/zfs/usr/freebsd-dist
+cp /usr/freebsd-dist/base.txz /tmp/zfs/usr/freebsd-dist
+cp /usr/freebsd-dist/kernel.txz /tmp/zfs/usr/freebsd-dist
+
 # Shut down
+echo 'Shutting down'
 poweroff

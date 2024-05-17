@@ -8,14 +8,30 @@ Setup a bootable ZFS filesystem on the specified device:
 - Networking tuned for podman performance
 - Use UTC timezone
 - /etc/rc.local starts up DHCP on first non-loop network device
-- An executable copy of this script at /setup.sh
-- A copy of /usr/freebsd-dist/base.txz and /usr/freebsd-dist/kernel.txz
   "
   exit 1
 }
 
 ## Verify we have a parameter passed for which device to setup
 [ -n "$1" ] || usage
+
+# Check if /boot/loader.conf contains lines for disk identification settings (not present by default)
+grep -q 'kern.geom.label' /boot/loader.conf || {
+  # Inform user
+  echo 'Configuring gptid disk identification'
+
+  # Append lines to the end
+  {
+    echo 'kern.geom.label.disk_ident.enable="0"'
+    echo 'kern.geom.label.gpt.enable="0"'
+    echo 'kern.geom.label.gptid.enable="1"'
+  } >> /boot/loader.conf
+
+  # Inform user
+  echo 'Rebooting'
+
+  reboot
+}
 
 ## Destroy any existing gpt partition on second drive
 echo 'Destroying gpt partition table'
@@ -79,18 +95,11 @@ dhclient \$netdev
 EOF
 chmod +x etc/rc.local
 
-echo 'Copying this script to /setup.sh and base and kernel sets to /usr/freebsd-dist'
-mkdir -p usr/freebsd-dist
-cp "$0" setup.sh
-chmod +x usr/freebsd-dist
-cp /usr/freebsd-dist/base.txz usr/freebsd-dist
-cp /usr/freebsd-dist/kernel.txz usr/freebsd-dist
-
 echo 'Configuring boot loader to use zfs'
 echo 'zfs_load="YES"' >> boot/loader.conf
 echo 'vfs.root.mountfrom="zfs:zroot"' >> boot/loader.conf
 
-echo 'Tuning boot loader for podmman network performance'
+echo 'Tuning boot loader and sysctl for podmman network performance'
 echo 'hw.vtnet.X.csum_disable=1' >> boot/loader.conf
 echo 'hw.vtnet.lro_disable=1' >> boot/loader.conf
 echo 'net.link.bridge.pfil_member=0' >> etc/sysctl.conf
