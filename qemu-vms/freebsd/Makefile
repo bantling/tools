@@ -76,7 +76,9 @@ LATEST_AMD64_XZ_CKSUM_F      := .$(LATEST_AMD64_XZ_MEMSTICK).sha512
 LATEST_AMD64_XZ_CKSUM_URL    := $(ISO_BASE_URL_AMD64)/$(LATEST_AMD64_RELEASE)/CHECKSUM.SHA512-FreeBSD-$(LATEST_AMD64_RELEASE)-RELEASE-amd64
 LATEST_AMD64_XZ_CKSUM_GEN_F  := $(LATEST_AMD64_XZ_CKSUM_F).gen
 LATEST_AMD64_XZ_CKSUM_CMP_F  := $(LATEST_AMD64_XZ_CKSUM_F).cmp
-LATEST_AMD64_MEMSTICK_CONF_F := $(LATEST_AMD64_MEMSTICK_F).conf
+LATEST_AMD64_XZ_CKSUM_COPY_F := $(LATEST_AMD64_MEMSTICK).copy
+LATEST_AMD64_MEMSTICK_CONF   := $(LATEST_AMD64_MEMSTICK).conf
+LATEST_AMD64_MEMSTICK_CONF_F := .$(LATEST_AMD64_MEMSTICK_CONF)
 
 # Define other vars
 COMMA                        := ,
@@ -85,7 +87,6 @@ QEMU_ACCEL_WHPX              := $(shell qemu-system-x86_64 -accel help | grep wh
 QEMU_ACCEL_KVM               := $(shell qemu-system-x86_64 -accel help | grep kvm)
 QEMU_ACCEL                   := $(if $(QEMU_ACCEL_HVF),hvf,$(if $(QEMU_ACCEL_WHPX),whpx$(COMMA)kernel-irqchip=off,$(if $(QEMU_ACCEL_KVM),kvm,tcg)))
 IMAGE_AMD64                  := FreeBSD-$(LATEST_AMD64_RELEASE).img
-IMAGE_AMD64_PHYS             := FreeBSD-$(LATEST_AMD64_RELEASE).phys.img
 
 # Silent by default
 # Run "make VERBOSE=1 ..." to show output of each recipe invoked
@@ -94,50 +95,53 @@ ifndef VERBOSE
 endif
 
 # Default target
-.PHONY: all
-all: $(LATEST_AMD64_MEMSTICK_CONF_F)
+.DEFAULT_GOAL := $(LATEST_AMD64_MEMSTICK_CONF_F)
 
 # Download latest image if we don't have it
 $(LATEST_AMD64_XZ_MEMSTICK_F):
-	echo "Removing older images"; \
-	find . -maxdepth 1 -type f -name '.FreeBSD-*-RELEASE-amd64-memstick.img*' \! -name '.FreeBSD-$(LATEST_AMD64_RELEASE)-RELEASE-amd64-memstick.img*' -print0 | xargs -0 rm; \
-	echo "Downloading the $(LATEST_AMD64_RELEASE) image"; \
+	echo "Removing older images"
+	find . -maxdepth 1 -type f -name '.FreeBSD-*-RELEASE-amd64-memstick.img*' \! -name '.FreeBSD-$(LATEST_AMD64_RELEASE)-RELEASE-amd64-memstick.img*' -print0 | xargs -0 rm
+	echo "Downloading the $(LATEST_AMD64_RELEASE) image"
 	curl --progress-bar -Lo $@ $(LATEST_AMD64_XZ_URL)
 
 # Download latest image checksum if we don't have it
 $(LATEST_AMD64_XZ_CKSUM_F): $(LATEST_AMD64_XZ_MEMSTICK_F)
-	echo "Downloading checksum"; \
+	echo "Downloading checksum"
 	curl -sLo - $(LATEST_AMD64_XZ_CKSUM_URL) | grep amd64-memstick.img.xz | awk '-F=' '{print $$2}' | tr -d ' ' > $@
 
 # Generate a checksum to compare against downloaded checksum
 $(LATEST_AMD64_XZ_CKSUM_GEN_F): $(LATEST_AMD64_XZ_CKSUM_F)
-	echo "Generating checksum"; \
+	echo "Generating checksum"
 	sha512sum -b $(LATEST_AMD64_XZ_MEMSTICK_F) | awk '{print $$1}' > $@
 
 # Compare checksums
 $(LATEST_AMD64_XZ_CKSUM_CMP_F): $(LATEST_AMD64_XZ_CKSUM_F) $(LATEST_AMD64_XZ_CKSUM_GEN_F)
-	echo "Comparing checksums"; \
+	echo "Comparing checksums"
 	diff $^ > /dev/null || { \
 	  echo "Downloaded checksum does not match generated checksum"; \
 	  exit 1; \
-	}; \
+	}
 	touch $@
 
 # Decompress image
 # For some reason, we need to touch the extracted file after extracting it, to ensure it has a date newer than
 # the prerequisite. Otherwise, it keeps extracting.
 $(LATEST_AMD64_MEMSTICK_F): $(LATEST_AMD64_XZ_CKSUM_CMP_F)
-	echo "Extracting image"; \
-	xz --verbose -kd $@.xz; \
+	echo "Extracting image"
+	xz --verbose -kd $@.xz
 	touch $@
 
+$(LATEST_AMD64_XZ_CKSUM_COPY_F): $(LATEST_AMD64_MEMSTICK_F) bootstrap.sh
+	echo "Copying image"
+	cp $< $@
+
 # Create the target images, always recreate them so we can keep running the process to test installation scripts
-$(IMAGE_AMD64) $(IMAGE_AMD64_PHYS): $(LATEST_AMD64_MEMSTICK_F)
+$(IMAGE_AMD64):
 	qemu-img create -f raw $@ 8G
 
 # Modify the memstick image to install bootstrap.sh script
 # vsftpd /Users/user/dev/homebrew/etc/vsftpd.conf
-$(LATEST_AMD64_MEMSTICK_CONF_F): $(IMAGE_AMD64) $(IMAGE_AMD64_PHYS)
+$(LATEST_AMD64_MEMSTICK_CONF_F): $(LATEST_AMD64_MEMSTICK_COPY_F) $(IMAGE_AMD64) setup.sh
 	echo '1. Remount root as read/write:'
 	echo 'mount -u -w /'
 	echo
@@ -145,7 +149,7 @@ $(LATEST_AMD64_MEMSTICK_CONF_F): $(IMAGE_AMD64) $(IMAGE_AMD64_PHYS)
 	echo 'dhclient vtnet0'
 	echo
 	echo '3. Download bootstrap script:'
-	echo "{printf \"GET /bantling/tools/master/qemu-vms/freebsd/bootstrap.sh HTTP/1.0\\\r\\\nHOST: raw.githubusercontent.com\\\r\\\n\\\r\\\n\"; sleep 2} | openssl s_client -connect raw.githubusercontent.com:443 -quiet | sed -n '/#\!/,\$p' > /bootstrap.sh"
+	echo 'echo "get bootstrap.sh | tftp 10.0.2.2"'
 	echo
 	echo '4. Run bootstrap.sh:'
 	echo 'sh /bootstrap.sh'
@@ -157,13 +161,15 @@ $(LATEST_AMD64_MEMSTICK_CONF_F): $(IMAGE_AMD64) $(IMAGE_AMD64_PHYS)
 	  -m 1024 \
 	  -drive file=$(LATEST_AMD64_MEMSTICK_F),format=raw,if=virtio \
 	  -drive file=$(IMAGE_AMD64),format=raw,if=virtio \
-	  -drive file=$(IMAGE_AMD64_PHYS),format=raw,if=virtio \
-	  -nic user,model=virtio-net-pci
+	  -nic user,model=virtio-net-pci,tftp=.
 	touch $@
 
-# Run the target image, after ensuring it has been installed
-.PHONY: run
-run: $(LATEST_AMD64_MEMSTICK_CONF_F)
+.PHONY: setup
+setup: $(LATEST_AMD64_MEMSTICK_CONF_F)
+
+# Run the target image with vrtio devices
+.PHONY: run-virt
+run-virt: $(LATEST_AMD64_MEMSTICK_CONF_F)
 	qemu-system-x86_64 \
 	  -accel "$(QEMU_ACCEL)" \
 	  -boot c \
@@ -172,9 +178,22 @@ run: $(LATEST_AMD64_MEMSTICK_CONF_F)
 	  -drive file=$(IMAGE_AMD64),format=raw,if=virtio \
 	  -nic user,model=virtio-net-pci
 
+# Run the target image with real world devices
+.PHONY: run-real
+run-real: $(LATEST_AMD64_MEMSTICK_CONF_F)
+	qemu-system-x86_64 \
+	  -accel "$(QEMU_ACCEL)" \
+	  -boot c \
+	  -cpu qemu64 \
+	  -m 1024 \
+	  -drive file=$(IMAGE_AMD64),format=raw,if=none,id=disk0 \
+		-device ich9-ahci,id=ahci \
+		-device ide-hd,drive=disk0,bus=ahci.0 \
+	  -nic user,model=e1000
+
 .PHONY: clean
 clean:
-	find . -maxdepth 1 -type f -name 'FreeBSD-*-RELEASE-amd64-memstick.img*' -print0 | xargs -0 rm;
+	find . -maxdepth 1 -type f -name '*FreeBSD*' -print0 | xargs -0 rm;
 
 .PHONY: push
 push:
@@ -195,10 +214,11 @@ vars:
 	echo "LATEST_AMD64_XZ_CKSUM_URL    = $(LATEST_AMD64_XZ_CKSUM_URL)"
 	echo "LATEST_AMD64_XZ_CKSUM_GEN_F  = $(LATEST_AMD64_XZ_CKSUM_GEN_F)"
 	echo "LATEST_AMD64_XZ_CKSUM_CMP_F  = $(LATEST_AMD64_XZ_CKSUM_CMP_F)"
+	echo "LATEST_AMD64_XZ_CKSUM_COPY_F = $(LATEST_AMD64_XZ_CKSUM_COPY_F)"
+	echo "LATEST_AMD64_MEMSTICK_CONF   = $(LATEST_AMD64_MEMSTICK_CONF)"
 	echo "LATEST_AMD64_MEMSTICK_CONF_F = $(LATEST_AMD64_MEMSTICK_CONF_F)"
 	echo "QEMU_ACCEL_HVF               = $(QEMU_ACCEL_HVF)"
 	echo "QEMU_ACCEL_WHPX              = $(QEMU_ACCEL_WHPX)"
 	echo "QEMU_ACCEL_KVM               = $(QEMU_ACCEL_KVM)"
 	echo "QEMU_ACCEL                   = $(QEMU_ACCEL)"
 	echo "IMAGE_AMD64                  = $(IMAGE_AMD64)"
-	echo "IMAGE_AMD64_PHYS             = $(IMAGE_AMD64_PHYS)"

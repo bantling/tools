@@ -14,7 +14,8 @@ grep -q bootstrap.sh /etc/rc.local || {
 }
 
 # Get network running, this script only ever runs in QEMU with a single virtio nic
-dhclient vtnet0
+# Ignore errors, as it is probably due to user manually bringing up the interface to download this script
+dhclient vtnet0 || :
 
 # Download setup.sh script, in case it has changed
 echo 'Downloading latest setup.sh'
