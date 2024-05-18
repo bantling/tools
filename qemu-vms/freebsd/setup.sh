@@ -1,23 +1,33 @@
 #!/bin/sh
 
 usage {
-  echo "$0 { device }
+  echo "$0 { device } [ -n ]
+
+-n: no swap volume
 
 Setup a bootable ZFS filesystem on the specified device:
-- A 4G swap zvol
+- A 4G swap zvol (unless suppressed by -n)
 - Networking tuned for podman performance
 - Use UTC timezone
-- /etc/rc.local starts up DHCP on first non-loop network device
+- /etc/rc.local starts up DHCP on all non-loop network devices
   "
   exit 1
 }
 
-## Verify we have a parameter passed for which device to setup
+# Verify we have a parameter passed for which device to setup
 [ -n "$1" ] || usage
+dev="$1"
+shift
+
+# Check if the -n option was passed
+swap=1
+[ "$1" != "-n" ] || {
+  shift
+  swap=0
+}
 
 # Check if /boot/loader.conf contains lines for disk identification settings (not present by default)
 grep -q 'kern.geom.label' /boot/loader.conf || {
-  # Inform user
   echo 'Configuring gptid disk identification'
 
   # Append lines to the end
@@ -27,9 +37,7 @@ grep -q 'kern.geom.label' /boot/loader.conf || {
     echo 'kern.geom.label.gptid.enable="1"'
   } >> /boot/loader.conf
 
-  # Inform user
   echo 'Rebooting'
-
   reboot
 }
 
@@ -67,12 +75,6 @@ zpool create -m / -R /tmp/zfs zroot $zroot_dev
 echo 'Setting bootfs property'
 zpool set bootfs=zroot zroot
 
-## Create swap space
-echo 'Creating swap space'
-zfs create -V 4G zroot/swap
-echo 'Setting freebsd swap property'
-zfs set org.freebsd:swap=on zroot/swap
-
 ## Install base and kernel distributions
 echo 'Entering temp mount point'
 cd /tmp/zfs
@@ -83,15 +85,25 @@ tar xvJf /usr/freebsd-dist/base.txz
 echo 'Installing kernel'
 tar xvJf /usr/freebsd-dist/kernel.txz
 
+## Create swap space, if desired
+[ "$swap" -eq 0 ] || {
+  echo 'Creating swap space'
+  zfs create -V 4G zroot/swap
+
+  echo 'Setting freebsd swap property'
+  zfs set org.freebsd:swap=on zroot/swap
+}
+
 echo 'Creating fstab'
 echo -e '#Device\t\tMountpoint\tFSType\tOptions\t\tDump\tPass\nzroot\t\t/\t\tzfs\trw,noatime\t0\t0' > etc/fstab
 
-echo 'Creating rc.local to start DHCP for first non-loop network device at boot, tuned for podman'
+echo 'Creating rc.local to start DHCP for all non-loop network devices at boot, tuned for podman'
 cat <<-EOF > etc/rc.local
 #!/bin/sh
-netdev="\`ifconfig -a | sed -r '/^\t/d;s,^([^:]*).*,\1,' | grep -v lo | head -1\`"
-ifconfig \$netdev -rxcsum
-dhclient \$netdev
+for netdev in \`ifconfig -a | sed -r '/^\t/d;s,^([^:]*).*,\1,' | grep -v lo\`; do
+  ifconfig \$netdev -rxcsum
+  dhclient \$netdev
+done
 EOF
 chmod +x etc/rc.local
 
@@ -116,6 +128,7 @@ sysrc hostname="freebsd"
 
 echo 'Setting timezone to UTC'
 cp usr/share/zoneinfo/UTC etc/localtime
+
 echo 'Adjusting kernel time zone'
 adjkerntz -a
 

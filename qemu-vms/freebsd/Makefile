@@ -79,6 +79,8 @@ LATEST_AMD64_XZ_CKSUM_CMP_F  := $(LATEST_AMD64_XZ_CKSUM_F).cmp
 LATEST_AMD64_XZ_CKSUM_COPY_F := $(LATEST_AMD64_MEMSTICK).copy
 LATEST_AMD64_MEMSTICK_CONF   := $(LATEST_AMD64_MEMSTICK).conf
 LATEST_AMD64_MEMSTICK_CONF_F := .$(LATEST_AMD64_MEMSTICK_CONF)
+LATEST_AMD64_MEMSTICK_TEST   := $(LATEST_AMD64_MEMSTICK).test
+LATEST_AMD64_MEMSTICK_TEST_F := .$(LATEST_AMD64_MEMSTICK).test
 
 # Define other vars
 COMMA                        := ,
@@ -86,7 +88,8 @@ QEMU_ACCEL_HVF               := $(shell qemu-system-x86_64 -accel help | grep hv
 QEMU_ACCEL_WHPX              := $(shell qemu-system-x86_64 -accel help | grep whpx)
 QEMU_ACCEL_KVM               := $(shell qemu-system-x86_64 -accel help | grep kvm)
 QEMU_ACCEL                   := $(if $(QEMU_ACCEL_HVF),hvf,$(if $(QEMU_ACCEL_WHPX),whpx$(COMMA)kernel-irqchip=off,$(if $(QEMU_ACCEL_KVM),kvm,tcg)))
-IMAGE_AMD64                  := FreeBSD-$(LATEST_AMD64_RELEASE).img
+IMAGE_INSTALL_AMD64          := FreeBSD-$(LATEST_AMD64_RELEASE)-install.img
+IMAGE_TEST_AMD64             := FreeBSD-$(LATEST_AMD64_RELEASE)-test.img
 
 # Silent by default
 # Run "make VERBOSE=1 ..." to show output of each recipe invoked
@@ -95,7 +98,11 @@ ifndef VERBOSE
 endif
 
 # Default target
-.DEFAULT_GOAL := $(LATEST_AMD64_MEMSTICK_CONF_F)
+.DEFAULT_GOAL := $(LATEST_AMD64_MEMSTICK_TEST_F)
+
+# Alias targets
+.PHONY: config
+config: $(LATEST_AMD64_MEMSTICK_CONF_F)
 
 # Download latest image if we don't have it
 $(LATEST_AMD64_XZ_MEMSTICK_F):
@@ -131,17 +138,18 @@ $(LATEST_AMD64_MEMSTICK_F): $(LATEST_AMD64_XZ_CKSUM_CMP_F)
 	xz --verbose -kd $@.xz
 	touch $@
 
+# Make a copy of decompressed image, to contain modifications
 $(LATEST_AMD64_XZ_CKSUM_COPY_F): $(LATEST_AMD64_MEMSTICK_F) bootstrap.sh
 	echo "Copying image"
 	cp $< $@
 
-# Create the target images, always recreate them so we can keep running the process to test installation scripts
-$(IMAGE_AMD64):
+# Create the install image
+$(IMAGE_INSTALL_AMD64):
 	qemu-img create -f raw $@ 8G
 
 # Modify the memstick image to install bootstrap.sh script
 # vsftpd /Users/user/dev/homebrew/etc/vsftpd.conf
-$(LATEST_AMD64_MEMSTICK_CONF_F): $(LATEST_AMD64_MEMSTICK_COPY_F) $(IMAGE_AMD64) setup.sh
+$(LATEST_AMD64_MEMSTICK_CONF_F): $(LATEST_AMD64_MEMSTICK_COPY_F) $(IMAGE_INSTALL_AMD64) bootstrap-setup.sh setup.sh
 	echo '1. Remount root as read/write:'
 	echo 'mount -u -w /'
 	echo
@@ -160,36 +168,28 @@ $(LATEST_AMD64_MEMSTICK_CONF_F): $(LATEST_AMD64_MEMSTICK_COPY_F) $(IMAGE_AMD64) 
 	  -cpu qemu64 \
 	  -m 1024 \
 	  -drive file=$(LATEST_AMD64_MEMSTICK_F),format=raw,if=virtio \
-	  -drive file=$(IMAGE_AMD64),format=raw,if=virtio \
+	  -drive file=$(IMAGE_INSTALL_AMD64),format=raw,if=virtio \
 	  -nic user,model=virtio-net-pci,tftp=.
 	touch $@
 
-.PHONY: setup
-setup: $(LATEST_AMD64_MEMSTICK_CONF_F)
+$(IMAGE_TEST_AMD64):
+	qemu-img create -f raw $@ 8G
 
-# Run the target image with vrtio devices
-.PHONY: run-virt
-run-virt: $(LATEST_AMD64_MEMSTICK_CONF_F)
+# Run the target image with real world devices, to manually test installing to another drive
+$(LATEST_AMD64_MEMSTICK_TEST_F): $(LATEST_AMD64_MEMSTICK_CONF_F) $(IMAGE_TEST_AMD64)
 	qemu-system-x86_64 \
 	  -accel "$(QEMU_ACCEL)" \
 	  -boot c \
 	  -cpu qemu64 \
 	  -m 1024 \
-	  -drive file=$(IMAGE_AMD64),format=raw,if=virtio \
-	  -nic user,model=virtio-net-pci
-
-# Run the target image with real world devices
-.PHONY: run-real
-run-real: $(LATEST_AMD64_MEMSTICK_CONF_F)
-	qemu-system-x86_64 \
-	  -accel "$(QEMU_ACCEL)" \
-	  -boot c \
-	  -cpu qemu64 \
-	  -m 1024 \
-	  -drive file=$(IMAGE_AMD64),format=raw,if=none,id=disk0 \
+	  -drive file=$(IMAGE_INSTALL_AMD64),format=raw,if=none,id=disk0 \
+	  -drive file=$(IMAGE_TEST_AMD64),format=raw,if=none,id=disk1 \
 		-device ich9-ahci,id=ahci \
 		-device ide-hd,drive=disk0,bus=ahci.0 \
-	  -nic user,model=e1000
+		-device ide-hd,drive=disk1,bus=ahci.1 \
+	  -nic user,model=e1000,net=192.168.0.0/24,dhcpstart=192.168.0.1 \
+	  -nic user,model=rtl8139,net=192.168.1.0/24,dhcpstart=192.168.1.1 \
+	touch $@
 
 .PHONY: clean
 clean:
@@ -217,8 +217,11 @@ vars:
 	echo "LATEST_AMD64_XZ_CKSUM_COPY_F = $(LATEST_AMD64_XZ_CKSUM_COPY_F)"
 	echo "LATEST_AMD64_MEMSTICK_CONF   = $(LATEST_AMD64_MEMSTICK_CONF)"
 	echo "LATEST_AMD64_MEMSTICK_CONF_F = $(LATEST_AMD64_MEMSTICK_CONF_F)"
+	echo "LATEST_AMD64_MEMSTICK_TEST   = $(LATEST_AMD64_MEMSTICK_TEST)"
+	echo "LATEST_AMD64_MEMSTICK_TEST_F = $(LATEST_AMD64_MEMSTICK_TEST_F)"
 	echo "QEMU_ACCEL_HVF               = $(QEMU_ACCEL_HVF)"
 	echo "QEMU_ACCEL_WHPX              = $(QEMU_ACCEL_WHPX)"
 	echo "QEMU_ACCEL_KVM               = $(QEMU_ACCEL_KVM)"
 	echo "QEMU_ACCEL                   = $(QEMU_ACCEL)"
-	echo "IMAGE_AMD64                  = $(IMAGE_AMD64)"
+	echo "IMAGE_INSTALL_AMD64          = $(IMAGE_INSTALL_AMD64)"
+	echo "IMAGE_TEST_AMD64             = $(IMAGE_TEST_AMD64)"
