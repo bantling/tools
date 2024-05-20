@@ -1,6 +1,7 @@
 .project
 asciidoc/top-level-readme/docs/readme/build
 cross-compile/*/make/*/build
-qemu-vms/*/*.img*
+qemu-vms/freebsd/*amd*
+qemu-vms/*/*img*
 qemu-vms/*/*iso*
 
