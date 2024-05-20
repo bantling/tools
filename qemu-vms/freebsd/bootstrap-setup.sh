@@ -14,7 +14,7 @@ grep -q bootstrap.sh /etc/rc.local || {
 
 # Download setup.sh script, in case it has changed
 echo 'Downloading latest setup.sh'
-echo "get setup.sh" | tftpd 10.0.2.2
+echo "get setup.sh" | tftp 10.0.2.2
 
 # Execute setup script
 echo 'Executing setup.sh'

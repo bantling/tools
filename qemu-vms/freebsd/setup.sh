@@ -1,6 +1,6 @@
 #!/bin/sh
 
-usage {
+usage() {
   echo "$0 { device } [ -n ]
 
 -n: no swap volume
@@ -28,10 +28,11 @@ swap=1
 
 # Check if /boot/loader.conf contains lines for disk identification settings (not present by default)
 grep -q 'kern.geom.label' /boot/loader.conf || {
-  echo 'Configuring gptid disk identification'
+  echo 'Configuring boot delay and gptid disk identification'
 
   # Append lines to the end
   {
+    echo 'autoboot_delay="0"'
     echo 'kern.geom.label.disk_ident.enable="0"'
     echo 'kern.geom.label.gpt.enable="0"'
     echo 'kern.geom.label.gptid.enable="1"'
@@ -42,25 +43,26 @@ grep -q 'kern.geom.label' /boot/loader.conf || {
 }
 
 ## Destroy any existing gpt partition on second drive
+## The command fails if no partitions exist
 echo 'Destroying gpt partition table'
-gpart destroy -F "$1"
+gpart destroy -F "$dev" 2> /dev/null || :
 
 ## Create an empty GPT partition table
 echo 'Creating gpt partiton table'
-gpart create -s gpt "$1"
+gpart create -s gpt "$dev"
 
 ## Create boot and zfs partitions
 echo 'Creating gpt boot and root partitions'
-gpart add -t freebsd-boot -l zboot -s 512k "$1"
-gpart add -t freebsd-zfs  -l zroot "$1"
+gpart add -t freebsd-boot -l zboot -s 512k "$dev"
+gpart add -t freebsd-zfs  -l zroot "$dev"
 
 ## Install boot code
 echo 'Installing gpt boot sector and gpt partition boot loader'
-gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 "$1"
+gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 "$dev"
 
 ## Get gpt id for zroot label
 echo 'Retrieving gpt root partition id'
-zroot_dev="/dev/gptid/`glabel status | grep "gptid.*${1}p2" | awk '{print $1}' | awk -F/ '{print $2}'`"
+zroot_dev="/dev/gptid/`glabel status | grep "gptid.*${dev}p2" | awk '{print $1}' | awk -F/ '{print $2}'`"
 
 ## Create temp mountpoint
 echo 'Creating temp mount point'
@@ -107,7 +109,10 @@ done
 EOF
 chmod +x etc/rc.local
 
-echo 'Configuring boot loader to use zfs'
+echo 'Configuring boot loader to enable gptid and use zfs'
+echo 'kern.geom.label.disk_ident.enable="0"' >> boot/loader.conf
+echo 'kern.geom.label.gpt.enable="0"' >> boot/loader.conf
+echo 'kern.geom.label.gptid.enable="1"' >> boot/loader.conf
 echo 'zfs_load="YES"' >> boot/loader.conf
 echo 'vfs.root.mountfrom="zfs:zroot"' >> boot/loader.conf
 
