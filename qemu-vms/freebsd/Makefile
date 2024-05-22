@@ -77,6 +77,7 @@ AMD64_XZ_CKSUM_GEN  := $(AMD64_XZ_CKSUM).gen
 AMD64_XZ_CKSUM_CMP  := $(AMD64_XZ_CKSUM).cmp
 AMD64_MEMSTICK_BOOT := .amd64.boot.img
 AMD64_MEMSTICK_CONF := .amd64.conf
+AMD64_MEMSTICK_INST := .amd64.inst
 AMD64_MEMSTICK_TEST := .amd64.test
 
 # Define other vars
@@ -149,6 +150,9 @@ $(AMD64_IMAGE_INSTALL):
 # Modify the memstick image to install bootstrap.sh script
 # The target file is not created by make - it is created by bootstrap.sh as last command, but only if it succeeds
 $(AMD64_MEMSTICK_CONF): $(AMD64_MEMSTICK_BOOT) $(AMD64_IMAGE_INSTALL) bootstrap-setup.sh setup.sh
+	echo
+	echo '#### Configure copy of memstick image to auto install'
+	echo
 	echo '1. Remount root as read/write:'
 	echo 'mount -u -w /'
 	echo
@@ -174,8 +178,23 @@ $(AMD64_MEMSTICK_CONF): $(AMD64_MEMSTICK_BOOT) $(AMD64_IMAGE_INSTALL) bootstrap-
 $(AMD64_IMAGE_TEST):
 	qemu-img create -f raw $@ 8G
 
-# Run the target image with real world devices, to manually test installing to another drive
-$(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
+# Install into a test image using the install image with real world devices, to manually test installing to another drive
+# Touches both AMD64_MEMSTICK_CONF file and target file:
+# - The AMD64_IMAGE_INSTALL is modified by the process of starting it up, as it is a regular read/write filesystem
+# - Causes the AMD64_IMAGE_INSTALL to have a newer date than AMD64_MEMSTICK_CONF
+# - Causes the AMD64_MEMSTICK_CONF target to re-execute on next make, since it is older than the AMD64_IMAGE_INSTALL prereq
+# By touching the AMD64_MEMSTICK_CONF file after QEMU quits, it has a newer date than the AMD64_IMAGE_INSTALL prereq,
+# which prevents endless make loop
+$(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
+	echo
+	echo '#### Use modified memstick image to auto install into a test image'
+	echo
+	echo 'When prompt appears, run /setup.sh ada1'
+	echo 'The default is to have swap and call the pool zroot, you can run /setup.sh ada1 [ -n ] [ -p poolname ]'
+	echo 'Where -n means no swap, and -p poolname provides an alternate pool name'
+	echo
+	echo 'Both network cards should work, where 192.168.0.1 and 192.168.1.1 are the gateways'
+	echo
 	qemu-system-x86_64 \
 	  -accel "$(QEMU_ACCEL)" \
 	  -boot c \
@@ -188,7 +207,44 @@ $(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 		-device ide-hd,drive=disk1,bus=ahci.1 \
 	  -nic user,model=e1000,net=192.168.0.0/24,dhcpstart=192.168.0.1 \
 	  -nic user,model=rtl8139,net=192.168.1.0/24,dhcpstart=192.168.1.1
-	touch $@
+	touch $< $@
+
+
+# Test the test image boots and has no setup scripts or freebsd sets.
+# Touches AMD64_MEMSTICK_INST, AMD64_MEMSTICK_CONF and target file for same reasons as above for AMD64_MEMSTICK_INST target
+$(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_IMAGE_TEST)
+	echo
+	echo '#### Boot test image, with same network config as auto install image'
+	echo
+	echo 'When login prompt appears, login as root, no passwords will be required'
+	echo 'Both network cards should work, where 192.168.0.1 and 192.168.1.1 are the gateways'
+	echo
+	qemu-system-x86_64 \
+		-accel "$(QEMU_ACCEL)" \
+		-boot c \
+		-cpu qemu64 \
+		-m 1024 \
+		-drive file=$(AMD64_IMAGE_TEST),format=raw,if=none,id=disk0 \
+		-device ich9-ahci,id=ahci \
+		-device ide-hd,drive=disk0,bus=ahci.0 \
+		-nic user,model=e1000,net=192.168.0.0/24,dhcpstart=192.168.0.1 \
+		-nic user,model=rtl8139,net=192.168.1.0/24,dhcpstart=192.168.1.1
+	touch $< $(AMD64_MEMSTICK_CONF) $@
+
+.PHONY: reconfig
+reconfig:
+	rm $(AMD64_MEMSTICK_CONF)
+	$(MAKE) $(AMD64_MEMSTICK_CONF)
+
+.PHONY: reinstall
+reinstall:
+	rm $(AMD64_MEMSTICK_INST)
+	$(MAKE) $(AMD64_MEMSTICK_INST)
+
+.PHONY: retest
+retest:
+	rm $(AMD64_MEMSTICK_TEST)
+	$(MAKE) $(AMD64_MEMSTICK_TEST)
 
 .PHONY: clean
 clean:
@@ -204,6 +260,7 @@ push:
 vars:
 	echo "AMD64_ISO_BASE_URL    = $(AMD64_ISO_BASE_URL)"
 	echo "AMD64_RELEASE         = $(AMD64_RELEASE)"
+	echo "AMD64_RELEASE_F       = $(AMD64_RELEASE_F)"
 	echo "AMD64_XZ_URL          = $(AMD64_XZ_URL)"
 	echo "AMD64_MEMSTICK        = $(AMD64_MEMSTICK)"
 	echo "AMD64_XZ_MEMSTICK     = $(AMD64_XZ_MEMSTICK)"
@@ -211,7 +268,9 @@ vars:
 	echo "AMD64_XZ_CKSUM        = $(AMD64_XZ_CKSUM)"
 	echo "AMD64_XZ_CKSUM_GEN    = $(AMD64_XZ_CKSUM_GEN)"
 	echo "AMD64_XZ_CKSUM_CMP    = $(AMD64_XZ_CKSUM_CMP)"
+	echo "AMD64_MEMSTICK_BOOT   = $(AMD64_MEMSTICK_BOOT)"
 	echo "AMD64_MEMSTICK_CONF   = $(AMD64_MEMSTICK_CONF)"
+	echo "AMD64_MEMSTICK_INST   = $(AMD64_MEMSTICK_INST)"
 	echo "AMD64_MEMSTICK_TEST   = $(AMD64_MEMSTICK_TEST)"
 	echo "QEMU_ACCEL_HVF        = $(QEMU_ACCEL_HVF)"
 	echo "QEMU_ACCEL_WHPX       = $(QEMU_ACCEL_WHPX)"
