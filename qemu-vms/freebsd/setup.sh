@@ -97,7 +97,7 @@ zpool_dev="/dev/gptid/`glabel status | grep "gptid.*${dev}p2" | awk '{print $1}'
 ## Create temp mountpoint
 echo 'Creating temp mount point'
 sleep 1
-mkdir /tmp/zfs
+mkdir -p /tmp/zfs
 
 ## Create zfs pool
 echo 'Creating zpool'
@@ -105,23 +105,30 @@ sleep 1
 zpool labelclear -f $zpool_dev
 zpool create -m / -R /tmp/zfs "$poolname" $zpool_dev
 
-## Set bootfs property
-echo 'Setting bootfs property'
-sleep 1
-zpool set bootfs="$poolname" "$poolname"
-
 ## Install base and kernel distributions
 echo 'Entering temp mount point'
 sleep 1
 cd /tmp/zfs
 
-echo 'Installing base'
-sleep 1
-tar xvJf /usr/freebsd-dist/base.txz
-
 echo 'Installing kernel'
 sleep 1
+xz -dkv --stdout /usr/freebsd-dist/kernel.txz | tar xf -
 tar xvJf /usr/freebsd-dist/kernel.txz
+
+echo 'Installing base'
+sleep 1
+xz -dkv --stdout /usr/freebsd-dist/base.txz | tar xf -
+
+# Copy setup script and base and kernel sets
+echo 'Copying setup.sh'
+sleep 1
+cp /setup.sh .
+chmod +x setup.sh
+
+echo 'Copying base and kernel sets'
+mkdir -p usr/freebsd-dist
+cp /usr/freebsd-dist/base.txz usr/freebsd-dist
+cp /usr/freebsd-dist/kernel.txz usr/freebsd-dist
 
 ## Create swap space, if desired
 [ "$swap" -eq 0 ] || {
@@ -129,9 +136,10 @@ tar xvJf /usr/freebsd-dist/kernel.txz
   sleep 1
   zfs create -V 4G "$poolname"/swap
 
-  echo 'Setting freebsd swap property'
+  echo 'Setting freebsd swap property and lzjb compression'
   sleep 1
   zfs set org.freebsd:swap=on "$poolname"/swap
+  zfs set compression=lzjb "$poolname"/swap
 }
 
 echo 'Creating fstab'

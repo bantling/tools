@@ -191,7 +191,7 @@ $(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 	echo
 	echo 'When prompt appears, run /setup.sh ada1'
 	echo 'The default is to have swap and call the pool zroot, you can run /setup.sh ada1 [ -n ] [ -p poolname ]'
-	echo 'Where -n means no swap, and -p poolname provides an alternate pool name'
+	echo "Where -n means no swap, and -p poolname provides an alternate pool name (don't use zinstall)"
 	echo
 	echo 'Both network cards should work, where 192.168.0.1 and 192.168.1.1 are the gateways'
 	echo
@@ -216,8 +216,9 @@ $(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_IMAGE_TEST)
 	echo
 	echo '#### Boot test image, with same network config as auto install image'
 	echo
-	echo 'When login prompt appears, login as root, no passwords will be required'
+	echo 'When login prompt appears, login as root, no password will be required'
 	echo 'Both network cards should work, where 192.168.0.1 and 192.168.1.1 are the gateways'
+	echo "tftp can be used on 192.168.1.2"
 	echo
 	qemu-system-x86_64 \
 		-accel "$(QEMU_ACCEL)" \
@@ -228,23 +229,23 @@ $(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_IMAGE_TEST)
 		-device ich9-ahci,id=ahci \
 		-device ide-hd,drive=disk0,bus=ahci.0 \
 		-nic user,model=e1000,net=192.168.0.0/24,dhcpstart=192.168.0.1 \
-		-nic user,model=rtl8139,net=192.168.1.0/24,dhcpstart=192.168.1.1
+		-nic user,model=rtl8139,net=192.168.1.0/24,dhcpstart=192.168.1.1,tftp=.
 	touch $< $(AMD64_MEMSTICK_CONF) $@
 
 .PHONY: reconfig
 reconfig:
 	rm $(AMD64_MEMSTICK_CONF)
-	$(MAKE) $(AMD64_MEMSTICK_CONF)
+	$(MAKE)
 
 .PHONY: reinstall
 reinstall:
 	rm $(AMD64_MEMSTICK_INST)
-	$(MAKE) $(AMD64_MEMSTICK_INST)
+	$(MAKE)
 
 .PHONY: retest
 retest:
 	rm $(AMD64_MEMSTICK_TEST)
-	$(MAKE) $(AMD64_MEMSTICK_TEST)
+	$(MAKE)
 
 .PHONY: clean
 clean:

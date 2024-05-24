@@ -35,16 +35,6 @@ echo 'Executing setup.sh (no swap, poolname = zinstall, autologin)'
 sleep 1
 sh /setup.sh vtbd1 -n -p zinstall -a
 
-# Copy setup script and base and kernel sets
-echo 'Copying setup.sh and base and kernel sets to new zfs filesystem'
-sleep 1
-cp /setup.sh /tmp/zfs
-chmod +x /tmp/zfs/setup.sh
-
-mkdir -p /tmp/zfs/usr/freebsd-dist
-cp /usr/freebsd-dist/base.txz /tmp/zfs/usr/freebsd-dist
-cp /usr/freebsd-dist/kernel.txz /tmp/zfs/usr/freebsd-dist
-
 # Auto login as root
 echo 'Autologin as root'
 sleep 1
