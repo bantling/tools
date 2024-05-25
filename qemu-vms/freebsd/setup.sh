@@ -51,20 +51,12 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Check if /boot/loader.conf contains lines for disk identification settings (not present by default)
-grep -q 'kern.geom.label' /boot/loader.conf || {
-  echo 'Configuring boot delay and gptid disk identification'
+grep -q 'autoboot_delay' /boot/loader.conf || {
+  echo 'Configuring boot delay'
   sleep 1
 
   # Append lines to the end
-  {
-    echo 'autoboot_delay="0"'
-    echo 'kern.geom.label.disk_ident.enable="0"'
-    echo 'kern.geom.label.gpt.enable="0"'
-    echo 'kern.geom.label.gptid.enable="1"'
-  } >> /boot/loader.conf
-
-  echo 'Rebooting'
-  reboot
+  echo 'autoboot_delay="0"' >> /boot/loader.conf
 }
 
 ## Destroy any existing gpt partition on second drive
@@ -112,12 +104,11 @@ cd /tmp/zfs
 
 echo 'Installing kernel'
 sleep 1
-xz -dkv --stdout /usr/freebsd-dist/kernel.txz | tar xf -
 tar xvJf /usr/freebsd-dist/kernel.txz
 
 echo 'Installing base'
 sleep 1
-xz -dkv --stdout /usr/freebsd-dist/base.txz | tar xf -
+tar xvJf /usr/freebsd-dist/base.txz
 
 # Copy setup script and base and kernel sets
 echo 'Copying setup.sh'
@@ -152,7 +143,7 @@ echo
 sleep 1
 cat <<-EOF > etc/rc.local
 #!/bin/sh
-for netdev in \`ifconfig -a | sed -r '/^\t/d;s,^([^:]*).*,\1,' | grep -v lo\`; do
+for netdev in \`ifconfig -a | sed -r '/^[ \t]/d;s,^([^:]*).*,\1,' | grep -v lo\`; do
   ifconfig \$netdev -rxcsum
   dhclient \$netdev
 done
@@ -164,11 +155,8 @@ echo 'Setting autoboot delay to 1 second'
 sleep 1
 echo 'autoboot_delay="1"' >> boot/loader.conf
 
-echo 'Configuring boot loader to enable gptid and use zfs'
+echo 'Configuring boot loader to use zfs'
 sleep 1
-echo 'kern.geom.label.disk_ident.enable="0"' >> boot/loader.conf
-echo 'kern.geom.label.gpt.enable="0"' >> boot/loader.conf
-echo 'kern.geom.label.gptid.enable="1"' >> boot/loader.conf
 echo 'zfs_load="YES"' >> boot/loader.conf
 echo "vfs.root.mountfrom=\"zfs:$poolname\"" >> boot/loader.conf
 

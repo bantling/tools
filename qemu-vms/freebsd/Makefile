@@ -189,24 +189,18 @@ $(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 	echo
 	echo '#### Use modified memstick image to auto install into a test image'
 	echo
-	echo 'When prompt appears, run /setup.sh ada1'
-	echo 'The default is to have swap and call the pool zroot, you can run /setup.sh ada1 [ -n ] [ -p poolname ]'
+	echo 'When prompt appears, run /setup.sh vtbd1'
+	echo 'The default is to have swap and call the pool zroot, you can run /setup.sh vtbd1 [ -n ] [ -p poolname ]'
 	echo "Where -n means no swap, and -p poolname provides an alternate pool name (don't use zinstall)"
-	echo
-	echo 'Both network cards should work, where 192.168.0.1 and 192.168.1.1 are the gateways'
 	echo
 	qemu-system-x86_64 \
 	  -accel "$(QEMU_ACCEL)" \
 	  -boot c \
 	  -cpu qemu64 \
 	  -m 1024 \
-	  -drive file=$(AMD64_IMAGE_INSTALL),format=raw,if=none,id=disk0 \
-	  -drive file=$(AMD64_IMAGE_TEST),format=raw,if=none,id=disk1 \
-		-device ich9-ahci,id=ahci \
-		-device ide-hd,drive=disk0,bus=ahci.0 \
-		-device ide-hd,drive=disk1,bus=ahci.1 \
-	  -nic user,model=e1000,net=192.168.0.0/24,dhcpstart=192.168.0.1 \
-	  -nic user,model=rtl8139,net=192.168.1.0/24,dhcpstart=192.168.1.1
+	  -drive file=$(AMD64_IMAGE_INSTALL),format=raw,if=virtio \
+	  -drive file=$(AMD64_IMAGE_TEST),format=raw,if=virtio \
+	  -nic user,model=virtio-net-pci
 	touch $< $@
 
 
@@ -231,6 +225,11 @@ $(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_IMAGE_TEST)
 		-nic user,model=e1000,net=192.168.0.0/24,dhcpstart=192.168.0.1 \
 		-nic user,model=rtl8139,net=192.168.1.0/24,dhcpstart=192.168.1.1,tftp=.
 	touch $< $(AMD64_MEMSTICK_CONF) $@
+
+.PHONY: recopy
+recopy:
+	rm $(AMD64_MEMSTICK_BOOT)
+	$(MAKE)
 
 .PHONY: reconfig
 reconfig:
