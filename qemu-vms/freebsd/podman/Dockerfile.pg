@@ -1,0 +1,7 @@
+FROM dougrabson/freebsd14-small
+
+RUN pkg_name=$(pkg search -S pkg-name 'postgres.*-server' | sort -rV | head -n 1 | awk '{print $1}'); \
+    pkg install $pkg_name
+
+ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["echo dude"]
