@@ -1,6 +1,8 @@
-ARG PG_VERSION
-
 FROM dougrabson/freebsd14-small
+ARG PG_VERSION
+ARG PG_MAJOR_VERSION
+
+RUN pkg install postgresql${PG_MAJOR_VERSION}-server-${PG_VERSION}
 
 ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["echo ${PG_VERSION}"]
+CMD ["echo dude"]
