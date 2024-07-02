@@ -1,0 +1,11 @@
+ARG BASE_IMAGE_REF
+FROM docker.io/${BASE_IMAGE_REF} AS build
+
+COPY app /app
+
+RUN cd /app; \
+	go vet ./...; \
+	go format ./...; \
+	go build ./...
+
+ENTRYPOINT ["/bin/sh", "/hotload.sh"]
