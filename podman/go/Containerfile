@@ -5,7 +5,9 @@ COPY app /app
 
 RUN cd /app; \
 	go vet ./...; \
-	go format ./...; \
-	go build ./...
+	go fmt ./...; \
+	go build ./...; \
+	cp /app/app /program; \
+	ls /program
 
-ENTRYPOINT ["/bin/sh", "/hotload.sh"]
+ENTRYPOINT ["/program"]
