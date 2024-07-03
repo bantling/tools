@@ -106,6 +106,7 @@ $(GO_CACHE_PKG) $(GO_CACHE_BUILD):
 	mkdir -p "$@"
 
 # Build oci image
+# Pruning removes the unnamed initial stage images of multi stage builds
 .PHONY: oci-build
 oci-build: app/main.go Containerfile | $(GO_CACHE_PKG) $(GO_CACHE_BUILD)
 	podman build \
