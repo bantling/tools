@@ -25,14 +25,19 @@ THIS_MAKEFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 THIS_MAKEFILE_DIR  := $(patsubst %/,%,$(dir $(THIS_MAKEFILE_PATH)))
 
 # golang docker image ref - see https://hub.docker.com/_/golang for latest release that is not rc, beta, etc
-BASE_IMAGE_NAME := golang
-BASE_IMAGE_VER  := 1.22.4-alpine3.20
-BASE_IMAGE_REF  := $(BASE_IMAGE_NAME):$(BASE_IMAGE_VER)
+COMPILE_IMAGE_NAME := golang
+COMPILE_IMAGE_VER  := 1.22.4-alpine3.20
+COMPILE_IMAGE_REF  := $(COMPILE_IMAGE_NAME):$(COMPILE_IMAGE_VER)
+
+# alpine docker image ref - see https://hub.docker.com/_/alpine for info, has a latest tag
+RUN_IMAGE_NAME := alpine
+RUN_IMAGE_VER  := latest
+RUN_IMAGE_REF  := $(RUN_IMAGE_NAME):$(RUN_IMAGE_VER)
 
 # generated image
-IMAGE_NAME := hello
-IMAGE_VER  := 1.0 
-IMAGE_REF  := $(IMAGE_NAME):$(IMAGE_VER)
+DEPLOY_IMAGE_NAME := hello
+DEPLOY_IMAGE_VER  := 1.0 
+DEPLOY_IMAGE_REF  := $(DEPLOY_IMAGE_NAME):$(DEPLOY_IMAGE_VER)
 
 # Cache dir to store compiled results across builds
 GO_CACHE_DIR := $(THIS_MAKEFILE_DIR)/.cache
@@ -85,14 +90,16 @@ oci: oci-clean oci-pull oci-build oci-run
 # The only thing not removed is the base image needed to build the code
 .PHONY: oci-clean
 oci-clean:
-	for id in `podman ps -a --format '{{.ID}} {{.Image}}' | grep $(IMAGE_REF) | awk '{print $$1}'`; do echo "Removing container $$id"; podman rm "$$id"; done
-	for id in `podman image ls --format '{{.ID}} {{.Repository}}:{{.Tag}}' | grep $(IMAGE_REF) | awk '{print $$1}'`; do echo "Removing image $$id";  podman image rm "$$id"; done
+	for id in `podman ps -a --format '{{.ID}} {{.Image}}' | grep $(DEPLOY_IMAGE_REF) | awk '{print $$1}'`; do echo "Removing container $$id"; podman rm "$$id"; done
+	for id in `podman image ls --format '{{.ID}} {{.Repository}}:{{.Tag}}' | grep $(DEPLOY_IMAGE_REF) | awk '{print $$1}'`; do echo "Removing image $$id";  podman image rm "$$id"; done
 
 # Pull oci base image
 .PHONY: oci-pull
 oci-pull:
-	[ "`podman image list --format "{{.ID}}" --filter "reference=$(BASE_IMAGE_REF)" | wc -l`" -gt 0 ] || \
-	podman pull $(BASE_IMAGE_REF)
+	[ "`podman image list --format "{{.ID}}" --filter "reference=$(COMPILE_IMAGE_REF)" | wc -l`" -gt 0 ] || \
+	podman pull $(COMPILE_IMAGE_REF)
+	[ "`podman image list --format "{{.ID}}" --filter "reference=$(RUN_IMAGE_REF)" | wc -l`" -gt 0 ] || \
+	podman pull $(RUN_IMAGE_REF)
 
 # Ensure cache dir for go ccompiled objects exists
 $(GO_CACHE_PKG) $(GO_CACHE_BUILD):
@@ -101,16 +108,20 @@ $(GO_CACHE_PKG) $(GO_CACHE_BUILD):
 # Build oci image
 .PHONY: oci-build
 oci-build: app/main.go Containerfile | $(GO_CACHE_PKG) $(GO_CACHE_BUILD)
-	podman build --build-arg "BASE_IMAGE_REF=$(BASE_IMAGE_REF)" \
+	podman build \
+	  --build-arg "COMPILE_IMAGE_REF=$(COMPILE_IMAGE_REF)" \
+	  --build-arg "RUN_IMAGE_REF=$(RUN_IMAGE_REF)" \
 	  -v "$(GO_CACHE_PKG):/go/pkg/mod" \
 	  -v "$(GO_CACHE_BUILD):/root/.cache" \
-	  -t $(IMAGE_REF) \
+	  -t $(DEPLOY_IMAGE_REF) \
 	  .
+	podman system prune -f
 
 # Run oci image
+# Ignore errors from run, assume user hit CTRL-C to stop it
 .PHONY: oci-run
 oci-run:
-	podman run --name=$(IMAGE_NAME) -p 8000:8000 $(IMAGE_REF)
+	podman run --rm --name=$(DEPLOY_IMAGE_NAME) -p 8000:8000 $(DEPLOY_IMAGE_REF) || :
 
 # git push
 .PHONY: push
@@ -123,12 +134,15 @@ push:
 vars:
 	echo "THIS_MAKEFILE_PATH = $(THIS_MAKEFILE_PATH)"
 	echo "THIS_MAKEFILE_DIR  = $(THIS_MAKEFILE_DIR)"
-	echo "BASE_IMAGE_NAME    = $(BASE_IMAGE_NAME)"
-	echo "BASE_IMAGE_VER     = $(BASE_IMAGE_VER)"
-	echo "BASE_IMAGE_REF     = $(BASE_IMAGE_REF)"
-	echo "IMAGE_NAME         = $(IMAGE_NAME)"
-	echo "IMAGE_VER          = $(IMAGE_VER)" 
-	echo "IMAGE_REF          = $(IMAGE_REF)"
+	echo "COMPILE_IMAGE_NAME = $(COMPILE_IMAGE_NAME)"
+	echo "COMPILE_IMAGE_VER  = $(COMPILE_IMAGE_VER)"
+	echo "COMPILE_IMAGE_REF  = $(COMPILE_IMAGE_REF)"
+	echo "RUN_IMAGE_NAME     = $(RUN_IMAGE_NAME)"
+	echo "RUN_IMAGE_VER      = $(RUN_IMAGE_VER)" 
+	echo "RUN_IMAGE_REF      = $(RUN_IMAGE_REF)"
+	echo "DEPLOY_IMAGE_NAME  = $(DEPLOY_IMAGE_NAME)"
+	echo "DEPLOY_IMAGE_VER   = $(DEPLOY_IMAGE_VER)" 
+	echo "DEPLOY_IMAGE_REF   = $(DEPLOY_IMAGE_REF)"
 	echo "GO_CACHE_DIR       = $(GO_CACHE_DIR)"
 	echo "GO_CACHE_PKG       = $(GO_CACHE_PKG)"
 	echo "GO_CACHE_BUILD     = $(GO_CACHE_BUILD)"

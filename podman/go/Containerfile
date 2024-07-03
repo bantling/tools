@@ -1,5 +1,5 @@
-ARG BASE_IMAGE_REF
-FROM docker.io/${BASE_IMAGE_REF} AS build
+ARG COMPILE_IMAGE_REF
+FROM docker.io/${COMPILE_IMAGE_REF} AS build
 
 COPY app /app
 
@@ -7,7 +7,13 @@ RUN cd /app; \
 	go vet ./...; \
 	go fmt ./...; \
 	go build ./...; \
-	cp /app/app /program; \
-	ls /program
+	cp /app/app /program
 
-ENTRYPOINT ["/program"]
+ARG RUN_IMAGE_REF
+FROM docker.io/${RUN_IMAGE_REF}
+
+RUN mkdir /app
+
+COPY --from=build /program /app
+
+ENTRYPOINT ["/app/program"]
