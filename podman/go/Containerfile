@@ -1,13 +1,11 @@
 ARG COMPILE_IMAGE_REF
 FROM docker.io/${COMPILE_IMAGE_REF} AS build
 
-COPY app /app
-
-RUN cd /app; \
+RUN cd /src; \
 	go vet ./...; \
 	go fmt ./...; \
 	go build ./...; \
-	cp /app/app /program
+	mv app /program
 
 ARG RUN_IMAGE_REF
 FROM docker.io/${RUN_IMAGE_REF}

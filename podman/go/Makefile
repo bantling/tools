@@ -10,9 +10,6 @@ ifndef VERBOSE
 .SILENT:
 endif
 
-# Execute all recipe lines as a single shell invocation
-.ONESHELL:
-
 # Execute recipes with shell flags -eu, where:
 # -e means die if any command fails with non-zero status
 # -u means die if an undefined shell variable is referenced
@@ -39,6 +36,9 @@ DEPLOY_IMAGE_NAME := hello
 DEPLOY_IMAGE_VER  := 1.0 
 DEPLOY_IMAGE_REF  := $(DEPLOY_IMAGE_NAME):$(DEPLOY_IMAGE_VER)
 
+# Src dir of source code
+SRC_DIR := $(THIS_MAKEFILE_DIR)/src
+
 # Cache dir to store compiled results across builds
 GO_CACHE_DIR := $(THIS_MAKEFILE_DIR)/.cache
 
@@ -56,30 +56,33 @@ all: vars podman $(GO_CACHE_DIR) oci
 
 # Ensure podman is up so we can use it to build containers
 .PHONY: podman
-podman-up: podman-path podman-machine-init podman-machine-start
+podman: podman-path podman-machine-init podman-machine-start
 
 # Ensure podman is in the path
 .PHONY: podman-path
 podman-path:
-	which podman > /dev/null 2> /dev/null || {
-	  echo "podman is not installed, or not in your path"
-	  exit 1
+	echo ">>> Checking if podman is in path"
+	which podman > /dev/null 2> /dev/null || { \
+	  echo "podman is not installed, or not in your path"; \
+	  exit 1; \
 	}
 
 # Ensure podman has been initialzed
 .PHONY: podman-machine-init
 podman-machine-init:
-	[ "`podman machine list --format "{{.Name}}" | wc -l`" -ge 1 ] || {
-	  echo "Initializing podman"
-	  podman machine init
+	echo ">>> Checking of podman has been intialized"
+	[ "`podman machine list --format "{{.Name}}" | wc -l`" -ge 1 ] || { \
+	  echo "Initializing podman"; \
+	  podman machine init; \
 	}
 
 # Ensure podman has been started 
 .PHONY: podman-machine-start
 podman-machine-start:
-	[ "`podman machine list --format "{{.LastUp}}" | grep -i running | wc -l`" -ge 1 ] || {
-	  echo "Starting podman"
-	  podman machine start
+	echo ">>> Checking if podman has been started"
+	[ "`podman machine list --format "{{.LastUp}}" | grep -i running | wc -l`" -ge 1 ] || { \
+	  echo "Starting podman"; \
+	  podman machine start; \
 	}
 
 # Ensure all oci container building operations are performed, so we have all the containers we need to run the app
@@ -90,28 +93,45 @@ oci: oci-clean oci-pull oci-build oci-run
 # The only thing not removed is the base image needed to build the code
 .PHONY: oci-clean
 oci-clean:
-	for id in `podman ps -a --format '{{.ID}} {{.Image}}' | grep $(DEPLOY_IMAGE_REF) | awk '{print $$1}'`; do echo "Removing container $$id"; podman rm "$$id"; done
-	for id in `podman image ls --format '{{.ID}} {{.Repository}}:{{.Tag}}' | grep $(DEPLOY_IMAGE_REF) | awk '{print $$1}'`; do echo "Removing image $$id";  podman image rm "$$id"; done
+	echo ">>> Cleaning previously generated OCI images and containers"
+	for id in `podman ps -a --format '{{.ID}} {{.Image}}' | grep $(DEPLOY_IMAGE_REF) | awk '{print $$1}'`; \
+	do \
+	  echo "Removing container $$id"; \
+	  podman rm "$$id"; \
+	done
+	for id in `podman image ls --format '{{.ID}} {{.Repository}}:{{.Tag}}' | grep $(DEPLOY_IMAGE_REF) | awk '{print $$1}'`; \
+	do \
+	  echo "Removing image $$id"; \
+	  podman image rm "$$id"; \
+	done
 
-# Pull oci base image
+# Pull oci compile and run images
 .PHONY: oci-pull
 oci-pull:
-	[ "`podman image list --format "{{.ID}}" --filter "reference=$(COMPILE_IMAGE_REF)" | wc -l`" -gt 0 ] || \
-	podman pull $(COMPILE_IMAGE_REF)
-	[ "`podman image list --format "{{.ID}}" --filter "reference=$(RUN_IMAGE_REF)" | wc -l`" -gt 0 ] || \
-	podman pull $(RUN_IMAGE_REF)
+	echo ">>> Checking if compile and run images need to be pulled"
+	[ "`podman image list --format "{{.ID}}" --filter "reference=$(COMPILE_IMAGE_REF)" | wc -l`" -gt 0 ] || { \
+	  echo "Pulling compile image"; \
+	  podman pull $(COMPILE_IMAGE_REF); \
+	}
+	[ "`podman image list --format "{{.ID}}" --filter "reference=$(RUN_IMAGE_REF)" | wc -l`" -gt 0 ] || { \
+	  echo "Pelling run image"; \
+	  podman pull $(RUN_IMAGE_REF); \
+	}
 
-# Ensure cache dir for go ccompiled objects exists
+# Ensure package and compiled object cache dirs exist
 $(GO_CACHE_PKG) $(GO_CACHE_BUILD):
+	echo ">>> Creating package and build cache dirs"
 	mkdir -p "$@"
 
 # Build oci image
 # Pruning removes the unnamed initial stage images of multi stage builds
 .PHONY: oci-build
-oci-build: app/main.go Containerfile | $(GO_CACHE_PKG) $(GO_CACHE_BUILD)
+oci-build: src/main.go Containerfile | $(GO_CACHE_PKG) $(GO_CACHE_BUILD)
+	echo ">>> Building image"
 	podman build \
 	  --build-arg "COMPILE_IMAGE_REF=$(COMPILE_IMAGE_REF)" \
 	  --build-arg "RUN_IMAGE_REF=$(RUN_IMAGE_REF)" \
+	  -v "$(SRC_DIR):/src" \
 	  -v "$(GO_CACHE_PKG):/go/pkg/mod" \
 	  -v "$(GO_CACHE_BUILD):/root/.cache" \
 	  -t $(DEPLOY_IMAGE_REF) \
@@ -122,17 +142,20 @@ oci-build: app/main.go Containerfile | $(GO_CACHE_PKG) $(GO_CACHE_BUILD)
 # Ignore errors from run, assume user hit CTRL-C to stop it
 .PHONY: oci-run
 oci-run:
+	echo ">>> Running image. To stop, hit Ctrl-C or run curl localhost:8000/quit"
 	podman run --rm --name=$(DEPLOY_IMAGE_NAME) -p 8000:8000 $(DEPLOY_IMAGE_REF) || :
 
 # git push
 .PHONY: push
 push:
+	echo ">>> Pushing all changes to git"
 	git add -A
 	git commit -am Changes
 	git push
 
 .PHONY: vars
 vars:
+	echo ">>> Displaying variables"
 	echo "THIS_MAKEFILE_PATH = $(THIS_MAKEFILE_PATH)"
 	echo "THIS_MAKEFILE_DIR  = $(THIS_MAKEFILE_DIR)"
 	echo "COMPILE_IMAGE_NAME = $(COMPILE_IMAGE_NAME)"
@@ -144,6 +167,7 @@ vars:
 	echo "DEPLOY_IMAGE_NAME  = $(DEPLOY_IMAGE_NAME)"
 	echo "DEPLOY_IMAGE_VER   = $(DEPLOY_IMAGE_VER)" 
 	echo "DEPLOY_IMAGE_REF   = $(DEPLOY_IMAGE_REF)"
+	echo "SRC_DIR            = $(SRC_DIR)"
 	echo "GO_CACHE_DIR       = $(GO_CACHE_DIR)"
 	echo "GO_CACHE_PKG       = $(GO_CACHE_PKG)"
 	echo "GO_CACHE_BUILD     = $(GO_CACHE_BUILD)"
