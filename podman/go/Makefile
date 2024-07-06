@@ -1,4 +1,4 @@
-# Demo of using podman on Windows, Mac, or Linux
+# Go Makefile
 
 #### Change Make defaults
 
@@ -21,7 +21,7 @@ endif
 THIS_MAKEFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 THIS_MAKEFILE_DIR  := $(patsubst %/,%,$(dir $(THIS_MAKEFILE_PATH)))
 
-# golang docker image ref - see https://hub.docker.com/_/golang for latest release that is not rc, beta, etc
+# golang docker image ref - see https://hub.docker.com/_/golang for tags
 COMPILE_IMAGE_NAME := golang
 COMPILE_IMAGE_VER  := 1.22.4-alpine3.20
 COMPILE_IMAGE_REF  := $(COMPILE_IMAGE_NAME):$(COMPILE_IMAGE_VER)
@@ -36,7 +36,7 @@ DEPLOY_IMAGE_NAME := hello
 DEPLOY_IMAGE_VER  := 1.0 
 DEPLOY_IMAGE_REF  := $(DEPLOY_IMAGE_NAME):$(DEPLOY_IMAGE_VER)
 
-# Src dir of source code
+# Dir of source code
 SRC_DIR := $(THIS_MAKEFILE_DIR)/src
 
 # Cache dir to store compiled results across builds
