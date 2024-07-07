@@ -8,7 +8,7 @@ SELECT 'CREATE ROLE app_objects'
 \gexec
 
 -- app_exec owns all functions and procedures, and has a password for external access
-SELECT 'CREATE ROLE app_exec PASSWORD ${PASSWORD}'
+SELECT 'CREATE ROLE app_exec PASSWORD ${APP_EXEC_PASS}'
  WHERE NOT EXISTS (
 	     SELECT 1
 	       FROM pg_roles

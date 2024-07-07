@@ -1,0 +1,11 @@
+ARG PG_IMAGE_REF
+FROM --platform=linux/amd64 docker.io/${PG_IMAGE_REF} AS build
+
+# Password for app_exec USER, that only has accesss to call procedures and functions
+ARG APP_EXEC_PASS
+
+# Copy all sql scripts into container
+COPY src/* /docker-entrypoint-initdb.d
+
+# Replace every occurrence of ${APP_EXEC_PASS} in copied sql scripts with value of build arg APP_EXEC_PASS
+RUN find /docker-entrypoint-initdb.d -type f -name '*.sql' -exec sed -i 's,[$][{]APP_EXEC_PASS[}],${APP_EXEC_PASS},g' '{}' \;

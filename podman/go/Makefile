@@ -93,7 +93,7 @@ oci: oci-clean oci-pull oci-build oci-run
 # The only thing not removed is the base image needed to build the code
 .PHONY: oci-clean
 oci-clean:
-	echo ">>> Cleaning previously generated OCI images and containers"
+	echo ">>> Cleaning previously generated app OCI images and containers"
 	for id in `podman ps -a --format '{{.ID}} {{.Image}}' | grep $(DEPLOY_IMAGE_REF) | awk '{print $$1}'`; \
 	do \
 	  echo "Removing container $$id"; \
@@ -108,7 +108,7 @@ oci-clean:
 # Pull oci compile and run images
 .PHONY: oci-pull
 oci-pull:
-	echo ">>> Checking if compile and run images need to be pulled"
+	echo ">>> Checking if app compile and run images need to be pulled"
 	[ "`podman image list --format "{{.ID}}" --filter "reference=$(COMPILE_IMAGE_REF)" | wc -l`" -gt 0 ] || { \
 	  echo "Pulling compile image"; \
 	  podman pull $(COMPILE_IMAGE_REF); \
@@ -120,14 +120,14 @@ oci-pull:
 
 # Ensure package and compiled object cache dirs exist
 $(GO_CACHE_PKG) $(GO_CACHE_BUILD):
-	echo ">>> Creating package and build cache dirs"
+	echo ">>> Creating app package and build cache dirs"
 	mkdir -p "$@"
 
 # Build oci image
 # Pruning removes the unnamed initial stage images of multi stage builds
 .PHONY: oci-build
-oci-build: src/main.go Containerfile | $(GO_CACHE_PKG) $(GO_CACHE_BUILD)
-	echo ">>> Building image"
+oci-build: Containerfile | $(GO_CACHE_PKG) $(GO_CACHE_BUILD)
+	echo ">>> Building app image"
 	podman build \
 	  --build-arg "COMPILE_IMAGE_REF=$(COMPILE_IMAGE_REF)" \
 	  --build-arg "RUN_IMAGE_REF=$(RUN_IMAGE_REF)" \
@@ -138,11 +138,11 @@ oci-build: src/main.go Containerfile | $(GO_CACHE_PKG) $(GO_CACHE_BUILD)
 	  .
 	podman system prune -f
 
-# Run oci image
+# Run oci container
 # Ignore errors from run, assume user hit CTRL-C to stop it
 .PHONY: oci-run
 oci-run:
-	echo ">>> Running image. To stop, hit Ctrl-C or run curl localhost:8000/quit"
+	echo ">>> Running app container. To stop, hit Ctrl-C or run curl localhost:8000/quit"
 	podman run --rm --name=$(DEPLOY_IMAGE_NAME) -p 8000:8000 $(DEPLOY_IMAGE_REF) || :
 
 # git push
