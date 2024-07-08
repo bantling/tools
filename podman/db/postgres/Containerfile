@@ -8,4 +8,5 @@ ARG APP_EXEC_PASS
 COPY src/* /docker-entrypoint-initdb.d
 
 # Replace every occurrence of ${APP_EXEC_PASS} in copied sql scripts with value of build arg APP_EXEC_PASS
-RUN find /docker-entrypoint-initdb.d -type f -name '*.sql' -exec sed -i 's,[$][{]APP_EXEC_PASS[}],${APP_EXEC_PASS},g' '{}' \;
+# Note that ${APP_EXEC_PASS} cannot be in quotes, or it will be passed as the literal sequence ${APP_EXEC_PASS}
+RUN find /docker-entrypoint-initdb.d -type f -name '*.sql' -exec sed -i 's,[$][{]APP_EXEC_PASS[}],'${APP_EXEC_PASS}',g' '{}' \;

@@ -1,0 +1,1 @@
+-- Helper functions that could be ussed in table definitions, views, or code

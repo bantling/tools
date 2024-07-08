@@ -57,7 +57,7 @@ oci-clean:
 	for id in `podman ps -a --format '{{.ID}} {{.Image}}' | grep $(DEPLOY_IMAGE_REF) | awk '{print $$1}'`; \
 	do \
 	  echo "Removing container $$id"; \
-	  podman rm "$$id"; \
+	  podman rm -f "$$id"; \
 	done
 	for id in `podman image ls --format '{{.ID}} {{.Repository}}:{{.Tag}}' | grep $(DEPLOY_IMAGE_REF) | awk '{print $$1}'`; \
 	do \
@@ -96,7 +96,7 @@ oci-run:
 # Run psql inside running postgres container
 .PHONY: oci-sql-cli
 oci-sql-cli:
-	podman exec -it $(DEPLOY_IMAGE_NAME) psql -U postgres
+	podman exec -it $(DEPLOY_IMAGE_NAME) psql -U postgres -d $(DB_NAME)
 
 .PHONY: vars
 vars:
