@@ -1,6 +1,6 @@
 -- Customer
 CREATE TABLE IF NOT EXISTS tables.customer(
-	 relid       INTEGER                     NOT NULL
+	 relid       SERIAL                      NOT NULL
 	,id          UUID                        NOT NULL
 	,version     INTEGER                     NOT NULL
 	,created_at  TIMESTAMP WITHOUT TIME ZONE NOT NULL
@@ -22,7 +22,7 @@ SELECT 'ALTER TABLE tables.customer ADD CONSTRAINT customer_pk PRIMARY KEY(relid
 
 -- Address
 CREATE TABLE IF NOT EXISTS tables.address(
-	 relid          INTEGER                     NOT NULL
+	 relid          SERIAL                      NOT NULL
 	,customer_relid INTEGER                     NOT NULL
 	,id             UUID                        NOT NULL
 	,version        INTEGER                     NOT NULL

@@ -87,11 +87,34 @@ oci-build: Containerfile
 	podman system prune -f
 
 # Run oci image
+# If there are no errors, "database system is ready to accept connections" occurs twice
+# If there are errors, "database system is ready to accept connections" occurs once, followed by ERROR line
 .PHONY: oci-run
 oci-run:
 	echo ">>> Running postgres container"
 	podman create --name=$(DEPLOY_IMAGE_NAME) -e POSTGRES_DB=$(DB_NAME) -e POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" -p 5432:5432 $(DEPLOY_IMAGE_REF)
 	podman start $(DEPLOY_IMAGE_NAME)
+	while true; do \
+	  sleep 1; \
+	  printf "."; \
+	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "database system is ready to accept connections" | wc -l`" -eq 0 ] || { \
+	    break; \
+	  }; \
+	done
+	while true; do \
+	  sleep 1; \
+	  printf "."; \
+	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "ERROR" | wc -l`" -eq 0 ] || { \
+	    echo; \
+	    podman logs $(DEPLOY_IMAGE_NAME); \
+	    exit 1; \
+	  }; \
+	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "database system is ready to accept connections" | wc -l`" -eq 0 ] || { \
+	    break; \
+	  }; \
+	done
+	echo
+	echo "Database $(DEPLOY_IMAGE_REF) started"
 
 # Run psql inside running postgres container
 .PHONY: oci-sql-cli

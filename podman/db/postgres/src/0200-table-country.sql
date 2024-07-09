@@ -1,6 +1,6 @@
 -- Create country table
 CREATE TABLE IF NOT EXISTS tables.country(
-	 relid       INTEGER NOT NULL
+	 relid       SERIAL  NOT NULL
 	,id          UUID    NOT NULL
 	,name        TEXT    NOT NULL
 	,code_2      CHAR(2) NOT NULL
@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS tables.country(
 	,has_regions BOOLEAN NOT NULL
 );
 
-SELECT 'ALTER TABLE tables.COUNTRY ADD CONSTRAINT country_pk PRIMARY KEY(relid)'
+SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
@@ -20,7 +20,7 @@ SELECT 'ALTER TABLE tables.COUNTRY ADD CONSTRAINT country_pk PRIMARY KEY(relid)'
 
 -- Create region table
 CREATE TABLE IF NOT EXISTS tables.region(
-	 relid         INTEGER NOT NULL
+	 relid         SERIAL  NOT NULL
 	,country_relid INTEGER NOT NULL
 	,id            UUID    NOT NULL
 	,name          TEXT    NOT NULL
