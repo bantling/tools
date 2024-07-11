@@ -1,0 +1,1 @@
+-- Seed the customer and addresss tables with random data

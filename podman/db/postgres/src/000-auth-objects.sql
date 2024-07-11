@@ -1,9 +1,9 @@
 -- app_objects owns all database objects except functions and procedures
 SELECT 'CREATE ROLE app_objects'
  WHERE NOT EXISTS (
-	     SELECT 1
-	       FROM pg_roles
-	      WHERE rolname = 'app_objects'
+       SELECT 1
+         FROM pg_roles
+        WHERE rolname = 'app_objects'
  )
 \gexec
 
