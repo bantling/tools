@@ -97,19 +97,19 @@ oci-run:
 	while true; do \
 	  sleep 1; \
 	  printf "."; \
-	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "database system is ready to accept connections" | wc -l`" -eq 0 ] || { \
+	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "database system is ready to accept connections" | wc -l`" -lt 1 ] || { \
 	    break; \
 	  }; \
 	done
 	while true; do \
 	  sleep 1; \
 	  printf "."; \
-	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "ERROR" | wc -l`" -eq 0 ] || { \
+	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "ERROR" | wc -l`" -lt 1 ] || { \
 	    echo; \
 	    podman logs $(DEPLOY_IMAGE_NAME); \
 	    exit 1; \
 	  }; \
-	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "database system is ready to accept connections" | wc -l`" -eq 0 ] || { \
+	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "database system is ready to accept connections" | wc -l`" -lt 2 ] || { \
 	    break; \
 	  }; \
 	done

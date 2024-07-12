@@ -1,9 +1,9 @@
 -- Address types
 CREATE TABLE IF NOT EXISTS tables.address_type(
-   relid SERIAL
-  ,id    UUID
-  ,name  TEXT
-  ,ord   INTEGER -- ordering
+   relid SERIAL  NOT NULL
+  ,id    UUID    NOT NULL
+  ,name  TEXT    NOT NULL
+  ,ord   INTEGER NOT NULL -- ordering
 );
 
 SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_pk PRIMARY KEY(relid)'
@@ -18,19 +18,19 @@ SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_pk PRIMARY K
 
 -- Address
 CREATE TABLE IF NOT EXISTS tables.address(
-   relid          SERIAL                      NOT NULL
-  ,type_relid     INTEGER                     NOT NULL
-  ,country_relid  INTEGER                     NOT NULL
-  ,region_relid   INTEGER
-  ,id             UUID                        NOT NULL
-  ,version        INTEGER                     NOT NULL
-  ,created_at     TIMESTAMP WITHOUT TIME ZONE NOT NULL
-  ,changed_at     TIMESTAMP WITHOUT TIME ZONE NOT NULL
-  ,city           TEXT                        NOT NULL
-  ,address        TEXT                        NOT NULL
-  ,address_2      TEXT
-  ,address_3      TEXT
-  ,mailing_code   TEXT
+   relid         SERIAL                      NOT NULL
+  ,type_relid    INTEGER                     NOT NULL
+  ,country_relid INTEGER                     NOT NULL
+  ,region_relid  INTEGER
+  ,id            UUID                        NOT NULL
+  ,version       INTEGER                     NOT NULL
+  ,created       TIMESTAMP WITHOUT TIME ZONE NOT NULL
+  ,changed       TIMESTAMP WITHOUT TIME ZONE NOT NULL
+  ,city          TEXT                        NOT NULL
+  ,address       TEXT                        NOT NULL
+  ,address_2     TEXT
+  ,address_3     TEXT
+  ,mailing_code  TEXT
 );
 
 SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_pk PRIMARY KEY(relid)'
@@ -79,8 +79,8 @@ CREATE TABLE IF NOT EXISTS tables.customer_person(
   ,address_relid INTEGER
   ,id            UUID                        NOT NULL
   ,version       INTEGER                     NOT NULL
-  ,created_at    TIMESTAMP WITHOUT TIME ZONE NOT NULL
-  ,changed_at    TIMESTAMP WITHOUT TIME ZONE NOT NULL
+  ,created       TIMESTAMP WITHOUT TIME ZONE NOT NULL
+  ,changed       TIMESTAMP WITHOUT TIME ZONE NOT NULL
   ,first_name    TEXT                        NOT NULL
   ,middle_name   TEXT
   ,last_name     TEXT                        NOT NULL
@@ -108,12 +108,12 @@ SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_addres
 
 -- Business Customer
 CREATE TABLE IF NOT EXISTS tables.customer_business(
-   relid       SERIAL                      NOT NULL
-  ,id          UUID                        NOT NULL
-  ,version     INTEGER                     NOT NULL
-  ,created_at  TIMESTAMP WITHOUT TIME ZONE NOT NULL
-  ,changed_at  TIMESTAMP WITHOUT TIME ZONE NOT NULL
-  ,name        TEXT                        NOT NULL
+   relid   SERIAL                      NOT NULL
+  ,id      UUID                        NOT NULL
+  ,version INTEGER                     NOT NULL
+  ,created TIMESTAMP WITHOUT TIME ZONE NOT NULL
+  ,changed TIMESTAMP WITHOUT TIME ZONE NOT NULL
+  ,name    TEXT                        NOT NULL
 );
 
 SELECT 'ALTER TABLE tables.customer_business ADD CONSTRAINT customer_business_pk PRIMARY KEY(relid)'
