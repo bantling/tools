@@ -1,11 +1,13 @@
 -- Create country table
 CREATE TABLE IF NOT EXISTS tables.country(
-   relid       SERIAL  NOT NULL
-  ,id          UUID    NOT NULL
-  ,name        TEXT    NOT NULL
-  ,code_2      CHAR(2) NOT NULL
-  ,code_3      CHAR(3) NOT NULL
-  ,has_regions BOOLEAN NOT NULL
+   relid               SERIAL  NOT NULL
+  ,id                  UUID    NOT NULL
+  ,name                TEXT    NOT NULL
+  ,code_2              CHAR(2) NOT NULL
+  ,code_3              CHAR(3) NOT NULL
+  ,has_regions         BOOLEAN NOT NULL
+  ,mailing_code_match  TEXT
+  ,mailing_code_format TEXT
 );
 
 SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_pk PRIMARY KEY(relid)'

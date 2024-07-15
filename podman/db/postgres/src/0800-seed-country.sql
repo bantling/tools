@@ -7,20 +7,26 @@ INSERT INTO tables.country(
   ,code_2
   ,code_3
   ,has_regions
+  ,mailing_code_match
+  ,mailing_code_format
 ) VALUES
+  (
+     'BE5A978E-AFF7-4EDE-A994-03C07366F9F6'::UUID
+    ,'Aruba'
+    ,'AW'
+    ,'ABW'
+    ,false
+    ,NULL
+    ,NULL
+  ),
   (
      'D273DF38-2798-4B72-AC83-7FE145D5B8A7'::UUID
     ,'Canada'
     ,'CA'
     ,'CAN'
     ,true
-  ),
-  (
-     '4EE216CA-0032-4951-AC9D-5547AFCC8707'::UUID
-    ,'United States'
-    ,'US'
-    ,'USA'
-    ,true
+    ,'([A-Za-z][0-9][A-Za-z]) *([0-9][A-Za-z][0-9])'
+    ,'\1 \2'
   ),
   (
      '07A5A579-895D-4965-9436-2B603D2FF43A'::UUID
@@ -28,6 +34,17 @@ INSERT INTO tables.country(
     ,'CX'
     ,'CXR'
     ,false
+    ,'6798'
+    ,'6798'
+  ),
+  (
+     '4EE216CA-0032-4951-AC9D-5547AFCC8707'::UUID
+    ,'United States'
+    ,'US'
+    ,'USA'
+    ,true
+    ,'([0-9]{5}(?:-[0-9]{4})?)'
+    ,'\1'
   );
 
 -- Canadian provinces
@@ -216,7 +233,7 @@ INSERT INTO tables.region(
   (
      (SELECT relid FROM tables.country WHERE code_2 = 'US')
     ,'BFF249A8-11FA-471B-89E3-A652C3AADCC6'
-    ,'Illionois'
+    ,'Illinois'
     ,'IL'
   ),
   (
@@ -450,7 +467,7 @@ INSERT INTO tables.region(
   (
      (SELECT relid FROM tables.country WHERE code_2 = 'US')
     ,'A479817A-6BB0-4240-B3C4-8DB36BA72BDE'
-    ,'Wisonsin'
+    ,'Wisconsin'
     ,'WI'
   ),
   (
