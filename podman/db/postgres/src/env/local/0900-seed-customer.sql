@@ -55,12 +55,12 @@ WITH PARAMS AS (
 --                   2 |             4 |          56
 -- (5 rows)
 
-, GEN_DATA_REGION_RELID AS (
+, GEN_REGION_RELID AS (
   SELECT d.*
         ,((random() * d.num_regions - 1) + 1)::int region_relid
     FROM GEN_NUM_REGIONS d
 )
--- SELECT * FROM GEN_DATA_REGION_RELID;
+-- SELECT * FROM GEN_REGION_RELID;
 --  address_type_relid | country_relid | num_regions | region_relid 
 -- --------------------+---------------+-------------+--------------
 --                   2 |             2 |          13 |            6
@@ -70,38 +70,76 @@ WITH PARAMS AS (
 --                   2 |             4 |          56 |           34
 -- (5 rows)
 
+, GEN_CITY AS (
+  SELECT d.*
+        ,CASE c.code_2
+         WHEN 'CA' THEN -- Canada
+           jsonb_build_array(
+              jsonb_build_array('Calgary'      , 'Edmonton')     -- AB
+             ,jsonb_build_array('Victoria'     , 'Vancouver')    -- BC
+             ,jsonb_build_array('Winnepeg'     , 'Brandon')      -- MB
+             ,jsonb_build_array('Fredericton'  , 'Moncton')      -- NB
+             ,jsonb_build_array('St John''s'   , 'Paradise')     -- NL
+             ,jsonb_build_array('Yellowknife'  , 'Hay River')    -- NT
+             ,jsonb_build_array('Halifax'      , 'Sydney')       -- NS
+             ,jsonb_build_array('Iqaluit'      , 'Rankin Inlet') -- NU
+             ,jsonb_build_array('Ottawa'       , 'Toronto')      -- ON
+             ,jsonb_build_array('Charlottetown', 'Summerside')   -- PE
+             ,jsonb_build_array('Quebec City'  , 'Montreal')     -- QC
+             ,jsonb_build_array('Saskatoon'    , 'Regina')       -- SK
+             ,jsonb_build_array('Whitehorse'   , 'Dawson City')  -- YT
+           ) -> (random() * 13)::int -> (random() < 0.5)::int
+    FROM GEN_REGION_RELID
+    JOIN tables.country c
+      ON c.relid = d.country_relid
+)
+
 , GEN_MAILING_CODE AS (
   SELECT d.*
         ,CASE c.code_2
-         WHEN 'CA' THEN
-           CASE r.code
-           WHEN 'AB' THEN 'T'
-           WHEN 'BC' THEN 'T'
-           WHEN 'MB' THEN 'T'
-           WHEN 'NB' THEN 'T'
-           WHEN 'NL' THEN 'T'
-           WHEN 'NT' THEN 'T'
-           WHEN 'NS' THEN 'T'
-           WHEN 'NU' THEN 'T'
-           WHEN 'ON' THEN 'T'
-           WHEN 'PE' THEN 'T'
-           WHEN 'QC' THEN 'T'
-           WHEN 'SK' THEN 'T'
-           -- YT
-           ELSE
-           END 
-         WHEN 'CX' THEN '6798' 
+         WHEN 'CA' THEN -- Canada
+           chr((ascii('A') + random() * 25)::int) || -- letter
+           chr((ascii('0') + random() *  9)::int) || -- digit
+           chr((ascii('A') + random() * 25)::int) || -- letter
+           ' '                                    || -- space
+           chr((ascii('0') + random() *  9)::int) || -- digit
+           chr((ascii('A') + random() * 25)::int) || -- letter
+           chr((ascii('0') + random() *  9)::int)    -- digit
+         WHEN 'CX' THEN -- Christmas Island
+           '6798'
          WHEN 'US' THEN
-           CASE r.code
-           WHEN 'AL' THEN
+           chr((ascii('0') + random() * 9)::int) ||
+           chr((ascii('0') + random() * 9)::int) ||
+           chr((ascii('0') + random() * 9)::int) ||
+           chr((ascii('0') + random() * 9)::int) ||
+           chr((ascii('0') + random() * 9)::int) ||
+           CASE random() < 0.5
+           WHEN TRUE THEN
+             ''
+           ELSE
+             '-'                                   ||
+             chr((ascii('0') + random() * 9)::int) ||
+             chr((ascii('0') + random() * 9)::int) ||
+             chr((ascii('0') + random() * 9)::int) ||
+             chr((ascii('0') + random() * 9)::int)
            END
          END mailing_code
-    FROM GEN_DATA_REGION_RELID d
+    FROM GEN_REGION_RELID d
     JOIN tables.country c
       ON c.relid = d.country_relid
-    JOIN tables.region  r
+    LEFT JOIN tables.region  r
       ON r.country_relid = c.relid
      AND r.relid = d.region_relid
+)
+-- SELECT * FROM GEN_MAILING_CODE;
+--  address_type_relid | country_relid | num_regions | region_relid | mailing_code 
+-- --------------------+---------------+-------------+--------------+--------------
+--                   2 |             2 |          13 |            2 | H5G 3Z5
+--                     |             3 |             |              | 6798
+--                   2 |             3 |             |              | 6798
+--                   1 |             3 |             |              | 6798
+--                   1 |             4 |          56 |            3 | 71192
+-- (5 rows)
 
 , GEN_ADDRESS AS (
   SELECT d.address_type_relid AS type_relid
@@ -115,8 +153,8 @@ WITH PARAMS AS (
         ,'123 Sesame St'      AS address
         ,CASE WHEN d.address_type_relid IS NOT NULL THEN 'Door 5' END AS address_2
         ,CASE WHEN d.address_type_relid IS NOT NULL THEN 'Stop 6' END AS address_3
-        ,CASE WHEN d.has_mailing_code THEN 
-    FROM GEN_DATA_REGION_RELID d
+        ,d.mailing_code
+    FROM GEN_MAILING_CODE d
 )
 -- SELECT * FROM GEN_ADDRESS
 --  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |    city     |    address    | address_2 | address_3 
