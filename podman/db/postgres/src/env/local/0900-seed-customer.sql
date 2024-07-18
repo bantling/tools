@@ -73,22 +73,104 @@ WITH PARAMS AS (
 , GEN_CITY AS (
   SELECT d.*
         ,CASE c.code_2
+         WHEN 'AW' THEN -- Aruba
+           jsonb_build_array(
+              'Noord'       -- district
+             ,'Alto Vista'
+             ,'Bubali'
+             ,'Malmok'
+             ,'Moko'
+             ,'Oranjestad'  -- capital
+             ,'Barcadera'
+             ,'Companashi'
+             ,'Cumana'
+             ,'Cunucu Abao'
+           ) -> (random() * 9)::int
          WHEN 'CA' THEN -- Canada
            jsonb_build_array(
-              jsonb_build_array('Calgary'      , 'Edmonton')     -- AB
-             ,jsonb_build_array('Victoria'     , 'Vancouver')    -- BC
-             ,jsonb_build_array('Winnepeg'     , 'Brandon')      -- MB
-             ,jsonb_build_array('Fredericton'  , 'Moncton')      -- NB
-             ,jsonb_build_array('St John''s'   , 'Paradise')     -- NL
-             ,jsonb_build_array('Yellowknife'  , 'Hay River')    -- NT
-             ,jsonb_build_array('Halifax'      , 'Sydney')       -- NS
-             ,jsonb_build_array('Iqaluit'      , 'Rankin Inlet') -- NU
-             ,jsonb_build_array('Ottawa'       , 'Toronto')      -- ON
-             ,jsonb_build_array('Charlottetown', 'Summerside')   -- PE
-             ,jsonb_build_array('Quebec City'  , 'Montreal')     -- QC
-             ,jsonb_build_array('Saskatoon'    , 'Regina')       -- SK
-             ,jsonb_build_array('Whitehorse'   , 'Dawson City')  -- YT
-           ) -> (random() * 13)::int -> (random() < 0.5)::int
+              'Calgary'      , 'Edmonton'     -- AB
+             ,'Victoria'     , 'Vancouver'    -- BC
+             ,'Winnepeg'     , 'Brandon'      -- MB
+             ,'Fredericton'  , 'Moncton'      -- NB
+             ,'St John''s'   , 'Paradise'     -- NL
+             ,'Yellowknife'  , 'Hay River'    -- NT
+             ,'Halifax'      , 'Sydney'       -- NS
+             ,'Iqaluit'      , 'Rankin Inlet' -- NU
+             ,'Ottawa'       , 'Toronto'      -- ON
+             ,'Charlottetown', 'Summerside'   -- PE
+             ,'Quebec City'  , 'Montreal'     -- QC
+             ,'Saskatoon'    , 'Regina'       -- SK
+             ,'Whitehorse'   , 'Dawson City'  -- YT
+           ) -> (random() * 25)::int
+         END
+         WHEN 'CX' THEN -- Christmas Island
+           json_build_array(
+              'Flying Fish Cove' -- capital
+             ,'Drimsite'
+             ,'Poon Saan'
+             ,'Silver City'
+           )
+         END -> (random() * 3)::int
+         -- WHEN 'US' THEN -- United States
+         ELSE
+           json_build_array(
+              'Montgomery'      , 'Birmingham' -- AL
+             ,'Juneau'          , 'Fairbanks' -- AK
+             ,'Aunu''u'         , 'Ofu' -- AS
+             ,'Phoenix'         , 'Tucson' -- AZ
+             ,'Little Rock'     , 'Fayetteville' -- AR
+             ,'Sacramento'      , 'San Diego' -- CA
+             ,'Denver'          , 'Castle Rock' -- CO
+             ,'Hartford'        , 'Bridgeport'-- CT
+             ,'Dover'           , 'Wilmington' -- DE
+             ,'Washington'      , 'Shaw' -- DC
+             ,'Tallahassee'     , 'Jacksonville' -- FL
+             ,'Atlanta'         , 'Columbus' -- 'GA'
+             ,'Hagåtña'         , 'Dededo' -- GU
+             ,'Honolulu'        , 'Hilo' -- HI
+             ,'Boise'           , 'Meridian' -- ID
+             ,'Springfield'     , 'Chicago' -- IL
+             ,'Indianapolis'    , 'Fort Wayne' -- IN
+             ,'Des Moines'      , 'Cedar Rapids' -- IA
+             ,'Topeka'          , 'Wichita' -- KS
+             ,'Frankfort'       , 'Louisville' -- KY
+             ,'Baton Rouge'     , 'New Orleans' -- LA
+             ,'Augusta'         , 'Portland' -- ME
+             ,'Annapolis'       , 'Baltimore' -- MD
+             ,'Boston'          , 'Worcester' -- MA
+             ,'Lansing'         , 'Detroit' -- MI
+             ,'Saint Paul'      , 'Minneapolis' -- MN
+             ,'Jackson'         , 'Gulfport' -- MS
+             ,'Jefferson'       , 'Kansas' -- MO
+             ,'Helena'          , 'Billings' -- MT
+             ,'Lincoln'         , 'Omaha' -- NE
+             ,'Carson City'     , 'Las Vegas'  -- NV
+             ,'Concord'         , 'Manchester' -- NH
+             ,'Trenton'         , 'Newark' -- NJ
+             ,'Santa Fe'        , 'Albuquerque' -- NM
+             ,'Albany'          , 'New York' -- NY
+             ,'Bismarck'        , 'Fargo' -- ND
+             ,'Saipan'          , 'San Jose' -- MP
+             ,'Columbus'        , 'Cincinnati' -- OH
+             ,'Oklahoma City'   , 'Tulsa' -- OK
+             ,'Salem'           , 'Bend' -- OR
+             ,'Harrisburg'      , 'Philadelphia' -- PA
+             ,'San Juan'        , 'Bayamón' -- PU
+             ,'Providence'      , 'Cranston' -- RI
+             ,'Columbia'        , 'Charleston' -- SC
+             ,'Pierre'          , 'Sioux Falls' -- SD
+             ,'Nashville'       , 'Memphis' -- TN
+             ,'Austin'          , 'Houston' -- TX
+             ,'Salt Lake City'  , 'West Valley City' -- UT
+             ,'Montpelier'      , 'Burlington' -- VT
+             ,'Charlotte Amalie', 'St Croix' -- VI
+             ,'Richmond'        , 'Virginia Beach'   -- VA
+             ,'Olympia'         , 'Seattle' -- WA
+             ,'Charleston'      , 'Huntington' -- WV
+             ,'Madison'         , 'Milwaukeee' -- WI
+             ,'Cheyenne'        , 'Casper' -- WY
+           )
+         END -> (random() * 109)::int
     FROM GEN_REGION_RELID
     JOIN tables.country c
       ON c.relid = d.country_relid
