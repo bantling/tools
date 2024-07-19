@@ -424,12 +424,6 @@ INSERT INTO tables.region(
   ),
   (
      (SELECT relid FROM tables.country WHERE code_2 = 'US')
-    ,'5A5F44E4-99C5-4E49-A2AB-E9DD8E03AF08'
-    ,'United States Minor Outlying Islands'
-    ,'UM'
-  ),
-  (
-     (SELECT relid FROM tables.country WHERE code_2 = 'US')
     ,'5FC06317-5C34-4BF9-A357-E9F756D8884E'
     ,'Utah'
     ,'UT'
