@@ -4,8 +4,14 @@ FROM --platform=linux/amd64 docker.io/${PG_IMAGE_REF} AS build
 # Password for app_exec USER, that only has accesss to call procedures and functions
 ARG APP_EXEC_PASS
 
-# Copy all sql scripts into container
+# Dir for environment source files
+ARG SRC_ENV_DIR
+
+# Copy all sql scripts
 COPY src/* /docker-entrypoint-initdb.d
+
+# Copy environment specific files, if any
+COPY ${SRC_ENV_DIR}/* /docker-entrypoint-initdb.d
 
 # Replace every occurrence of ${APP_EXEC_PASS} in copied sql scripts with value of build arg APP_EXEC_PASS
 # Note that ${APP_EXEC_PASS} cannot be in quotes, or it will be passed as the literal sequence ${APP_EXEC_PASS}

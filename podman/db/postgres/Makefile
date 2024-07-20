@@ -17,10 +17,6 @@ endif
 
 #### Variables
 
-# The absolute path and dir to this Makefile
-THIS_MAKEFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
-THIS_MAKEFILE_DIR  := $(patsubst %/,%,$(dir $(THIS_MAKEFILE_PATH)))
-
 # Postgres image ref - see https://hub.docker.com/_/postgres for tags
 PG_IMAGE_NAME := postgres
 PG_IMAGE_VER  := latest
@@ -31,8 +27,9 @@ DEPLOY_IMAGE_NAME := postgres_db
 DEPLOY_IMAGE_VER  := 1.0
 DEPLOY_IMAGE_REF  := $(DEPLOY_IMAGE_NAME):$(DEPLOY_IMAGE_VER)
 
-# Dir of source code (DDL and DML used to init the database)
-SRC_DIR := $(THIS_MAKEFILE_DIR)/src
+# Dir of env source code (DML only)
+SRC_ENV     := local
+SRC_ENV_DIR := src-env/$(SRC_ENV)
 
 # Database name, and app_exec user password
 DB_NAME           := pg_app
@@ -113,6 +110,7 @@ oci-build: Containerfile
 	podman build \
 	  --build-arg "PG_IMAGE_REF=$(PG_IMAGE_REF)" \
 	  --build-arg "APP_EXEC_PASS=$(APP_EXEC_PASS)" \
+	  --build-arg "SRC_ENV_DIR=$(SRC_ENV_DIR)" \
 	  -t $(DEPLOY_IMAGE_REF) \
 	  .
 	podman system prune -f
@@ -160,15 +158,14 @@ oci-bash:
 .PHONY: vars
 vars:
 	echo ">>> Displaying variables"
-	echo "THIS_MAKEFILE_PATH = $(THIS_MAKEFILE_PATH)"
-	echo "THIS_MAKEFILE_DIR  = $(THIS_MAKEFILE_DIR)"
 	echo "PG_IMAGE_NAME      = $(PG_IMAGE_NAME)"
 	echo "PG_IMAGE_VER       = $(PG_IMAGE_VER)"
 	echo "PG_IMAGE_REF       = $(PG_IMAGE_REF)"
 	echo "DEPLOY_IMAGE_NAME  = $(DEPLOY_IMAGE_NAME)"
 	echo "DEPLOY_IMAGE_VER   = $(DEPLOY_IMAGE_VER)" 
 	echo "DEPLOY_IMAGE_REF   = $(DEPLOY_IMAGE_REF)"
-	echo "SRC_DIR            = $(SRC_DIR)"
+	echo "SRC_ENV            = $(SRC_ENV)"
+	echo "SRC_ENV_DIR        = $(SRC_ENV_DIR)"
 	echo "DB_NAME            = $(DB_NAME)"
 	echo "POSTGRES_PASSWORD  = $(POSTGRES_PASSWORD)"
 	echo "APP_EXEC_PASS      = ${APP_EXEC_PASS}"

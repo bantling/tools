@@ -19,7 +19,7 @@ SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_pk PRIMARY K
 -- Address
 CREATE TABLE IF NOT EXISTS tables.address(
    relid         SERIAL    NOT NULL
-  ,type_relid    INTEGER   NOT NULL
+  ,type_relid    INTEGER
   ,country_relid INTEGER   NOT NULL
   ,region_relid  INTEGER
   ,id            UUID      NOT NULL

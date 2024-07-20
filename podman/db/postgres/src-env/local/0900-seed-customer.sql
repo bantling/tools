@@ -1,6 +1,6 @@
 -- Seed addresses
 WITH PARAMS AS (
-  SELECT 5 num_rows
+  SELECT 100 num_rows
         ,(SELECT COUNT(*) FROM tables.address_type) num_address_types
         ,(SELECT COUNT(*) FROM tables.country     ) num_countries
 )
@@ -40,12 +40,13 @@ WITH PARAMS AS (
 --                   1 |             1
 -- (5 rows)
 
-, ADD_NUM_REGIONS AS (
+, ADD_NUM_REGIONS_MIN_RELID AS (
   SELECT d.*
         ,NULLIF((SELECT COUNT(*) FROM tables.region r WHERE r.country_relid = d.country_relid), 0) num_regions
+        ,(SELECT MIN(relid) FROM tables.region r WHERE r.country_relid = d.country_relid)          min_region_relid
     FROM GEN_ADDRESS_COUNTRY_RELID d
 )
--- SELECT * FROM ADD_NUM_REGIONS;
+-- SELECT * FROM ADD_NUM_REGIONS_MIN_RELID;
 --  address_type_relid | country_relid | num_regions 
 -- --------------------+---------------+-------------
 --                   2 |             1 |            
@@ -55,17 +56,24 @@ WITH PARAMS AS (
 --                   2 |             4 |          56
 -- (5 rows)
 
+-- region relid is a bit tricky:
+-- country 1 region relids start at 1
+-- country 2 region relids start at (max relid for country 1) + 1
+-- country 3 region relids start at (max relid for country 2) + 1
+-- etc
+-- pick a random number from 0 to num regions - 1
+-- add minimum region relid for the country
 , ADD_REGION_RELID AS (
   SELECT d.*
-        ,((random() * d.num_regions - 1) + 1)::int region_relid
-    FROM ADD_NUM_REGIONS d
+        ,((random() * (d.num_regions - 1)) + d.min_region_relid)::int region_relid
+    FROM ADD_NUM_REGIONS_MIN_RELID d
 )
 -- SELECT * FROM ADD_REGION_RELID;
 --  address_type_relid | country_relid | num_regions | region_relid 
 -- --------------------+---------------+-------------+--------------
 --                   2 |             2 |          13 |            9
---                   1 |             3 |             |             
 --                   2 |             2 |          13 |           11
+--                   1 |             3 |             |             
 --                   2 |             4 |          56 |           34
 --                   2 |             4 |          56 |           12
 -- (5 rows)
@@ -186,6 +194,83 @@ WITH PARAMS AS (
 --                   1 |             3 |             |              | "Poon Saan"
 -- (5 rows)
 
+, ADD_ADDRESS AS (
+  SELECT d.*
+        ,CASE c.code_2
+         WHEN 'AW' THEN
+           jsonb_build_array(
+              'Bilderdijkstraat'
+             ,'Caya Papa Juan Pablo II'
+             ,'Dominicanessenstraat'
+             ,'Watty Vos Blvd'
+             ,'Patiastraat'
+           ) -> (random() * 4)::int
+         WHEN 'CA' THEN
+           jsonb_build_array(
+              'Argyle St'
+             ,'Campbell Rd'
+             ,'Cariboo Rd'
+             ,'George St'
+             ,'Granville St'
+             ,'Jasper Ave'
+             ,'Osborne St'
+             ,'Portage Ave'
+             ,'Robson St'
+             ,'Rue du Petit-Champlain'
+             ,'Saint Laurent Boulevard'
+             ,'Second St'
+             ,'Sussex Drive'
+             ,'Stephen Ave'
+             ,'Water St'
+             ,'Yonge St'
+           ) -> (random() * 15)::int
+         WHEN 'CX' THEN
+           jsonb_build_array(
+              'Abbots Nest'
+             ,'Hawks Rd'
+             ,'Lam Lok Loh'
+             ,'Pai Chin Lu'
+             ,'Short St'
+           ) -> (random() * 4)::int
+         WHEN 'US' THEN
+           jsonb_build_array(
+              '6th St'
+             ,'Abbot Kinney Blvd'
+             ,'Alamo Square'
+             ,'Beale St'
+             ,'Bourbon St'
+             ,'Calle Ocho'
+             ,'East Exchange Ave'
+             ,'Fifth Ave'
+             ,'Front St'
+             ,'Hollywood Blvd'
+             ,'Lake Shore Dr'
+             ,'Lombard St'
+             ,'Melrose Ave'
+             ,'Michiagn Ave'
+             ,'Newbury St'
+             ,'NW 2nd Ave'
+             ,'Ocean Dr'
+             ,'Rodeo Dr'
+             ,'Santana Row'
+             ,'Sesame St'
+             ,'The Strip'
+           ) -> (random() * 20)::int
+         END address
+    FROM ADD_CITY d
+    JOIN tables.country c
+      ON c.relid = d.country_relid
+)
+-- SELECT * FROM ADD_ADDRESS;
+--  address_type_relid | country_relid | num_regions | region_relid |        city        |        address         
+-- --------------------+---------------+-------------+--------------+--------------------+------------------------
+--                   1 |             1 |             |              | "Bubali"           | "Patiastraat"
+--                   1 |             1 |             |              | "Bubali"           | "Dominicanessenstraat"
+--                   2 |             2 |          13 |           10 | "Rankin Inlet"     | "Portage Ave"
+--                   1 |             3 |             |              | "Silver City"      | "Short St"
+--                     |             3 |             |              | "Flying Fish Cove" | "Lam Lok Loh"
+-- (5 rows)
+
 , ADD_MAILING_CODE AS (
   SELECT d.*
         ,CASE c.code_2
@@ -218,7 +303,7 @@ WITH PARAMS AS (
              chr(ascii('0') + (random() * 9)::int)
            END
          END mailing_code
-    FROM ADD_CITY d
+    FROM ADD_ADDRESS d
     JOIN tables.country c
       ON c.relid = d.country_relid
     LEFT
@@ -227,13 +312,13 @@ WITH PARAMS AS (
      AND r.relid = d.region_relid
 )
 -- SELECT * FROM ADD_MAILING_CODE;
---  address_type_relid | country_relid | num_regions | region_relid |        city        | mailing_code 
--- --------------------+---------------+-------------+--------------+--------------------+--------------
---                   2 |             2 |          13 |            7 | "Moncton"          | E3U 7H4
---                   1 |             3 |             |              | "Drimsite"         | 6798
---                   2 |             3 |             |              | "Flying Fish Cove" | 6798
---                     |             4 |          55 |           12 | "Carson City"      | 71602-2030
---                   1 |             4 |          55 |            6 | "Baton Rouge"      | 97640
+--  address_type_relid | country_relid | num_regions | region_relid |        city        |          address          | mailing_code 
+-- --------------------+---------------+-------------+--------------+--------------------+---------------------------+--------------
+--                   3 |             1 |             |              | "Cumana"           | "Caya Papa Juan Pablo II" | 
+--                     |             2 |          13 |            6 | "Regina"           | "Granville St"            | J3F 5F2
+--                   3 |             3 |             |              | "Flying Fish Cove" | "Short St"                | 6798
+--                   3 |             3 |             |              | "Drimsite"         | "Abbots Nest"             | 6798
+--                   3 |             4 |          55 |           28 | "Sioux Falls"      | "Abbot Kinney Blvd"       | 57876
 -- (5 rows)
 
 , GEN_ADDRESS AS (
@@ -245,21 +330,22 @@ WITH PARAMS AS (
         ,current_timestamp    AS created
         ,current_timestamp    AS changed
         ,d.city
-        ,'123 Sesame St'      AS address
+        ,d.address            AS address
         ,CASE WHEN d.address_type_relid IS NOT NULL THEN 'Door 5' END AS address_2
         ,CASE WHEN d.address_type_relid IS NOT NULL THEN 'Stop 6' END AS address_3
         ,d.mailing_code
-    FROM GEN_MAILING_CODE d
+    FROM ADD_MAILING_CODE d
 )
--- SELECT * FROM GEN_ADDRESS
---  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |    city     |    address    | address_2 | address_3 
--- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+-------------+---------------+-----------+-----------
---             |             3 |              | 3d835a92-7a83-4569-b882-84e5c1569c41 |       1 | 2024-07-14 19:28:15.849933+00 | 2024-07-14 19:28:15.849933+00 | Cooks Brook | 123 Sesame St |           | 
---           1 |             2 |           13 | 88f70390-201c-4269-8766-3c58c707a145 |       1 | 2024-07-14 19:28:15.849933+00 | 2024-07-14 19:28:15.849933+00 | Cooks Brook | 123 Sesame St | Door 5    | Stop 6
---           2 |             1 |           13 | 7c965fbb-4efa-48ad-8667-44504c88968f |       1 | 2024-07-14 19:28:15.849933+00 | 2024-07-14 19:28:15.849933+00 | Cooks Brook | 123 Sesame St | Door 5    | Stop 6
---           1 |             2 |           38 | fc8b40f4-e787-4192-8a53-093490a00398 |       1 | 2024-07-14 19:28:15.849933+00 | 2024-07-14 19:28:15.849933+00 | Cooks Brook | 123 Sesame St | Door 5    | Stop 6
---           3 |             3 |              | 8e4d3996-c075-4450-bece-11f47bb71d69 |       1 | 2024-07-14 19:28:15.849933+00 | 2024-07-14 19:28:15.849933+00 | Cooks Brook | 123 Sesame St | Door 5    | Stop 6
+-- SELECT * FROM GEN_ADDRESS;
+--  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |     city      |          address          | address_2 | address_3 | mailing_code 
+-- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+---------------+---------------------------+-----------+-----------+--------------
+--           2 |             1 |              | 396993e2-66fb-4183-9450-a69cf97fd424 |       1 | 2024-07-20 11:26:11.923622+00 | 2024-07-20 11:26:11.923622+00 | "Oranjestad"  | "Caya Papa Juan Pablo II" | Door 5    | Stop 6    | 
+--           1 |             1 |              | 4ab48a16-8287-45f8-b423-36b94260fcef |       1 | 2024-07-20 11:26:11.923622+00 | 2024-07-20 11:26:11.923622+00 | "Moko"        | "Dominicanessenstraat"    | Door 5    | Stop 6    | 
+--           2 |             2 |            2 | fbfbeac2-6596-41c8-904c-78c36ee2505f |       1 | 2024-07-20 11:26:11.923622+00 | 2024-07-20 11:26:11.923622+00 | "Regina"      | "Argyle St"               | Door 5    | Stop 6    | I5S 6D7
+--             |             3 |              | 7acaa99c-0f92-45f8-9b7f-2aea024839bd |       1 | 2024-07-20 11:26:11.923622+00 | 2024-07-20 11:26:11.923622+00 | "Silver City" | "Abbots Nest"             |           |           | 6798
+--           2 |             4 |           13 | 73b95a06-8e8b-41d2-94fd-a537ce364cbb |       1 | 2024-07-20 11:26:11.923622+00 | 2024-07-20 11:26:11.923622+00 | "Austin"      | "Hollywood Blvd"          | Door 5    | Stop 6    | 82067-4225
 -- (5 rows)
+
 INSERT INTO tables.address(
    type_relid
   ,country_relid
@@ -274,3 +360,5 @@ INSERT INTO tables.address(
   ,address_3
   ,mailing_code
 )
+SELECT *
+  FROM GEN_ADDRESS;
