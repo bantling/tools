@@ -1,6 +1,6 @@
 -- Seed addresses
 WITH PARAMS AS (
-  SELECT 100 num_rows
+  SELECT 5 num_rows
         ,(SELECT COUNT(*) FROM tables.address_type) num_address_types
         ,(SELECT COUNT(*) FROM tables.country     ) num_countries
 )
@@ -26,20 +26,25 @@ WITH PARAMS AS (
 -- (5 rows)
 
 , GEN_ADDRESS_COUNTRY_RELID AS (
-  SELECT NULLIF((random() * d.num_address_types)::int, 0)      address_type_relid -- null = person, number = business
+  SELECT NULLIF((random() * d.num_address_types)::int, 0)      type_relid    -- null = person, number = business
         ,      (random() * (d.num_countries     - 1) + 1)::int country_relid
     FROM ADD_ROWS d
 )
 -- SELECT * FROM GEN_ADDRESS_COUNTRY_RELID;
---  address_type_relid | country_relid 
--- --------------------+---------------
---                   1 |             2
---                   1 |             2
---                     |             1
---                   2 |             3
---                   1 |             1
+--  type_relid | country_relid 
+-- ------------+---------------
+--           1 |             2
+--           1 |             2
+--             |             1
+--           2 |             3
+--           1 |             1
 -- (5 rows)
 
+-- region relid is a bit tricky:
+-- country 1 region relids start at 1
+-- country 2 region relids start at (max relid for country 1) + 1
+-- country 3 region relids start at (max relid for country 2) + 1
+-- provide minimum region relid for each country
 , ADD_NUM_REGIONS_MIN_RELID AS (
   SELECT d.*
         ,NULLIF((SELECT COUNT(*) FROM tables.region r WHERE r.country_relid = d.country_relid), 0) num_regions
@@ -47,20 +52,15 @@ WITH PARAMS AS (
     FROM GEN_ADDRESS_COUNTRY_RELID d
 )
 -- SELECT * FROM ADD_NUM_REGIONS_MIN_RELID;
---  address_type_relid | country_relid | num_regions 
--- --------------------+---------------+-------------
---                   2 |             1 |            
---                     |             2 |          13
---                     |             3 |            
---                   2 |             3 |            
---                   2 |             4 |          56
+--  type_relid | country_relid | num_regions | min_region_relid 
+-- ------------+---------------+-------------+------------------
+--           1 |             3 |             |                 
+--           3 |             4 |          55 |               14
+--             |             1 |             |                 
+--           1 |             2 |          13 |                1
+--           3 |             2 |          13 |                1
 -- (5 rows)
 
--- region relid is a bit tricky:
--- country 1 region relids start at 1
--- country 2 region relids start at (max relid for country 1) + 1
--- country 3 region relids start at (max relid for country 2) + 1
--- etc
 -- pick a random number from 0 to num regions - 1
 -- add minimum region relid for the country
 , ADD_REGION_RELID AS (
@@ -69,13 +69,13 @@ WITH PARAMS AS (
     FROM ADD_NUM_REGIONS_MIN_RELID d
 )
 -- SELECT * FROM ADD_REGION_RELID;
---  address_type_relid | country_relid | num_regions | region_relid 
--- --------------------+---------------+-------------+--------------
---                   2 |             2 |          13 |            9
---                   2 |             2 |          13 |           11
---                   1 |             3 |             |             
---                   2 |             4 |          56 |           34
---                   2 |             4 |          56 |           12
+--  type_relid | country_relid | num_regions | min_region_relid | region_relid 
+-- ------------+---------------+-------------+------------------+--------------
+--           1 |             3 |             |                  |             
+--           1 |             4 |          55 |               14 |           22
+--           2 |             2 |          13 |                1 |            4
+--           1 |             1 |             |                  |             
+--           2 |             3 |             |                  |             
 -- (5 rows)
 
 , ADD_CITY AS (
@@ -185,13 +185,13 @@ WITH PARAMS AS (
       ON c.relid = d.country_relid
 )
 -- SELECT * FROM ADD_CITY;
---  address_type_relid | country_relid | num_regions | region_relid |        city        
--- --------------------+---------------+-------------+--------------+--------------------
---                   2 |             1 |             |              | "Barcadera"
---                   2 |             2 |          13 |            5 | "Ottawa"
---                   1 |             3 |             |              | "Drimsite"
---                   1 |             3 |             |              | "Flying Fish Cove"
---                   1 |             3 |             |              | "Poon Saan"
+--  type_relid | country_relid | num_regions | min_region_relid | region_relid |        city        
+-- ------------+---------------+-------------+------------------+--------------+--------------------
+--             |             2 |          13 |                1 |            4 | "Winnepeg"
+--             |             2 |          13 |                1 |            1 | "Moncton"
+--           1 |             3 |             |                  |              | "Flying Fish Cove"
+--           3 |             3 |             |                  |              | "Flying Fish Cove"
+--             |             4 |          55 |               14 |           21 | "Salem"
 -- (5 rows)
 
 , ADD_ADDRESS AS (
@@ -262,13 +262,13 @@ WITH PARAMS AS (
       ON c.relid = d.country_relid
 )
 -- SELECT * FROM ADD_ADDRESS;
---  address_type_relid | country_relid | num_regions | region_relid |        city        |        address         
--- --------------------+---------------+-------------+--------------+--------------------+------------------------
---                   1 |             1 |             |              | "Bubali"           | "Patiastraat"
---                   1 |             1 |             |              | "Bubali"           | "Dominicanessenstraat"
---                   2 |             2 |          13 |           10 | "Rankin Inlet"     | "Portage Ave"
---                   1 |             3 |             |              | "Silver City"      | "Short St"
---                     |             3 |             |              | "Flying Fish Cove" | "Lam Lok Loh"
+--  type_relid | country_relid | num_regions | min_region_relid | region_relid |        city        |    address     
+-- ------------+---------------+-------------+------------------+--------------+--------------------+----------------
+--           1 |             2 |          13 |                1 |            3 | "Regina"           | "Granville St"
+--             |             3 |             |                  |              | "Drimsite"         | "Short St"
+--             |             3 |             |                  |              | "Drimsite"         | "Short St"
+--             |             3 |             |                  |              | "Flying Fish Cove" | "Pai Chin Lu"
+--           2 |             4 |          55 |               14 |           65 | "Fort Wayne"       | "Beale St"
 -- (5 rows)
 
 , ADD_MAILING_CODE AS (
@@ -312,17 +312,18 @@ WITH PARAMS AS (
      AND r.relid = d.region_relid
 )
 -- SELECT * FROM ADD_MAILING_CODE;
---  address_type_relid | country_relid | num_regions | region_relid |        city        |          address          | mailing_code 
--- --------------------+---------------+-------------+--------------+--------------------+---------------------------+--------------
---                   3 |             1 |             |              | "Cumana"           | "Caya Papa Juan Pablo II" | 
---                     |             2 |          13 |            6 | "Regina"           | "Granville St"            | J3F 5F2
---                   3 |             3 |             |              | "Flying Fish Cove" | "Short St"                | 6798
---                   3 |             3 |             |              | "Drimsite"         | "Abbots Nest"             | 6798
---                   3 |             4 |          55 |           28 | "Sioux Falls"      | "Abbot Kinney Blvd"       | 57876
+--  type_relid | country_relid | num_regions | min_region_relid | region_relid |     city      |        address         | mailing_code 
+-- ------------+---------------+-------------+------------------+--------------+---------------+------------------------+--------------
+--           3 |             1 |             |                  |              | "Cunucu Abao" | "Dominicanessenstraat" | 
+--           2 |             2 |          13 |                1 |            4 | "Brandon"     | "Cariboo Rd"           | T3Y 3X6
+--           2 |             3 |             |                  |              | "Poon Saan"   | "Pai Chin Lu"          | 6798
+--           1 |             3 |             |                  |              | "Drimsite"    | "Pai Chin Lu"          | 6798
+--           2 |             4 |          55 |               14 |           38 | "Omaha"       | "East Exchange Ave"    | 14650
 -- (5 rows)
 
 , GEN_ADDRESS AS (
-  SELECT d.address_type_relid AS type_relid
+  SELECT row_number() OVER() AS relid
+        ,d.type_relid AS type_relid
         ,d.country_relid
         ,d.region_relid
         ,gen_random_uuid()    AS id
@@ -331,34 +332,163 @@ WITH PARAMS AS (
         ,current_timestamp    AS changed
         ,d.city
         ,d.address            AS address
-        ,CASE WHEN d.address_type_relid IS NOT NULL THEN 'Door 5' END AS address_2
-        ,CASE WHEN d.address_type_relid IS NOT NULL THEN 'Stop 6' END AS address_3
+        ,CASE WHEN d.type_relid IS NOT NULL THEN 'Door 5' END AS address_2
+        ,CASE WHEN (d.type_relid IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
         ,d.mailing_code
+        ,row_number() OVER(PARTITION BY d.type_relid IS NULL) person_business_relid
     FROM ADD_MAILING_CODE d
 )
--- SELECT * FROM GEN_ADDRESS;
---  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |     city      |          address          | address_2 | address_3 | mailing_code 
--- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+---------------+---------------------------+-----------+-----------+--------------
---           2 |             1 |              | 396993e2-66fb-4183-9450-a69cf97fd424 |       1 | 2024-07-20 11:26:11.923622+00 | 2024-07-20 11:26:11.923622+00 | "Oranjestad"  | "Caya Papa Juan Pablo II" | Door 5    | Stop 6    | 
---           1 |             1 |              | 4ab48a16-8287-45f8-b423-36b94260fcef |       1 | 2024-07-20 11:26:11.923622+00 | 2024-07-20 11:26:11.923622+00 | "Moko"        | "Dominicanessenstraat"    | Door 5    | Stop 6    | 
---           2 |             2 |            2 | fbfbeac2-6596-41c8-904c-78c36ee2505f |       1 | 2024-07-20 11:26:11.923622+00 | 2024-07-20 11:26:11.923622+00 | "Regina"      | "Argyle St"               | Door 5    | Stop 6    | I5S 6D7
---             |             3 |              | 7acaa99c-0f92-45f8-9b7f-2aea024839bd |       1 | 2024-07-20 11:26:11.923622+00 | 2024-07-20 11:26:11.923622+00 | "Silver City" | "Abbots Nest"             |           |           | 6798
---           2 |             4 |           13 | 73b95a06-8e8b-41d2-94fd-a537ce364cbb |       1 | 2024-07-20 11:26:11.923622+00 | 2024-07-20 11:26:11.923622+00 | "Austin"      | "Hollywood Blvd"          | Door 5    | Stop 6    | 82067-4225
+SELECT * FROM GEN_ADDRESS;
+--  relid | type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |     city      |          address          | address_2 | address_3 | mailing_code 
+-- -------+------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+---------------+---------------------------+-----------+-----------+--------------
+--      1 |          3 |             1 |              | f2eea31f-481c-49c8-a968-17f3db1a016b |       1 | 2024-07-24 11:56:38.769804+00 | 2024-07-24 11:56:38.769804+00 | "Cunucu Abao" | "Caya Papa Juan Pablo II" | Door 5    | Stop 6    | 
+--      2 |            |             1 |              | 003ec98d-4668-4ab5-a34b-7635deecd083 |       1 | 2024-07-24 11:56:38.769804+00 | 2024-07-24 11:56:38.769804+00 | "Bubali"      | "Caya Papa Juan Pablo II" |           |           | 
+--      3 |          1 |             2 |            6 | 337f9e9c-d59a-4a56-8d9c-ab6dcb7fda8e |       1 | 2024-07-24 11:56:38.769804+00 | 2024-07-24 11:56:38.769804+00 | "Toronto"     | "Water St"                | Door 5    | Stop 6    | Y1J 3S6
+--      4 |          2 |             3 |              | cfad66b2-35b1-47df-bb91-e2e23542818a |       1 | 2024-07-24 11:56:38.769804+00 | 2024-07-24 11:56:38.769804+00 | "Poon Saan"   | "Pai Chin Lu"             | Door 5    | Stop 6    | 6798
+--      5 |            |             4 |           49 | 7d1c9ead-d4f4-4eec-a597-026d9c6985db |       1 | 2024-07-24 11:56:38.769804+00 | 2024-07-24 11:56:38.769804+00 | "Newark"      | "Calle Ocho"              |           |           | 95714-5848
 -- (5 rows)
 
-INSERT INTO tables.address(
-   type_relid
-  ,country_relid
-  ,region_relid
-  ,id
-  ,version
-  ,created
-  ,changed
-  ,city
-  ,address
-  ,address_2
-  ,address_3
-  ,mailing_code
+, MOD_PERSON_BUSINESS_RELIDS AS (
+  SELECT d.relid
+        ,d.type_relid
+        ,d.country_relid
+        ,d.region_relid
+        ,d.id
+        ,d.version
+        ,d.created
+        ,d.changed
+        ,d.city
+        ,d.address
+        ,d.address_2
+        ,d.address_3
+        ,d.mailing_code
+        ,CASE WHEN d.type_relid IS NOT NULL THEN D.person_business_relid END AS person_business_relid
+    FROM GEN_ADDRESS d
+)
+SELECT * FROM ADD_PERSON_BUSINESS_RELIDS;
+
+-- Insert addresses and return generated relids
+, INS_ADDRESS AS (
+     INSERT
+       INTO tables.address(
+               type_relid
+              ,country_relid
+              ,region_relid
+              ,id
+              ,version
+              ,created
+              ,changed
+              ,city
+              ,address
+              ,address_2
+              ,address_3
+              ,mailing_code
+            )
+     SELECT type_relid
+           ,country_relid
+           ,region_relid
+           ,id
+           ,version
+           ,created
+           ,changed
+           ,city
+           ,address
+           ,address_2
+           ,address_3
+           ,mailing_code
+       FROM GEN_ADDRESS
+  RETURNING relid
+)
+-- SELECT * FROM INS_ADDRESS;
+--  relid 
+-- -------
+--      1
+--      2
+--      3
+-- ...
+
+-- Insert person customers and return generated relids
+, INS_CUSTOMER_PERSON AS (
+     INSERT
+       INTO tables.customer_person(
+               address_relid
+              ,id
+              ,version
+              ,created
+              ,changed
+              ,first_name
+              ,middle_name
+              ,last_name
+            )
+     SELECT relid
+           ,gen_random_uuid()
+           ,1
+           ,current_timestamp
+           ,current_timestamp
+           ,'John'
+           ,'James'
+           ,'Doe'
+       FROM GEN_ADDRESS
+      WHERE address_2 IS NULL
+  RETURNING relid
+)
+-- SELECT * FROM INS_CUSTOMER_PERSON;
+--  relid 
+-- -------
+--      1
+--      2
+--      3
+-- ...
+
+-- Insert business customers and return generated relids
+, INS_CUSTOMER_BUSINESS AS (
+     INSERT
+       INTO tables.customer_business(
+               id
+              ,version
+              ,created
+              ,changed
+              ,name
+            )
+     SELECT gen_random_uuid()
+           ,1
+           ,current_timestamp
+           ,current_timestamp
+           ,'Biz'
+       FROM GEN_ADDRESS
+      WHERE address_2 IS NOT NULL
+  RETURNING relid
+)
+-- SELECT * FROM INS_CUSTOMER_BUSINESS;
+--  relid 
+-- -------
+--      1
+--      2
+--      3
+--      4
+--      5
+-- (5 rows)
+
+-- Insert join entries for business customer addresses
+, INS_CUSTOMER_BUSINESS_ADDRESS_JT AS (
+     INSERT
+       INTO tables.customer_business_address_jt(
+               business_relid
+              ,address_relid
+            )
+     SELECT cbus.relid
+           ,addr.relid
+       FROM GEN_ADDRESS
+      WHERE address_2 IS NOT NULL
 )
 SELECT *
-  FROM GEN_ADDRESS;
+  FROM INS_ADDRESS
+ UNION ALL
+SELECT *
+  FROM INS_CUSTOMER_PERSON
+ UNION ALL
+SELECT *
+  FROM INS_CUSTOMER_BUSINESS
+ UNION ALL
+SELECT *
+  FROM INS_CUSTOMER_BUSINESS_ADDRESS_JT;
