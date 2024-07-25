@@ -1,4 +1,6 @@
 -- Seed addresses
+
+-- Parameters for seeding
 WITH PARAMS AS (
   SELECT 5 num_rows
         ,(SELECT COUNT(*) FROM tables.address_type) num_address_types
@@ -10,6 +12,7 @@ WITH PARAMS AS (
 --         5 |                 3 |             3
 -- (1 row)
 
+-- Multiply the one params row by the num_rows value
 , ADD_ROWS AS (
   SELECT p.*
     FROM PARAMS p
@@ -25,8 +28,11 @@ WITH PARAMS AS (
 --         5 |                 3 |             4
 -- (5 rows)
 
+-- Generate a new data set with random address type relids and random country relids
+-- If a random type relid is 0, change it to null, as it represents a person address, and type relids are only for
+-- business addresses
 , GEN_ADDRESS_COUNTRY_RELID AS (
-  SELECT NULLIF((random() * d.num_address_types)::int, 0)      type_relid    -- null = person, number = business
+  SELECT NULLIF((random() * d.num_address_types)::int, 0)      type_relid
         ,      (random() * (d.num_countries     - 1) + 1)::int country_relid
     FROM ADD_ROWS d
 )
@@ -40,11 +46,13 @@ WITH PARAMS AS (
 --           1 |             1
 -- (5 rows)
 
--- region relid is a bit tricky:
+-- Add number of regions for the chosen counntry, and minimum region relid
+-- Region relid is a bit tricky:
 -- country 1 region relids start at 1
 -- country 2 region relids start at (max relid for country 1) + 1
 -- country 3 region relids start at (max relid for country 2) + 1
--- provide minimum region relid for each country
+-- provide minimum region relid for each randomly chosen country, which is null if the country has no regions
+-- Both number of regions and minimum region relid are null for countries with no regions
 , ADD_NUM_REGIONS_MIN_RELID AS (
   SELECT d.*
         ,NULLIF((SELECT COUNT(*) FROM tables.region r WHERE r.country_relid = d.country_relid), 0) num_regions
@@ -61,8 +69,9 @@ WITH PARAMS AS (
 --           3 |             2 |          13 |                1
 -- (5 rows)
 
--- pick a random number from 0 to num regions - 1
--- add minimum region relid for the country
+-- Add a region relid
+-- pick a random number from 0 to num_regions - 1
+-- add min_region_relid for the country
 , ADD_REGION_RELID AS (
   SELECT d.*
         ,((random() * (d.num_regions - 1)) + d.min_region_relid)::int region_relid
@@ -78,6 +87,11 @@ WITH PARAMS AS (
 --           2 |             3 |             |                  |             
 -- (5 rows)
 
+-- Add a city
+-- For countries with no regions, a reasonable number of cities are provided
+-- For countries with regions: 
+-- - Two cities are chosen from each region to form a flat list of cities to choose from
+-- - To simplify generation, the cities are specific to the chosen country only, not the chosen region
 , ADD_CITY AS (
   SELECT d.*
         ,CASE c.code_2
@@ -95,21 +109,47 @@ WITH PARAMS AS (
              ,'Oranjestad'
            ) -> (random() * 9)::int
          WHEN 'CA' THEN -- Canada
-           jsonb_build_array(
-              'Calgary'      , 'Edmonton'     -- AB
-             ,'Victoria'     , 'Vancouver'    -- BC
-             ,'Winnepeg'     , 'Brandon'      -- MB
-             ,'Fredericton'  , 'Moncton'      -- NB
-             ,'St John''s'   , 'Paradise'     -- NL
-             ,'Yellowknife'  , 'Hay River'    -- NT
-             ,'Halifax'      , 'Sydney'       -- NS
-             ,'Iqaluit'      , 'Rankin Inlet' -- NU
-             ,'Ottawa'       , 'Toronto'      -- ON
-             ,'Charlottetown', 'Summerside'   -- PE
-             ,'Quebec City'  , 'Montreal'     -- QC
-             ,'Saskatoon'    , 'Regina'       -- SK
-             ,'Whitehorse'   , 'Dawson City'  -- YT
-           ) -> (random() * 25)::int
+           jsonb_build_object(
+              'AB', jsonb_build_array(
+                'Calgary'      , 'Edmonton'
+              )
+             ,'BC', jsonb_build_array(
+                'Victoria'     , 'Vancouver'
+              )
+             ,'MB', jsonb_build_array(
+                'Winnepeg'     , 'Brandon'
+              )
+             ,'NB', jsonb_build_array(
+                'Fredericton'  , 'Moncton'
+              )
+             ,'NL', jsonb_build_array(
+                'St John''s'   , 'Paradise'
+              )
+             ,'NT', jsonb_build_array(
+                'Yellowknife'  , 'Hay River'
+              )
+             ,'NS', jsonb_build_array(
+                'Halifax'      , 'Sydney'
+              )
+             ,'NU', jsonb_build_array(
+                'Iqaluit'      , 'Rankin Inlet'
+              )
+             ,'ON', jsonb_build_array(
+                'Ottawa'       , 'Toronto'
+              )
+             ,'PE', jsonb_build_array(
+                'Charlottetown', 'Summerside'
+              )
+             ,'QC', jsonb_build_array(
+                'Quebec City'  , 'Montreal'
+              )
+             ,'SK', jsonb_build_array(
+                'Saskatoon'    , 'Regina'
+              )
+             ,'YT', jsonb_build_array(
+                'Whitehorse'   , 'Dawson City'
+              )
+           ) -> r.code -> (random() * 1)::int
          WHEN 'CX' THEN -- Christmas Island
            jsonb_build_array(
               'Drimsite'
@@ -118,80 +158,192 @@ WITH PARAMS AS (
              ,'Silver City'
            ) -> (random() * 3)::int
          WHEN 'US' THEN -- United States
-           -- Postgres has limit of 100 function args, but we have 110 cities
-           -- Use two sub arrays of 60 and 50 args and concatenate them using ||
-           jsonb_build_array(
-              'Montgomery'      , 'Birmingham'       -- AL
-             ,'Juneau'          , 'Fairbanks'        -- AK
-             ,'Aunu''u'         , 'Ofu'              -- AS
-             ,'Phoenix'         , 'Tucson'           -- AZ
-             ,'Little Rock'     , 'Fayetteville'     -- AR
-             ,'Sacramento'      , 'San Diego'        -- CA
-             ,'Denver'          , 'Castle Rock'      -- CO
-             ,'Hartford'        , 'Bridgeport'       -- CT
-             ,'Dover'           , 'Wilmington'       -- DE
-             ,'Washington'      , 'Shaw'             -- DC
-             ,'Tallahassee'     , 'Jacksonville'     -- FL
-             ,'Atlanta'         , 'Columbus'         -- GA
-             ,'Hagåtña'         , 'Dededo'           -- GU
-             ,'Honolulu'        , 'Hilo'             -- HI
-             ,'Boise'           , 'Meridian'         -- ID
-             ,'Springfield'     , 'Chicago'          -- IL
-             ,'Indianapolis'    , 'Fort Wayne'       -- IN
-             ,'Des Moines'      , 'Cedar Rapids'     -- IA
-             ,'Topeka'          , 'Wichita'          -- KS
-             ,'Frankfort'       , 'Louisville'       -- KY
-             ,'Baton Rouge'     , 'New Orleans'      -- LA
-             ,'Augusta'         , 'Portland'         -- ME
-             ,'Annapolis'       , 'Baltimore'        -- MD
-             ,'Boston'          , 'Worcester'        -- MA
-             ,'Lansing'         , 'Detroit'          -- MI
-             ,'Saint Paul'      , 'Minneapolis'      -- MN
-             ,'Jackson'         , 'Gulfport'         -- MS
-             ,'Jefferson'       , 'Kansas'           -- MO
-             ,'Helena'          , 'Billings'         -- MT
-             ,'Lincoln'         , 'Omaha'            -- NE
-           ) ||
-           jsonb_build_array(
-              'Carson City'     , 'Las Vegas'        -- NV
-             ,'Concord'         , 'Manchester'       -- NH
-             ,'Trenton'         , 'Newark'           -- NJ
-             ,'Santa Fe'        , 'Albuquerque'      -- NM
-             ,'Albany'          , 'New York'         -- NY
-             ,'Bismarck'        , 'Fargo'            -- ND
-             ,'Saipan'          , 'San Jose'         -- MP
-             ,'Columbus'        , 'Cincinnati'       -- OH
-             ,'Oklahoma City'   , 'Tulsa'            -- OK
-             ,'Salem'           , 'Bend'             -- OR
-             ,'Harrisburg'      , 'Philadelphia'     -- PA
-             ,'San Juan'        , 'Bayamón'          -- PU
-             ,'Providence'      , 'Cranston'         -- RI
-             ,'Columbia'        , 'Charleston'       -- SC
-             ,'Pierre'          , 'Sioux Falls'      -- SD
-             ,'Nashville'       , 'Memphis'          -- TN
-             ,'Austin'          , 'Houston'          -- TX
-             ,'Salt Lake City'  , 'West Valley City' -- UT
-             ,'Montpelier'      , 'Burlington'       -- VT
-             ,'Charlotte Amalie', 'St Croix'         -- VI
-             ,'Richmond'        , 'Virginia Beach'   -- VA
-             ,'Olympia'         , 'Seattle'          -- WA
-             ,'Charleston'      , 'Huntington'       -- WV
-             ,'Madison'         , 'Milwaukeee'       -- WI
-             ,'Cheyenne'        , 'Casper'           -- WY
-           ) -> (random() * 109)::int
+           -- Postgres has limit of 100 function args, and we have 55 regions = 110 args to jsonb_build_object
+           -- Use two jsonb_build_objects for 30 and 25 regions, using || to merge them into one object 
+           jsonb_build_object(
+              'AL', jsonb_build_array(
+                'Montgomery'      , 'Birmingham'
+              )
+             ,'AK', jsonb_build_array(
+                'Juneau'          , 'Fairbanks'
+              )
+             ,'AS', jsonb_build_array(
+                'Aunu''u'         , 'Ofu'
+              )
+             ,'AZ', jsonb_build_array(
+                'Phoenix'         , 'Tucson'
+              )
+             ,'AR', jsonb_build_array(
+                'Little Rock'     , 'Fayetteville'
+              )
+             ,'CA', jsonb_build_array(
+                'Sacramento'      , 'San Diego'
+              )
+             ,'CO', jsonb_build_array(
+                'Denver'          , 'Castle Rock'
+              )
+             ,'CT', jsonb_build_array(
+                'Hartford'        , 'Bridgeport'
+              )
+             ,'DE', jsonb_build_array(
+                'Dover'           , 'Wilmington'
+              )
+             ,'DC', jsonb_build_array(
+                'Washington'      , 'Shaw'
+              )
+             ,'FL', jsonb_build_array(
+                'Tallahassee'     , 'Jacksonville'
+              )
+             ,'GA', jsonb_build_array(
+                'Atlanta'         , 'Columbus'
+              )
+             ,'GU', jsonb_build_array(
+                'Hagåtña'         , 'Dededo'
+              )
+             ,'HI', jsonb_build_array(
+                'Honolulu'        , 'Hilo'
+              )
+             ,'ID', jsonb_build_array(
+                'Boise'           , 'Meridian'
+              )
+             ,'IL', jsonb_build_array(
+                'Springfield'     , 'Chicago'
+              )
+             ,'IN', jsonb_build_array(
+                'Indianapolis'    , 'Fort Wayne'
+              )
+             ,'IA', jsonb_build_array(
+                'Des Moines'      , 'Cedar Rapids'
+              )
+             ,'KS', jsonb_build_array(
+                'Topeka'          , 'Wichita'
+              )
+             ,'KY', jsonb_build_array(
+                'Frankfort'       , 'Louisville'
+              )
+             ,'LA', jsonb_build_array(
+                'Baton Rouge'     , 'New Orleans'
+              )
+             ,'ME', jsonb_build_array(
+                'Augusta'         , 'Portland'
+              )
+             ,'MD', jsonb_build_array(
+                'Annapolis'       , 'Baltimore'
+              )
+             ,'MA', jsonb_build_array(
+                'Boston'          , 'Worcester'
+              )
+             ,'MI', jsonb_build_array(
+                'Lansing'         , 'Detroit'
+              )
+             ,'MN', jsonb_build_array(
+                'Saint Paul'      , 'Minneapolis'
+              )
+             ,'MS', jsonb_build_array(
+                'Jackson'         , 'Gulfport'
+              )
+             ,'MO', jsonb_build_array(
+                'Jefferson'       , 'Kansas'
+              )
+             ,'MT', jsonb_build_array(
+                'Helena'          , 'Billings'
+              )
+             ,'NE', jsonb_build_array(
+                'Lincoln'         , 'Omaha'
+              )
+           ) || jsonb_build_object(
+              'NV', jsonb_build_array(
+                'Carson City'     , 'Las Vegas'
+              )
+             ,'NH', jsonb_build_array(
+                'Concord'         , 'Manchester'
+              )
+             ,'NJ', jsonb_build_array(
+                'Trenton'         , 'Newark'
+              )
+             ,'NM', jsonb_build_array(
+                'Santa Fe'        , 'Albuquerque'
+              )
+             ,'NY', jsonb_build_array(
+                'Albany'          , 'New York'
+              )
+             ,'ND', jsonb_build_array(
+                'Bismarck'        , 'Fargo'
+              )
+             ,'MP', jsonb_build_array(
+                'Saipan'          , 'San Jose'
+              )
+             ,'OH', jsonb_build_array(
+                'Columbus'        , 'Cincinnati'
+              )
+             ,'OK', jsonb_build_array(
+                'Oklahoma City'   , 'Tulsa'
+              )
+             ,'OR', jsonb_build_array(
+                'Salem'           , 'Bend'
+              )
+             ,'PA', jsonb_build_array(
+                'Harrisburg'      , 'Philadelphia'
+              )
+             ,'PU', jsonb_build_array(
+                'San Juan'        , 'Bayamón'
+              )
+             ,'RI', jsonb_build_array(
+                'Providence'      , 'Cranston'
+              )
+             ,'SC', jsonb_build_array(
+                'Columbia'        , 'Charleston'
+              )
+             ,'SD', jsonb_build_array(
+                'Pierre'          , 'Sioux Falls'
+              )
+             ,'TN', jsonb_build_array(
+                'Nashville'       , 'Memphis'
+              )
+             ,'TX', jsonb_build_array(
+                'Austin'          , 'Houston'
+              )
+             ,'UT', jsonb_build_array(
+                'Salt Lake City'  , 'West Valley City'
+              )
+             ,'VT', jsonb_build_array(
+                'Montpelier'      , 'Burlington'
+              )
+             ,'VI', jsonb_build_array(
+                'Charlotte Amalie', 'St Croix'
+              )
+             ,'VA', jsonb_build_array(
+                'Richmond'        , 'Virginia Beach'
+              )
+             ,'WA', jsonb_build_array(
+                'Olympia'         , 'Seattle'
+              )
+             ,'WV', jsonb_build_array(
+                'Charleston'      , 'Huntington'
+              )
+             ,'WI', jsonb_build_array(
+                'Madison'         , 'Milwaukeee'
+              )
+             ,'WY', jsonb_build_array(
+                'Cheyenne'        , 'Casper'
+              )
+           ) -> r.code -> (random() * 1)::int
          END city
     FROM ADD_REGION_RELID d
     JOIN tables.country c
       ON c.relid = d.country_relid
+    LEFT
+    JOIN tables.region r
+      ON r.relid = d.region_relid
 )
 -- SELECT * FROM ADD_CITY;
 --  type_relid | country_relid | num_regions | min_region_relid | region_relid |        city        
 -- ------------+---------------+-------------+------------------+--------------+--------------------
---             |             2 |          13 |                1 |            4 | "Winnepeg"
---             |             2 |          13 |                1 |            1 | "Moncton"
+--           2 |             1 |             |                  |              | "Noord"
+--           1 |             2 |          13 |                1 |            5 | "St John's"
+--           1 |             2 |          13 |                1 |            4 | "Moncton"
 --           1 |             3 |             |                  |              | "Flying Fish Cove"
---           3 |             3 |             |                  |              | "Flying Fish Cove"
---             |             4 |          55 |               14 |           21 | "Salem"
+--           2 |             4 |          55 |               14 |           25 | "Atlanta"
 -- (5 rows)
 
 , ADD_ADDRESS AS (
@@ -322,8 +474,7 @@ WITH PARAMS AS (
 -- (5 rows)
 
 , GEN_ADDRESS AS (
-  SELECT row_number() OVER() AS relid
-        ,d.type_relid AS type_relid
+  SELECT d.type_relid AS type_relid
         ,d.country_relid
         ,d.region_relid
         ,gen_random_uuid()    AS id
@@ -335,37 +486,34 @@ WITH PARAMS AS (
         ,CASE WHEN d.type_relid IS NOT NULL THEN 'Door 5' END AS address_2
         ,CASE WHEN (d.type_relid IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
         ,d.mailing_code
-        ,row_number() OVER(PARTITION BY d.type_relid IS NULL) person_business_relid
     FROM ADD_MAILING_CODE d
+   ORDER BY d.type_relid IS NULL
 )
-SELECT * FROM GEN_ADDRESS;
---  relid | type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |     city      |          address          | address_2 | address_3 | mailing_code 
--- -------+------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+---------------+---------------------------+-----------+-----------+--------------
---      1 |          3 |             1 |              | f2eea31f-481c-49c8-a968-17f3db1a016b |       1 | 2024-07-24 11:56:38.769804+00 | 2024-07-24 11:56:38.769804+00 | "Cunucu Abao" | "Caya Papa Juan Pablo II" | Door 5    | Stop 6    | 
---      2 |            |             1 |              | 003ec98d-4668-4ab5-a34b-7635deecd083 |       1 | 2024-07-24 11:56:38.769804+00 | 2024-07-24 11:56:38.769804+00 | "Bubali"      | "Caya Papa Juan Pablo II" |           |           | 
---      3 |          1 |             2 |            6 | 337f9e9c-d59a-4a56-8d9c-ab6dcb7fda8e |       1 | 2024-07-24 11:56:38.769804+00 | 2024-07-24 11:56:38.769804+00 | "Toronto"     | "Water St"                | Door 5    | Stop 6    | Y1J 3S6
---      4 |          2 |             3 |              | cfad66b2-35b1-47df-bb91-e2e23542818a |       1 | 2024-07-24 11:56:38.769804+00 | 2024-07-24 11:56:38.769804+00 | "Poon Saan"   | "Pai Chin Lu"             | Door 5    | Stop 6    | 6798
---      5 |            |             4 |           49 | 7d1c9ead-d4f4-4eec-a597-026d9c6985db |       1 | 2024-07-24 11:56:38.769804+00 | 2024-07-24 11:56:38.769804+00 | "Newark"      | "Calle Ocho"              |           |           | 95714-5848
+-- SELECT * FROM GEN_ADDRESS;
+--  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |        city        |         address          | address_2 | address_3 | mailing_code 
+-- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+--------------------+--------------------------+-----------+-----------+--------------
+--           1 |             1 |              | 532a80c1-cd11-4763-9782-d7c9c9b42c9a |       1 | 2024-07-25 11:29:11.124512+00 | 2024-07-25 11:29:11.124512+00 | "Cumana"           | "Watty Vos Blvd"         | Door 5    | Stop 6    | 
+--           1 |             2 |           11 | 11c06456-df43-49f5-b947-81d3bbe0dab3 |       1 | 2024-07-25 11:29:11.124512+00 | 2024-07-25 11:29:11.124512+00 | "Yellowknife"      | "Sussex Drive"           | Door 5    | Stop 6    | M6O 2W9
+--           3 |             2 |            1 | 9160d6ca-d5dd-4a9e-a512-0629a7a8593c |       1 | 2024-07-25 11:29:11.124512+00 | 2024-07-25 11:29:11.124512+00 | "Winnepeg"         | "Rue du Petit-Champlain" | Door 5    | Stop 6    | G2A 8M8
+--           2 |             3 |              | f9dcbaad-a667-4337-8478-3ba149106251 |       1 | 2024-07-25 11:29:11.124512+00 | 2024-07-25 11:29:11.124512+00 | "Silver City"      | "Hawks Rd"               | Door 5    | Stop 6    | 6798
+--             |             4 |           46 | 07edc2ec-e166-4ef9-aa61-9e26b3b3b469 |       1 | 2024-07-25 11:29:11.124512+00 | 2024-07-25 11:29:11.124512+00 | "West Valley City" | "Bourbon St"             |           |           | 62983-3972
 -- (5 rows)
 
-, MOD_PERSON_BUSINESS_RELIDS AS (
-  SELECT d.relid
-        ,d.type_relid
-        ,d.country_relid
-        ,d.region_relid
-        ,d.id
-        ,d.version
-        ,d.created
-        ,d.changed
-        ,d.city
-        ,d.address
-        ,d.address_2
-        ,d.address_3
-        ,d.mailing_code
-        ,CASE WHEN d.type_relid IS NOT NULL THEN D.person_business_relid END AS person_business_relid
+-- Add a business relid, which is only relevant if the type_relid is not null
+, ADD_BUSINESS_RELID AS (
+  SELECT d.*
+        ,row_number() OVER () AS business_relid
     FROM GEN_ADDRESS d
 )
-SELECT * FROM ADD_PERSON_BUSINESS_RELIDS;
+-- SELECT * FROM ADD_BUSINESS_RELID;
+--  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |      city      |         address          | address_2 | address_3 | mailing_code | business_relid 
+-- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+----------------+--------------------------+-----------+-----------+--------------+----------------
+--           1 |             1 |              | e89fc7f3-348b-403b-9fef-ae178ee71258 |       1 | 2024-07-25 11:32:13.101516+00 | 2024-07-25 11:32:13.101516+00 | "Moko"         | "Dominicanessenstraat"   | Door 5    | Stop 6    |              |              1
+--           1 |             2 |            9 | cb236fdd-800a-402d-9574-045c2372808d |       1 | 2024-07-25 11:32:13.101516+00 | 2024-07-25 11:32:13.101516+00 | "Victoria"     | "Jasper Ave"             | Door 5    | Stop 6    | R6A 8X3      |              2
+--           3 |             3 |              | 256c94df-ed59-4277-a681-fd794bec58b0 |       1 | 2024-07-25 11:32:13.101516+00 | 2024-07-25 11:32:13.101516+00 | "Poon Saan"    | "Short St"               | Door 5    | Stop 6    | 6798         |              3
+--           1 |             4 |           63 | 008588ff-9b3d-4aa2-9846-a30876bd12a9 |       1 | 2024-07-25 11:32:13.101516+00 | 2024-07-25 11:32:13.101516+00 | "Fayetteville" | "Lombard St"             | Door 5    | Stop 6    | 61326-6247   |              4
+--             |             2 |            4 | 557a9d7b-37f6-4685-a7d2-192727d8a1fb |       1 | 2024-07-25 11:32:13.101516+00 | 2024-07-25 11:32:13.101516+00 | "Winnepeg"     | "Rue du Petit-Champlain" |           |           | W3X 3D4      |              5
+-- (5 rows)
 
 -- Insert addresses and return generated relids
 , INS_ADDRESS AS (
@@ -396,7 +544,7 @@ SELECT * FROM ADD_PERSON_BUSINESS_RELIDS;
            ,address_2
            ,address_3
            ,mailing_code
-       FROM GEN_ADDRESS
+       FROM MOD_PERSON_BUSINESS_RELIDS
   RETURNING relid
 )
 -- SELECT * FROM INS_ADDRESS;
