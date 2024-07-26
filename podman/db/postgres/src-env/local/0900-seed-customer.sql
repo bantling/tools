@@ -349,7 +349,7 @@ WITH PARAMS AS (
 , ADD_ADDRESS AS (
   SELECT d.*
         ,CASE c.code_2
-         WHEN 'AW' THEN
+         WHEN 'AW' THEN -- Aruba
            jsonb_build_array(
               'Bilderdijkstraat'
              ,'Caya Papa Juan Pablo II'
@@ -357,7 +357,47 @@ WITH PARAMS AS (
              ,'Watty Vos Blvd'
              ,'Patiastraat'
            ) -> (random() * 4)::int
-         WHEN 'CA' THEN
+         WHEN 'CA' THEN -- Canada
+           json_build_object(
+              'AB', jsonb_build_array(
+                '17th Ave SW', 'Whyte Ave'
+              )
+             ,'BC', jsonb_build_array(
+                'Government St', 'Robson St'
+              )
+             ,'MB', jsonb_build_array(
+                'Regent Ave W', 'Rosser Ave'
+              )
+             ,'NB', jsonb_build_array(
+                'Main St', 'King St'
+              )
+             ,'NL', jsonb_build_array(
+                '17th Ave SW', 'Whyte Ave'
+              )
+             ,'NT', jsonb_build_array(
+                '17th Ave SW', 'Whyte Ave'
+              )
+             ,'NS', jsonb_build_array(
+                '17th Ave SW', 'Whyte Ave'
+              )
+             ,'NU', jsonb_build_array(
+                '17th Ave SW', 'Whyte Ave'
+              )
+             ,'ON', jsonb_build_array(
+                '17th Ave SW', 'Whyte Ave'
+              )
+             ,'PE', jsonb_build_array(
+                '17th Ave SW', 'Whyte Ave'
+              )
+             ,'QC', jsonb_build_array(
+                '17th Ave SW', 'Whyte Ave'
+              )
+             ,'SK', jsonb_build_array(
+                '17th Ave SW', 'Whyte Ave'
+              )
+             ,'YT', jsonb_build_array(
+                '17th Ave SW', 'Whyte Ave'
+              )
            jsonb_build_array(
               'Argyle St'
              ,'Campbell Rd'
