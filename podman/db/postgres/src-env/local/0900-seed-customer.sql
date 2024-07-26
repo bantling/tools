@@ -87,27 +87,41 @@ WITH PARAMS AS (
 --           2 |             3 |             |                  |             
 -- (5 rows)
 
--- Add a city
+-- Add a city and street name
 -- For countries with no regions, a reasonable number of cities are provided
 -- For countries with regions: 
 -- - Two cities are chosen from each region to form a flat list of cities to choose from
 -- - To simplify generation, the cities are specific to the chosen country only, not the chosen region
-, ADD_CITY AS (
+, ADD_CITY_STREET AS (
   SELECT d.*
         ,CASE c.code_2
          WHEN 'AW' THEN -- Aruba
            jsonb_build_array(
-              'Alto Vista'
-             ,'Barcadera'
-             ,'Bubali'
-             ,'Companashi'
-             ,'Cumana'
-             ,'Cunucu Abao'
-             ,'Malmok'
-             ,'Moko'
-             ,'Noord'
-             ,'Oranjestad'
-           ) -> (random() * 9)::int
+              jsonb_build_array(
+                 'Noord'
+                ,'Caya Frans Figaroa'
+              )
+             ,jsonb_build_array(
+                 'Oranjestad'
+                ,'Spinozastraat'
+              )
+             ,jsonb_build_array(
+                 'Paradera'
+                ,'Bloemond'
+              )
+             ,jsonb_build_array(
+                 'San Nicolas'
+                ,'Sero Colorado'
+              )
+             ,jsonb_build_array(
+                 'Santa Cruz'
+                ,'San Fuego'
+              )
+             ,jsonb_build_array(
+                 'Savaneta'
+                ,'Sero Alejandro'
+              )
+           ) -> (random() * 5)::int
          WHEN 'CA' THEN -- Canada
            jsonb_build_object(
               'AB', jsonb_build_array(
@@ -149,7 +163,7 @@ WITH PARAMS AS (
              ,'YT', jsonb_build_array(
                 'Whitehorse'   , 'Dawson City'
               )
-           ) -> r.code -> (random() * 1)::int
+           ) -> r.code -> random()::int
          WHEN 'CX' THEN -- Christmas Island
            jsonb_build_array(
               'Drimsite'
@@ -327,7 +341,7 @@ WITH PARAMS AS (
              ,'WY', jsonb_build_array(
                 'Cheyenne'        , 'Casper'
               )
-           ) -> r.code -> (random() * 1)::int
+           ) -> r.code -> random()::int
          END city
     FROM ADD_REGION_RELID d
     JOIN tables.country c
@@ -369,54 +383,37 @@ WITH PARAMS AS (
                 'Regent Ave W', 'Rosser Ave'
               )
              ,'NB', jsonb_build_array(
-                'Main St', 'King St'
+                'Dundonald St', 'King St'
               )
              ,'NL', jsonb_build_array(
-                '17th Ave SW', 'Whyte Ave'
+                'George St', 'Everest St'
               )
              ,'NT', jsonb_build_array(
-                '17th Ave SW', 'Whyte Ave'
+                'Ragged Ass Rd', 'Poplar Rd'
               )
              ,'NS', jsonb_build_array(
-                '17th Ave SW', 'Whyte Ave'
+                'Spring Garden Rd', 'Dorchester St'
               )
              ,'NU', jsonb_build_array(
-                '17th Ave SW', 'Whyte Ave'
+                'Mivvik St', 'TikTaq Ave'
               )
              ,'ON', jsonb_build_array(
-                '17th Ave SW', 'Whyte Ave'
+                'Wellington Street', 'Yonge Street'
               )
              ,'PE', jsonb_build_array(
-                '17th Ave SW', 'Whyte Ave'
+                'Richmond St', 'Water St'
               )
              ,'QC', jsonb_build_array(
-                '17th Ave SW', 'Whyte Ave'
+                'Petit-Champlain St', 'Sainte-Catherine St'
               )
              ,'SK', jsonb_build_array(
-                '17th Ave SW', 'Whyte Ave'
+                'Broadway Ave', 'Winnipeg St'
               )
              ,'YT', jsonb_build_array(
-                '17th Ave SW', 'Whyte Ave'
+                'Saloon Rd', '4th Ave'
               )
-           jsonb_build_array(
-              'Argyle St'
-             ,'Campbell Rd'
-             ,'Cariboo Rd'
-             ,'George St'
-             ,'Granville St'
-             ,'Jasper Ave'
-             ,'Osborne St'
-             ,'Portage Ave'
-             ,'Robson St'
-             ,'Rue du Petit-Champlain'
-             ,'Saint Laurent Boulevard'
-             ,'Second St'
-             ,'Sussex Drive'
-             ,'Stephen Ave'
-             ,'Water St'
-             ,'Yonge St'
-           ) -> (random() * 15)::int
-         WHEN 'CX' THEN
+           ) -> r.code -> random()::int
+         WHEN 'CX' THEN -- Christmas Island
            jsonb_build_array(
               'Abbots Nest'
              ,'Hawks Rd'
@@ -424,7 +421,11 @@ WITH PARAMS AS (
              ,'Pai Chin Lu'
              ,'Short St'
            ) -> (random() * 4)::int
-         WHEN 'US' THEN
+         WHEN 'US' THEN -- United States
+           json_build_object(
+              'AL', jsonb_build_array(
+                '17th Ave SW', 'Whyte Ave'
+              )
            jsonb_build_array(
               '6th St'
              ,'Abbot Kinney Blvd'
@@ -452,6 +453,9 @@ WITH PARAMS AS (
     FROM ADD_CITY d
     JOIN tables.country c
       ON c.relid = d.country_relid
+    LEFT
+    JOIN tables.region r
+      ON r.relid = d.relid
 )
 -- SELECT * FROM ADD_ADDRESS;
 --  type_relid | country_relid | num_regions | min_region_relid | region_relid |        city        |    address     
