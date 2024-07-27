@@ -87,89 +87,197 @@ WITH PARAMS AS (
 --           2 |             3 |             |                  |             
 -- (5 rows)
 
--- Add a city and street name
--- For countries with no regions, a reasonable number of cities are provided
--- For countries with regions: 
--- - Two cities are chosen from each region to form a flat list of cities to choose from
--- - To simplify generation, the cities are specific to the chosen country only, not the chosen region
+-- Add (street, city) array that exists within chosen region
 , ADD_CITY_STREET AS (
   SELECT d.*
         ,CASE c.code_2
          WHEN 'AW' THEN -- Aruba
            jsonb_build_array(
               jsonb_build_array(
-                 'Noord'
-                ,'Caya Frans Figaroa'
+                 'Caya Frans Figaroa'
+                ,'Noord'
               )
              ,jsonb_build_array(
-                 'Oranjestad'
-                ,'Spinozastraat'
+                 'Spinozastraat'
+                ,'Oranjestad'
               )
              ,jsonb_build_array(
-                 'Paradera'
-                ,'Bloemond'
+                 'Bloemond'
+                ,'Paradera'
               )
              ,jsonb_build_array(
-                 'San Nicolas'
-                ,'Sero Colorado'
+                 'Sero Colorado'
+                ,'San Nicolas'
               )
              ,jsonb_build_array(
-                 'Santa Cruz'
-                ,'San Fuego'
+                 'San Fuego'
+                ,'Santa Cruz'
               )
-             ,jsonb_build_array(
-                 'Savaneta'
-                ,'Sero Alejandro'
-              )
-           ) -> (random() * 5)::int
+           ) -> (random() * 4)::int
          WHEN 'CA' THEN -- Canada
-           jsonb_build_object(
-              'AB', jsonb_build_array(
-                'Calgary'      , 'Edmonton'
-              )
-             ,'BC', jsonb_build_array(
-                'Victoria'     , 'Vancouver'
-              )
-             ,'MB', jsonb_build_array(
-                'Winnepeg'     , 'Brandon'
-              )
-             ,'NB', jsonb_build_array(
-                'Fredericton'  , 'Moncton'
-              )
-             ,'NL', jsonb_build_array(
-                'St John''s'   , 'Paradise'
-              )
-             ,'NT', jsonb_build_array(
-                'Yellowknife'  , 'Hay River'
-              )
-             ,'NS', jsonb_build_array(
-                'Halifax'      , 'Sydney'
-              )
-             ,'NU', jsonb_build_array(
-                'Iqaluit'      , 'Rankin Inlet'
-              )
-             ,'ON', jsonb_build_array(
-                'Ottawa'       , 'Toronto'
-              )
-             ,'PE', jsonb_build_array(
-                'Charlottetown', 'Summerside'
-              )
-             ,'QC', jsonb_build_array(
-                'Quebec City'  , 'Montreal'
-              )
-             ,'SK', jsonb_build_array(
-                'Saskatoon'    , 'Regina'
-              )
-             ,'YT', jsonb_build_array(
-                'Whitehorse'   , 'Dawson City'
-              )
-           ) -> r.code -> random()::int
+           CASE r.code
+           WHEN 'AB' THEN
+             jsonb_build_array(
+                jsonb_build_array(
+                   '17th Ave SW'
+                  ,'Calgary'
+                )
+               ,jsonb_build_array(
+                   'Whyte Ave'
+                  ,'Edmonton'
+                )
+             )
+           WHEN 'BC' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'Government St'
+                  ,'Victoria'
+                )
+               ,jsonb_build_array(
+                   'Robson St'
+                  ,'Vancouver'
+                )
+             )
+           WHEN 'MB' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'Regent Ave W'
+                  ,'Winnipeg'
+                )
+               ,jsonb_build_array(
+                   'Rosser Ave'
+                  ,'Brandon'
+                )
+             )
+           WHEN 'NB' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'Dundonald St'
+                  ,'Fredericton'
+                )
+               ,jsonb_build_array(
+                   'King St'
+                  ,'Moncton'
+                )
+             )
+           WHEN 'NL' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'George St'
+                  ,'St John''s'
+                )
+               ,jsonb_build_array(
+                   'Everest St'
+                  ,'Paradise'
+                )
+             )
+           WHEN 'NT' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'Ragged Ass Rd'
+                  ,'Yellowknife'
+                )
+               ,jsonb_build_array(
+                   'Poplar Rd'
+                  ,'Hay River'
+                )
+             )
+           WHEN 'NS' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'Spring Garden Rd'
+                  ,'Halifax'
+                )
+               ,jsonb_build_array(
+                   'Dorchester St'
+                  ,'Sydney'
+                )
+             )
+           WHEN 'NU' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'Mivvik St'
+                  ,'Iqaluit'
+                )
+               ,jsonb_build_array(
+                   'TikTaq Ave'
+                  ,'Rankin Inlet'
+                )
+             )
+           WHEN 'ON' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'Wellington St'
+                  ,'Ottawa'
+                )
+               ,jsonb_build_array(
+                   'Yonge St'
+                  ,'Toronto'
+                )
+             )
+           WHEN 'PE' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'Richmond St'
+                  ,'Charlottetown'
+                )
+               ,jsonb_build_array(
+                   'Water St'
+                  ,'Summerside'
+                )
+             )
+           WHEN 'QC' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'Petit-Champlain St'
+                  ,'Quebec City'
+                )
+               ,jsonb_build_array(
+                   'Sainte-Catherine St'
+                  ,'Montreal'
+                )
+             )
+           WHEN 'SK' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'Broadway Ave'
+                  ,'Saskatoon'
+                )
+               ,jsonb_build_array(
+                   'Winnipeg St'
+                  ,'Regina'
+                )
+             )
+           WHEN 'YT' then
+             jsonb_build_array(
+                jsonb_build_array(
+                   'Saloon Rd'
+                  ,'Whitehorse'
+                )
+               ,jsonb_build_array(
+                   '4th Ave'
+                  ,'Dawson City'
+                )
+             )
+           END -> random()::int
          WHEN 'CX' THEN -- Christmas Island
            jsonb_build_array(
-              'Drimsite'
-             ,'Flying Fish Cove'
-             ,'Poon Saan'
-             ,'Silver City'
+              jsonb_build_array(
+                 'Lam Lok Loh'
+                ,'Drumsite'
+              )
+             ,jsonb_build_array(
+                 'Jln Pantai'
+                ,'Flying Fish Cove'
+              )
+             ,jsonb_build_array(
+                 'San Chye Loh'
+                ,'Poon Saan'
+              )
+             ,jsonb_build_array(
+                 'Sea View Dr'
+                ,'Silver City'
+              )
            ) -> (random() * 3)::int
          WHEN 'US' THEN -- United States
            -- Postgres has limit of 100 function args, and we have 55 regions = 110 args to jsonb_build_object
@@ -362,16 +470,26 @@ WITH PARAMS AS (
 
 , ADD_ADDRESS AS (
   SELECT d.*
-        ,CASE c.code_2
-         WHEN 'AW' THEN -- Aruba
+         CASE c.code_2
+         WHEN 'AW' THEN -- Aruba: street civic city
            jsonb_build_array(
-              'Bilderdijkstraat'
-             ,'Caya Papa Juan Pablo II'
-             ,'Dominicanessenstraat'
-             ,'Watty Vos Blvd'
-             ,'Patiastraat'
-           ) -> (random() * 4)::int
-         WHEN 'CA' THEN -- Canada
+              jsonb_build_array(
+                 'Bilderdijkstraat', 'Oranjestad'
+              )
+             ,jsonb_build_array(
+                 'Savaneta', 'Savaneta'
+              )
+             ,jsonb_build_array(
+                 'San Fuego', 'Santa Cruz'
+              )
+             ,jsonb_build_array(
+                 'Caya Sint Maarten', 'San Nicolas'
+              )
+             ,jsonb_build_array(
+                 'Alto Vista', 'Noord'
+              )
+           )
+         WHEN 'CA' THEN -- Canada: civic street city
            json_build_object(
               'AB', jsonb_build_array(
                 '17th Ave SW', 'Whyte Ave'
