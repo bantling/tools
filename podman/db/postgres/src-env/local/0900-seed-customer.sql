@@ -436,7 +436,7 @@ WITH PARAMS AS (
              ) -> random()::int ||
                   jsonb_build_object(
                      'mcp',
-                     '96799'
+                     '967'
                   )
            END
            WHEN 'AZ' THEN -- Arizona
@@ -506,9 +506,9 @@ WITH PARAMS AS (
                        FROM (
                                SELECT generate_series(900, 961) v
                                EXCEPT
-                               SELECT jsonb_array_elements(jsonb_build_array(909, 929, 938))::int
+                               SELECT jsonb_array_elements(jsonb_build_array(909, 929))::int
                             ) t
-                     ) -> (random() * (961 - 900 - 3))::int
+                     ) -> (random() * (961 - 900 - 2))::int
                   )
            END
            WHEN 'CO' -- Colorado
@@ -573,8 +573,10 @@ WITH PARAMS AS (
                                SELECT generate_series(200, 205) v
                                EXCEPT
                                SELECT 201
+                                UNION ALL
+                               SELECT 569
                             ) t
-                     ) -> (random() * (205 - 200 - 1))::int
+                     ) -> (random() * (205 - 200 - 1 + 1))::int
            END
            WHEN 'DE' -- Delaware
              jsonb_build_array(
@@ -645,7 +647,7 @@ WITH PARAMS AS (
                                 UNION ALL
                                SELECT generate_series(398, 399)
                             ) t
-                     ) -> (random() * (319 - 300 + 2))::int
+                     ) -> (random() * ((319 - 300) + (399 - 398)))::int
                   )
            END
            WHEN 'GU' -- Guam
@@ -663,7 +665,7 @@ WITH PARAMS AS (
                   ,'Dededo'
                 )
              ) -> random()::int ||
-                  jsonb_build_object('mcp', '959')
+                  jsonb_build_object('mcp', '969')
            END
            WHEN 'HI' -- Hawaii
              jsonb_build_array(
@@ -682,7 +684,7 @@ WITH PARAMS AS (
              ) -> random()::int ||
                   jsonb_build_object(
                      'mcp',
-                     "0" || (967 + (random() * (968 - 967))::int)::text
+                     (967 + random()::int)::text
                   )
            END
            WHEN 'ID' -- Idaho
@@ -918,8 +920,13 @@ WITH PARAMS AS (
              ) -> random()::int ||
                   jsonb_build_object(
                      'mcp',
-                     '0' || (10 + (random() * (27 - 10))::int)::text
-                  )
+                     '0' || (SELECT jsonb_agg(v::text)
+                       FROM (
+                               SELECT generate_series(10, 27) v
+                                UNION ALL
+                               SELECT 55
+                            ) t
+                     ) -> (random() * (27 - 10 + 1))::int
            END
            WHEN 'MI' THEN -- Michigan
              jsonb_build_array(
@@ -984,11 +991,7 @@ WITH PARAMS AS (
              ) -> random()::int ||
                   jsonb_build_object(
                      'mcp',
-                     (SELECT jsonb_agg(v::text)
-                       FROM (
-                               SELECT generate_series(386, 397) v
-                            ) t
-                     ) -> (random() * (397 - 386))::int
+                     (386 + (random() * (397 - 386))::int)::text
                   )
            END
            WHEN 'MO' THEN -- Missouri
@@ -1150,9 +1153,9 @@ WITH PARAMS AS (
                        FROM (
                                SELECT generate_series(870, 884) v
                                EXCEPT
-                               SELECT 876
+                               SELECT jsonb_array_elements(jsonb_build_array(872, 876))::int
                             ) t
-                     ) -> (random() * (884 - 870 - 1))::int
+                     ) -> (random() * (884 - 870 - 2))::int
            END
            WHEN 'NY' THEN -- New York
              jsonb_build_array(
@@ -1220,6 +1223,26 @@ WITH PARAMS AS (
                      '969'
                   )
            END
+           WHEN 'NC' THEN -- North Carolina
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Tapochao Rd'
+                  ,'cn'
+                  ,'Saipan'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'Ayuyu Dr'
+                  ,'cn'
+                  ,'Marpi'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     (270 + (random() * (289 - 270))::int)::text
+                  )
+           END
            WHEN 'OH' THEN -- Ohio
              jsonb_build_array(
                 jsonb_build_object(
@@ -1261,7 +1284,7 @@ WITH PARAMS AS (
                        FROM (
                                SELECT generate_series(730, 749) v
                                EXCEPT
-                               SELECT jsonb_array_elements(jsonb_build_array(723, 733, 742))::int
+                               SELECT jsonb_array_elements(jsonb_build_array(732, 733, 742))::int
                             ) t
                      ) -> (random() * (749 - 730 - 3))::int
                   )
@@ -1323,7 +1346,7 @@ WITH PARAMS AS (
              ) -> random()::int ||
                   jsonb_build_object(
                      'mcp',
-                     '0' || (SELECT jsonb_agg(v::text)
+                     '00' || (SELECT jsonb_agg(v::text)
                        FROM (
                                SELECT generate_series(6, 9) v
                                EXCEPT
@@ -1332,47 +1355,299 @@ WITH PARAMS AS (
                      ) -> (random() * (9 - 6 - 1))::int
                   )
            END
-           
-             ,'RI', jsonb_build_array(
-                'Providence'      , 'Cranston'
-              )
-             ,'SC', jsonb_build_array(
-                'Columbia'        , 'Charleston'
-              )
-             ,'SD', jsonb_build_array(
-                'Pierre'          , 'Sioux Falls'
-              )
-             ,'TN', jsonb_build_array(
-                'Nashville'       , 'Memphis'
-              )
-             ,'TX', jsonb_build_array(
-                'Austin'          , 'Houston'
-              )
-             ,'UT', jsonb_build_array(
-                'Salt Lake City'  , 'West Valley City'
-              )
-             ,'VT', jsonb_build_array(
-                'Montpelier'      , 'Burlington'
-              )
-             ,'VI', jsonb_build_array(
-                'Charlotte Amalie', 'St Croix'
-              )
-             ,'VA', jsonb_build_array(
-                'Richmond'        , 'Virginia Beach'
-              )
-             ,'WA', jsonb_build_array(
-                'Olympia'         , 'Seattle'
-              )
-             ,'WV', jsonb_build_array(
-                'Charleston'      , 'Huntington'
-              )
-             ,'WI', jsonb_build_array(
-                'Madison'         , 'Milwaukeee'
-              )
-             ,'WY', jsonb_build_array(
-                'Cheyenne'        , 'Casper'
-              )
-           ) -> r.code -> random()::int
+           WHEN 'RI' THEN -- Rhode Island
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Hope St'
+                  ,'cn'
+                  ,'Providence'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'Phenix Ave'
+                  ,'cn'
+                  ,'Cranston'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     "0" || (28 + random()::int)::text
+                  )
+           END
+           WHEN 'SC' THEN -- South Carolina
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Gervais St'
+                  ,'cn'
+                  ,'Columbia'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'King St'
+                  ,'cn'
+                  ,'Charleston'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     (290 + (random() * (299 - 290))::int)::text
+                  )
+           END
+           WHEN 'SD' THEN -- South Dakota
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'N Taylor Ave'
+                  ,'cn'
+                  ,'Pierre'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'Ladyslipper Cir'
+                  ,'cn'
+                  ,'Sioux Falls'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     (570 + (random() * (577 - 570))::int)::text
+                  )
+           END
+           WHEN 'TN' THEN -- Tennessee
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Edgehill Ave'
+                  ,'cn'
+                  ,'Nashville'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'Spottswood Ave'
+                  ,'cn'
+                  ,'Memphis'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     (370 + (random() * (385 - 370))::int)::text
+                  )
+           END
+           WHEN 'TX' THEN -- Texas
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Sixth St'
+                  ,'cn'
+                  ,'Austin'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'Westheimeer Rd'
+                  ,'cn'
+                  ,'Houston'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     (SELECT jsonb_agg(v::text)
+                       FROM (
+                               SELECT 733
+                                UNION ALL
+                               SELECT generate_series(750, 799) v
+                               EXCEPT
+                               SELECT 771
+                                UNION ALL
+                               SELECT 885
+                            ) t
+                     ) -> (random() * (1 + (799 - 750) - 1 + 1))::int
+                  )
+           END
+           WHEN 'UT' THEN -- Utah
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Poplar Grove Vlvd S'
+                  ,'cn'
+                  ,'Salt Lake City'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'Nancy Dr'
+                  ,'cn'
+                  ,'West Valley City'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     (840 + (random() * (847 - 840))::int)::text
+                  )
+           END
+           WHEN 'VT' THEN -- Vermont
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Towne Hill Rd'
+                  ,'cn'
+                  ,'Montpelier'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'N Willard St'
+                  ,'cn'
+                  ,'Burlington'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     '0' || (SELECT jsonb_agg(v::text)
+                       FROM (
+                               SELECT generate_series(50, 59) v
+                               EXCEPT
+                               SELECT 55
+                            ) t
+                     ) -> (random() * (59 - 50 - 1))::int
+           END
+           WHEN 'VI' THEN -- Virgin Islands
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Harbour Ridge Rd'
+                  ,'cn'
+                  ,'Charlotte Amalie'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'Alfred Andrews St'
+                  ,'cn'
+                  ,'St Croix'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     '008'
+                  )
+           END
+           WHEN 'VA' THEN -- Virginia
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Monument Ave'
+                  ,'cn'
+                  ,'Richmond'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'Atlantic Ave'
+                  ,'cn'
+                  ,'Virginia Beach'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     (SELECT jsonb_agg(v::text)
+                       FROM (
+                               SELECT generate_series(220, 246) v
+                                UNION ALL
+                               SELECT 201
+                            ) t
+                     ) -> (random() * (246 - 220 + 1))::int
+                  )
+           END
+           WHEN 'WA' THEN -- Washington
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Union Ave SE'
+                  ,'cn'
+                  ,'Olympia'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'Pike St'
+                  ,'cn'
+                  ,'Seattle'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     (SELECT jsonb_agg(v::text)
+                       FROM (
+                               SELECT generate_series(980, 994) v
+                               EXCEPT
+                               SELECT 987
+                            ) t
+                     ) -> (random() * (994 - 980 - 1))::int
+                  )
+           END
+           WHEN 'WV' THEN -- West Virginia
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Quarrier St'
+                  ,'cn'
+                  ,'Charleston'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'Buffington Ave'
+                  ,'cn'
+                  ,'Huntington'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     (247 + (random() * (268 - 247))::int)::text
+                  )
+           END
+           WHEN 'WI' THEN -- Wisconsin
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'N Bassett St'
+                  ,'cn'
+                  ,'Madison'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'Brady St'
+                  ,'cn'
+                  ,'Milwaukee'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     (SELECT jsonb_agg(v::text)
+                       FROM (
+                               SELECT generate_series(530, 549) v
+                               EXCEPT
+                               SELECT jsonb_array_elements(jsonb_build_array(533, 536))::int
+                            ) t
+                     ) -> (random() * (549 - 530 - 2))::int
+                  )
+           END
+           WHEN 'WY' THEN -- Wyoming
+             jsonb_build_array(
+                jsonb_build_object(
+                   'st'
+                  ,'Evans Ave'
+                  ,'cn'
+                  ,'Cheyenne'
+                )
+               ,jsonb_build_object(
+                   'st'
+                  ,'W Collins Dr'
+                  ,'cn'
+                  ,'Casper'
+                )
+             ) -> random()::int ||
+                  jsonb_build_object(
+                     'mcp',
+                     (820 + (random() * (831 - 820))::int)::text
+                  )
+           END
          END city
     FROM ADD_REGION_RELID d
     JOIN tables.country c
