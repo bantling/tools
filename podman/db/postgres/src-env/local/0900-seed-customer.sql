@@ -88,7 +88,7 @@ WITH PARAMS AS (
 -- (5 rows)
 
 -- Add {st: street, cn: city, mcp: mailing code prefix (optional)} object for chosen city/region
-, ADD_CITY_STREET AS (
+, ADD_CITY_STREET_MCP AS (
   SELECT d.*
         ,CASE c.code_2
          WHEN 'AW' THEN -- Aruba
@@ -1802,7 +1802,7 @@ WITH PARAMS AS (
     JOIN tables.region r
       ON r.relid = d.region_relid
 )
--- SELECT * FROM ADD_CITY;
+-- SELECT * FROM ADD_CITY_STREET_MCP;
 --  type_relid | country_relid | num_regions | min_region_relid | region_relid |        city        
 -- ------------+---------------+-------------+------------------+--------------+--------------------
 --           2 |             1 |             |                  |              | "Noord"
