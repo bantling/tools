@@ -87,7 +87,7 @@ WITH PARAMS AS (
 --           2 |             3 |             |                  |             
 -- (5 rows)
 
--- Add {st: street, cn: city, mcp: mailing code prefix (optional)} object for chosen city/region
+-- Add {st: street, cn: city, mcp: mailing code prefix (optional)} object for chosen country/region
 , ADD_CITY_STREET_MCP AS (
   SELECT d.*
         ,CASE c.code_2
@@ -145,7 +145,6 @@ WITH PARAMS AS (
                 )
              ) -> random()::int || jsonb_build_object('mcp', 'T')
              --) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'BC' THEN
              -- select distinct v from (select (
              jsonb_build_array(
@@ -163,7 +162,6 @@ WITH PARAMS AS (
                 )
              ) -> random()::int || jsonb_build_object('mcp', 'V')
              --) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'MB' THEN
              -- select distinct v from (select (
              jsonb_build_array(
@@ -181,7 +179,6 @@ WITH PARAMS AS (
                 )
              ) -> random()::int || jsonb_build_object('mcp', 'R')
              --) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NB' THEN
              -- select distinct v from (select (
              jsonb_build_array(
@@ -199,7 +196,6 @@ WITH PARAMS AS (
                 )
              ) -> random()::int || jsonb_build_object('mcp', 'E')
              --) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NL' THEN
              -- select distinct v from (select (
              jsonb_build_array(
@@ -217,7 +213,6 @@ WITH PARAMS AS (
                 )
              ) -> random()::int || jsonb_build_object('mcp', 'A')
              --) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NT' THEN
              -- select distinct v from (select (
              jsonb_build_array(
@@ -235,7 +230,6 @@ WITH PARAMS AS (
                 )
              ) -> random()::int || jsonb_build_object('mcp', 'X')
              -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NS' THEN
              -- select distinct v from (select (
              jsonb_build_array(
@@ -253,7 +247,6 @@ WITH PARAMS AS (
                 )
              ) -> random()::int || jsonb_build_object('mcp', 'B')
              -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NU' THEN
                -- select distinct v from (select (
                jsonb_build_array(
@@ -271,7 +264,6 @@ WITH PARAMS AS (
                   )
                ) -> random()::int || jsonb_build_object('mcp', 'X')
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'ON' THEN
                -- select distinct v from (select (
                jsonb_build_array(
@@ -293,7 +285,6 @@ WITH PARAMS AS (
                     ,jsonb_build_array('K', 'L', 'M', 'N', 'P') -> (random() * 4)::int
                   )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'PE' THEN
                -- select distinct v from (select (
                jsonb_build_array(
@@ -311,7 +302,6 @@ WITH PARAMS AS (
                   )
                ) -> random()::int || jsonb_build_object('mcp', 'C')
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'QC' THEN
                -- select distinct v from (select (
                jsonb_build_array(
@@ -333,7 +323,6 @@ WITH PARAMS AS (
                        json_build_array('G', 'H', 'J') -> (random() * 2)::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'SK' THEN
                -- select distinct v from (select (
                jsonb_build_array(
@@ -351,7 +340,6 @@ WITH PARAMS AS (
                   )
                ) -> random()::int || jsonb_build_object('mcp', 'S')
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'YT' THEN
                -- select distinct v from (select (
                jsonb_build_array(
@@ -369,7 +357,6 @@ WITH PARAMS AS (
                   )
                ) -> random()::int || jsonb_build_object('mcp', 'Y')
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
           END
          WHEN 'CX' THEN -- Christmas Island
              -- select distinct v from (select (
@@ -400,7 +387,6 @@ WITH PARAMS AS (
                 )
              ) -> (random() * 3)::int
              -- ) v, generate_series(1, 1000) n) t order by 1;
-          END
          WHEN 'US' THEN -- United States
            CASE r.code
            WHEN 'AL' THEN -- Alabama
@@ -430,7 +416,6 @@ WITH PARAMS AS (
                        ) -> (random() * (369 - 350 - 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'AK' THEN -- Alaska
                -- select distinct v from (select (
                jsonb_build_array(
@@ -452,7 +437,6 @@ WITH PARAMS AS (
                        (995 + (random() * (999 - 995))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'AS' THEN -- American Samoa
                -- select distinct v from (select (
                jsonb_build_array(
@@ -474,7 +458,6 @@ WITH PARAMS AS (
                        '967'
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'AZ' THEN -- Arizona
                -- select distinct v from (select (
                jsonb_build_array(
@@ -502,7 +485,6 @@ WITH PARAMS AS (
                        ) -> (random() * (865 - 850 - 4))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'AR' THEN -- Arkansas
                -- select distinct v from (select (
                jsonb_build_array(
@@ -524,7 +506,6 @@ WITH PARAMS AS (
                        (716 + (random() * (729 - 716))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'CA' THEN -- California
                -- select distinct v from (select (
                jsonb_build_array(
@@ -552,8 +533,7 @@ WITH PARAMS AS (
                        ) -> (random() * (961 - 900 - 2))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
-           WHEN 'CO' -- Colorado
+           WHEN 'CO' THEN -- Colorado
                -- select distinct v from (select (
                jsonb_build_array(
                   jsonb_build_object(
@@ -574,8 +554,7 @@ WITH PARAMS AS (
                        (800 + (random() * (816 - 800))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
-           WHEN 'CT' -- Connecticut
+           WHEN 'CT' THEN -- Connecticut
                -- select distinct v from (select (
                  jsonb_build_array(
                     jsonb_build_object(
@@ -596,8 +575,7 @@ WITH PARAMS AS (
                          '0' || (60 + (random() * (69 - 60))::int)::text
                       )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
-           WHEN 'DC' -- District of Columbia
+           WHEN 'DC' THEN -- District of Columbia
                -- select distinct v from (select (
                jsonb_build_array(
                   jsonb_build_object(
@@ -626,8 +604,7 @@ WITH PARAMS AS (
                        ) -> (random() * (205 - 200 - 1 + 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
-           WHEN 'DE' -- Delaware
+           WHEN 'DE' THEN -- Delaware
                -- select distinct v from (select (
                jsonb_build_array(
                   jsonb_build_object(
@@ -648,8 +625,7 @@ WITH PARAMS AS (
                        (197 + (random() * (199 - 197))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
-           WHEN 'FL' -- Florida
+           WHEN 'FL' THEN -- Florida
                -- select distinct v from (select (
                jsonb_build_array(
                   jsonb_build_object(
@@ -676,8 +652,7 @@ WITH PARAMS AS (
                        ) -> (random() * (349 - 320 - 4))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
-           WHEN 'GA' -- Georgia
+           WHEN 'GA' THEN -- Georgia
                -- select distinct v from (select (
                jsonb_build_array(
                   jsonb_build_object(
@@ -704,8 +679,7 @@ WITH PARAMS AS (
                        ) -> (random() * ((319 - 300) + 2))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
-           WHEN 'GU' -- Guam
+           WHEN 'GU' THEN -- Guam
                -- select distinct v from (select (
                jsonb_build_array(
                   jsonb_build_object(
@@ -723,8 +697,7 @@ WITH PARAMS AS (
                ) -> random()::int ||
                     jsonb_build_object('mcp', '969')
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
-           WHEN 'HI' -- Hawaii
+           WHEN 'HI' THEN -- Hawaii
                -- select distinct v from (select (
                jsonb_build_array(
                   jsonb_build_object(
@@ -745,8 +718,7 @@ WITH PARAMS AS (
                        (967 + random()::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
-           WHEN 'ID' -- Idaho
+           WHEN 'ID' THEN -- Idaho
                -- select distinct v from (select (
                jsonb_build_array(
                   jsonb_build_object(
@@ -767,7 +739,6 @@ WITH PARAMS AS (
                        (832 + (random() * (838 - 832))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'IL' THEN -- Illinois
                -- select distinct v from (select (
                jsonb_build_array(
@@ -795,7 +766,6 @@ WITH PARAMS AS (
                        ) -> (random() * (629 - 600 - 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'IN' THEN -- Indiana
                -- select distinct v from (select (
                jsonb_build_array(
@@ -817,7 +787,6 @@ WITH PARAMS AS (
                        (460 + (random() * (479 - 460))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'IA' THEN -- Iowa
                -- select distinct v from (select (
                jsonb_build_array(
@@ -845,7 +814,6 @@ WITH PARAMS AS (
                        ) -> (random() * (528 - 500 - 3))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'KS' THEN -- Kansas
                -- select distinct v from (select (
                jsonb_build_array(
@@ -873,7 +841,6 @@ WITH PARAMS AS (
                        ) -> (random() * (679 - 660 - 1))::int
                     )
               -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'KY' THEN -- Kentucky
                -- select distinct v from (select (
                jsonb_build_array(
@@ -901,7 +868,6 @@ WITH PARAMS AS (
                        ) -> (random() * (427 - 400 - 1))::int
                     )
               -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'LA' THEN -- Louisiana
                -- select distinct v from (select (
                jsonb_build_array(
@@ -929,7 +895,6 @@ WITH PARAMS AS (
                        ) -> (random() * (714 - 700 - 2))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'ME' THEN -- Maine
                -- select distinct v from (select (
                jsonb_build_array(
@@ -951,7 +916,6 @@ WITH PARAMS AS (
                        '0' || (39 + (random() * (49 - 39))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'MD' THEN -- Maryland
                -- select distinct v from (select (
                jsonb_build_array(
@@ -979,7 +943,6 @@ WITH PARAMS AS (
                        ) -> (random() * (219 - 206 - 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'MA' THEN -- Massachusets
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1007,7 +970,6 @@ WITH PARAMS AS (
                        ) -> (random() * (27 - 10 + 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'MI' THEN -- Michigan
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1029,7 +991,6 @@ WITH PARAMS AS (
                        (480 + (random() * (499 - 480))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'MN' THEN -- Minnesota
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1057,7 +1018,6 @@ WITH PARAMS AS (
                        ) -> (random() * (567 - 550 - 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'MS' THEN -- Mississippi
              -- select distinct v from (select (
              jsonb_build_array(
@@ -1079,7 +1039,6 @@ WITH PARAMS AS (
                      (386 + (random() * (397 - 386))::int)::text
                   )
              -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'MO' THEN -- Missouri
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1107,7 +1066,6 @@ WITH PARAMS AS (
                        ) -> (random() * (658 - 630 - 3))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'MT' THEN -- Montana
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1129,7 +1087,6 @@ WITH PARAMS AS (
                        (590 + (random() * (599 - 590))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NE' THEN -- Nebraska
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1157,7 +1114,6 @@ WITH PARAMS AS (
                        ) -> (random() * (693 - 680 - 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NV' THEN -- Nevada
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1185,7 +1141,6 @@ WITH PARAMS AS (
                        ) -> (random() * (898 - 889 - 2))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NH' THEN -- New Hampshire
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1207,7 +1162,6 @@ WITH PARAMS AS (
                        '0' || (30 + (random() * (38 - 30))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NJ' THEN -- New Jersey
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1229,7 +1183,6 @@ WITH PARAMS AS (
                        '0' || (70 + (random() * (89 - 70))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NM' THEN -- New Mexico
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1257,7 +1210,6 @@ WITH PARAMS AS (
                        ) -> (random() * (884 - 870 - 2))::int
                     )
                 -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NY' THEN -- New York
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1285,7 +1237,6 @@ WITH PARAMS AS (
                        ) -> (random() * (149 - 100 + 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'ND' THEN -- North Dakota
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1307,7 +1258,6 @@ WITH PARAMS AS (
                        (580 + (random() * (588 - 580))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'MP' THEN -- Northern Mariana Islands
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1329,7 +1279,6 @@ WITH PARAMS AS (
                        '969'
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'NC' THEN -- North Carolina
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1351,7 +1300,6 @@ WITH PARAMS AS (
                        (270 + (random() * (289 - 270))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'OH' THEN -- Ohio
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1373,7 +1321,6 @@ WITH PARAMS AS (
                        (430 + (random() * (459 - 430))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'OK' THEN -- Oklahoma
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1401,7 +1348,6 @@ WITH PARAMS AS (
                        ) -> (random() * (749 - 730 - 3))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'OR' THEN -- Oregon
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1423,7 +1369,6 @@ WITH PARAMS AS (
                        (970 + (random() * (979 - 970))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'PA' THEN -- Pennsylvania
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1445,7 +1390,6 @@ WITH PARAMS AS (
                        (150 + (random() * (196 - 150))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'PR' THEN -- Puerto Rico
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1473,7 +1417,6 @@ WITH PARAMS AS (
                        ) -> (random() * (9 - 6 - 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'RI' THEN -- Rhode Island
                -- select distinct v from (select (
                  jsonb_build_array(
@@ -1495,7 +1438,6 @@ WITH PARAMS AS (
                          '0' || (28 + random()::int)::text
                       )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'SC' THEN -- South Carolina
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1517,7 +1459,6 @@ WITH PARAMS AS (
                        (290 + (random() * (299 - 290))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'SD' THEN -- South Dakota
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1539,7 +1480,6 @@ WITH PARAMS AS (
                        (570 + (random() * (577 - 570))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'TN' THEN -- Tennessee
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1561,7 +1501,6 @@ WITH PARAMS AS (
                        (370 + (random() * (385 - 370))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'TX' THEN -- Texas
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1593,7 +1532,6 @@ WITH PARAMS AS (
                        ) -> (random() * (1 + (799 - 750) - 1 + 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'UT' THEN -- Utah
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1615,7 +1553,6 @@ WITH PARAMS AS (
                        (840 + (random() * (847 - 840))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'VT' THEN -- Vermont
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1643,7 +1580,6 @@ WITH PARAMS AS (
                        ) -> (random() * (59 - 50 - 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'VI' THEN -- Virgin Islands
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1665,7 +1601,6 @@ WITH PARAMS AS (
                        '008'
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'VA' THEN -- Virginia
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1693,7 +1628,6 @@ WITH PARAMS AS (
                        ) -> (random() * (246 - 220 + 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'WA' THEN -- Washington
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1721,7 +1655,6 @@ WITH PARAMS AS (
                        ) -> (random() * (994 - 980 - 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'WV' THEN -- West Virginia
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1743,7 +1676,6 @@ WITH PARAMS AS (
                        (247 + (random() * (268 - 247))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'WI' THEN -- Wisconsin
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1771,7 +1703,6 @@ WITH PARAMS AS (
                        ) -> (random() * (549 - 530 - 2))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-            END
            WHEN 'WY' THEN -- Wyoming
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1793,8 +1724,8 @@ WITH PARAMS AS (
                        (820 + (random() * (831 - 820))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-           END
-         END city
+            END
+          END st_city_mcp
     FROM ADD_REGION_RELID d
     JOIN tables.country c
       ON c.relid = d.country_relid
@@ -1802,223 +1733,164 @@ WITH PARAMS AS (
     JOIN tables.region r
       ON r.relid = d.region_relid
 )
--- SELECT * FROM ADD_CITY_STREET_MCP;
---  type_relid | country_relid | num_regions | min_region_relid | region_relid |        city        
--- ------------+---------------+-------------+------------------+--------------+--------------------
---           2 |             1 |             |                  |              | "Noord"
---           1 |             2 |          13 |                1 |            5 | "St John's"
---           1 |             2 |          13 |                1 |            4 | "Moncton"
---           1 |             3 |             |                  |              | "Flying Fish Cove"
---           2 |             4 |          55 |               14 |           25 | "Atlanta"
+--  SELECT * FROM ADD_CITY_STREET_MCI;
+--  type_relid | country_relid | num_regions | min_region_relid | region_relid |                       st_city_mci                       
+-- ------------+---------------+-------------+------------------+--------------+---------------------------------------------------------
+--           2 |             1 |             |                  |              | {"cn": "San Nicolas", "st": "Sero Colorado"}
+--           2 |             2 |          13 |                1 |            8 | {"cn": "Rankin Inlet", "st": "TikTaq Ave", "mcp": "X"}
+--           3 |             2 |          13 |                1 |            6 | {"cn": "Hay River", "st": "Poplar Rd", "mcp": "X"}
+--             |             3 |             |                  |              | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}
+--           2 |             4 |          55 |               14 |           59 | {"cn": "Nashville", "st": "Edgehill Ave", "mcp": "373"}
 -- (5 rows)
 
-, ADD_ADDRESS AS (
+, ADD_ADDRESS_MAILING_CODE AS (
   SELECT d.*
-         CASE c.code_2
-         WHEN 'AW' THEN -- Aruba: street civic city
-           jsonb_build_array(
-              jsonb_build_array(
-                 'Bilderdijkstraat', 'Oranjestad'
+        ,CASE c.code_2
+         WHEN 'AW' THEN -- Aruba: street civic (max 2 digits)
+              format(
+                 '%s %s'
+                ,st_city_mcp ->> 'st'
+                ,(random() * 98 + 1)::int::text
               )
-             ,jsonb_build_array(
-                 'Savaneta', 'Savaneta'
+         WHEN 'CA' THEN -- Canada: civic (max 5 digits) street
+              format(
+                 '%s %s'
+                ,(random() * 99998 + 1)::int::text
+                ,st_city_mcp ->> 'st'
               )
-             ,jsonb_build_array(
-                 'San Fuego', 'Santa Cruz'
+         WHEN 'CX' THEN -- Christmas Island: civic (max 2 digits) street
+              format(
+                 '%s %s'
+                ,(random() * 98 + 1)::int::text
+                ,st_city_mcp ->> 'st'
               )
-             ,jsonb_build_array(
-                 'Caya Sint Maarten', 'San Nicolas'
+         WHEN 'US' THEN -- United States: civic (max 5 digits) street
+              format(
+                 '%s %s'
+                ,(random() * 99998 + 1)::int::text
+                ,st_city_mcp ->> 'st'
               )
-             ,jsonb_build_array(
-                 'Alto Vista', 'Noord'
+          END address
+        ,CASE c.code_2
+         WHEN 'AW' THEN -- Aruba: no mailing code
+              NULL
+         WHEN 'CA' THEN -- Canada: <MCP><dig><let><sp><dig><let><dig>
+              format(
+                 '%s%s%s %s%s%s'
+                ,st_city_mcp ->> 'mcp'
+                ,chr(ascii('0') + (random() *  9)::int)
+                ,chr(ascii('A') + (random() * 25)::int)
+                ,chr(ascii('0') + (random() *  9)::int)
+                ,chr(ascii('A') + (random() * 25)::int)
+                ,chr(ascii('0') + (random() *  9)::int)
               )
-           )
-         WHEN 'CA' THEN -- Canada: civic street city
-           json_build_object(
-              'AB', jsonb_build_array(
-                '17th Ave SW', 'Whyte Ave'
+         WHEN 'CX' THEN -- Christmas Island: 6798
+              '6798'
+         WHEN 'US' THEN -- United States: <MCP><dig><dig>(-<dig><dig><dig><dig>)?
+              format(
+                 '%s%s%s%s' -- MCP, dig, dig, plus four or empty
+                ,st_city_mcp ->> 'mcp'
+                ,chr(ascii('0') + (random() * 9)::int)
+                ,chr(ascii('0') + (random() * 9)::int)
+                ,CASE
+                 WHEN random() < 0.8
+                 THEN '' -- no plus 4
+                 ELSE format(
+                         '-%s%s%s%s'
+                        ,chr(ascii('0') + (random() * 9)::int)
+                        ,chr(ascii('0') + (random() * 9)::int)
+                        ,chr(ascii('0') + (random() * 9)::int)
+                        ,chr(ascii('0') + (random() * 9)::int)
+                      )
+                  END
               )
-             ,'BC', jsonb_build_array(
-                'Government St', 'Robson St'
-              )
-             ,'MB', jsonb_build_array(
-                'Regent Ave W', 'Rosser Ave'
-              )
-             ,'NB', jsonb_build_array(
-                'Dundonald St', 'King St'
-              )
-             ,'NL', jsonb_build_array(
-                'George St', 'Everest St'
-              )
-             ,'NT', jsonb_build_array(
-                'Ragged Ass Rd', 'Poplar Rd'
-              )
-             ,'NS', jsonb_build_array(
-                'Spring Garden Rd', 'Dorchester St'
-              )
-             ,'NU', jsonb_build_array(
-                'Mivvik St', 'TikTaq Ave'
-              )
-             ,'ON', jsonb_build_array(
-                'Wellington Street', 'Yonge Street'
-              )
-             ,'PE', jsonb_build_array(
-                'Richmond St', 'Water St'
-              )
-             ,'QC', jsonb_build_array(
-                'Petit-Champlain St', 'Sainte-Catherine St'
-              )
-             ,'SK', jsonb_build_array(
-                'Broadway Ave', 'Winnipeg St'
-              )
-             ,'YT', jsonb_build_array(
-                'Saloon Rd', '4th Ave'
-              )
-           ) -> r.code -> random()::int
-         WHEN 'CX' THEN -- Christmas Island
-           jsonb_build_array(
-              'Abbots Nest'
-             ,'Hawks Rd'
-             ,'Lam Lok Loh'
-             ,'Pai Chin Lu'
-             ,'Short St'
-           ) -> (random() * 4)::int
-         WHEN 'US' THEN -- United States
-           json_build_object(
-              'AL', jsonb_build_array(
-                '17th Ave SW', 'Whyte Ave'
-              )
-           jsonb_build_array(
-              '6th St'
-             ,'Abbot Kinney Blvd'
-             ,'Alamo Square'
-             ,'Beale St'
-             ,'Bourbon St'
-             ,'Calle Ocho'
-             ,'East Exchange Ave'
-             ,'Fifth Ave'
-             ,'Front St'
-             ,'Hollywood Blvd'
-             ,'Lake Shore Dr'
-             ,'Lombard St'
-             ,'Melrose Ave'
-             ,'Michiagn Ave'
-             ,'Newbury St'
-             ,'NW 2nd Ave'
-             ,'Ocean Dr'
-             ,'Rodeo Dr'
-             ,'Santana Row'
-             ,'Sesame St'
-             ,'The Strip'
-           ) -> (random() * 20)::int
-         END address
-    FROM ADD_CITY d
+          END mailing_code
+    FROM ADD_CITY_STREET_MCP d
     JOIN tables.country c
       ON c.relid = d.country_relid
     LEFT
     JOIN tables.region r
-      ON r.relid = d.relid
+      ON r.relid = d.region_relid
 )
--- SELECT * FROM ADD_ADDRESS;
---  type_relid | country_relid | num_regions | min_region_relid | region_relid |        city        |    address     
--- ------------+---------------+-------------+------------------+--------------+--------------------+----------------
---           1 |             2 |          13 |                1 |            3 | "Regina"           | "Granville St"
---             |             3 |             |                  |              | "Drimsite"         | "Short St"
---             |             3 |             |                  |              | "Drimsite"         | "Short St"
---             |             3 |             |                  |              | "Flying Fish Cove" | "Pai Chin Lu"
---           2 |             4 |          55 |               14 |           65 | "Fort Wayne"       | "Beale St"
--- (5 rows)
-
-, ADD_MAILING_CODE AS (
-  SELECT d.*
-        ,CASE c.code_2
-         WHEN 'CA' THEN -- Canada
-           chr(ascii('A') + (random() * 25)::int) || -- letter
-           chr(ascii('0') + (random() *  9)::int) || -- digit
-           chr(ascii('A') + (random() * 25)::int) || -- letter
-           ' '                                    || -- space
-           chr(ascii('0') + (random() *  9)::int) || -- digit
-           chr(ascii('A') + (random() * 25)::int) || -- letter
-           chr(ascii('0') + (random() *  9)::int)    -- digit
-         WHEN 'CX' THEN -- Christmas Island
-           '6798'
-         WHEN 'US' THEN -- US
-           --- Start with 5 digits
-           chr(ascii('0') + (random() * 9)::int) ||
-           chr(ascii('0') + (random() * 9)::int) ||
-           chr(ascii('0') + (random() * 9)::int) ||
-           chr(ascii('0') + (random() * 9)::int) ||
-           chr(ascii('0') + (random() * 9)::int) ||
-           -- Randomly add a dash and 4 digits for plus 4
-           CASE random() < 0.5
-           WHEN TRUE THEN
-             ''
-           ELSE
-             '-'                                   ||
-             chr(ascii('0') + (random() * 9)::int) ||
-             chr(ascii('0') + (random() * 9)::int) ||
-             chr(ascii('0') + (random() * 9)::int) ||
-             chr(ascii('0') + (random() * 9)::int)
-           END
-         END mailing_code
-    FROM ADD_ADDRESS d
-    JOIN tables.country c
-      ON c.relid = d.country_relid
-    LEFT
-    JOIN tables.region  r
-      ON r.country_relid = c.relid
-     AND r.relid = d.region_relid
-)
--- SELECT * FROM ADD_MAILING_CODE;
---  type_relid | country_relid | num_regions | min_region_relid | region_relid |     city      |        address         | mailing_code 
--- ------------+---------------+-------------+------------------+--------------+---------------+------------------------+--------------
---           3 |             1 |             |                  |              | "Cunucu Abao" | "Dominicanessenstraat" | 
---           2 |             2 |          13 |                1 |            4 | "Brandon"     | "Cariboo Rd"           | T3Y 3X6
---           2 |             3 |             |                  |              | "Poon Saan"   | "Pai Chin Lu"          | 6798
---           1 |             3 |             |                  |              | "Drimsite"    | "Pai Chin Lu"          | 6798
---           2 |             4 |          55 |               14 |           38 | "Omaha"       | "East Exchange Ave"    | 14650
+-- SELECT * FROM ADD_ADDRESS_MAILING_CODE;
+--  type_relid | country_relid | num_regions | min_region_relid | region_relid |                     st_city_mcp                      |     address     | mailing_code 
+-- ------------+---------------+-------------+------------------+--------------+------------------------------------------------------+-----------------+--------------
+--           3 |             1 |             |                  |              | {"cn": "Oranjestad", "st": "Spinozastraat"}          | Spinozastraat 6 | 
+--           1 |             2 |          13 |                1 |           10 | {"cn": "Summerside", "st": "Water St", "mcp": "C"}   | 31925 Water St  | C1X 5K5
+--           2 |             3 |             |                  |              | {"cn": "Silver City", "st": "Sea View Dr"}           | 11 Sea View Dr  | 6798
+--             |             3 |             |                  |              | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}       | 56 Jln Pantai   | 6798
+--           1 |             4 |          55 |               14 |           37 | {"cn": "Annapolis", "st": "Bladen St", "mcp": "011"} | 92592 Bladen St | 01112
 -- (5 rows)
 
 , GEN_ADDRESS AS (
   SELECT d.type_relid AS type_relid
         ,d.country_relid
         ,d.region_relid
-        ,gen_random_uuid()    AS id
-        ,1                    AS version
-        ,current_timestamp    AS created
-        ,current_timestamp    AS changed
-        ,d.city
-        ,d.address            AS address
-        ,CASE WHEN d.type_relid IS NOT NULL THEN 'Door 5' END AS address_2
+        ,gen_random_uuid()                                                           AS id
+        ,1                                                                           AS version
+        ,current_timestamp                                                           AS created
+        ,current_timestamp                                                           AS changed
+        ,d.st_city_mcp ->> 'cn'                                                      AS city
+        ,d.address                                                                   AS address
+        ,CASE WHEN d.type_relid IS NOT NULL THEN 'Door 5' END                        AS address_2
         ,CASE WHEN (d.type_relid IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
         ,d.mailing_code
-    FROM ADD_MAILING_CODE d
+    FROM ADD_ADDRESS_MAILING_CODE d
    ORDER BY d.type_relid IS NULL
 )
 -- SELECT * FROM GEN_ADDRESS;
---  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |        city        |         address          | address_2 | address_3 | mailing_code 
--- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+--------------------+--------------------------+-----------+-----------+--------------
---           1 |             1 |              | 532a80c1-cd11-4763-9782-d7c9c9b42c9a |       1 | 2024-07-25 11:29:11.124512+00 | 2024-07-25 11:29:11.124512+00 | "Cumana"           | "Watty Vos Blvd"         | Door 5    | Stop 6    | 
---           1 |             2 |           11 | 11c06456-df43-49f5-b947-81d3bbe0dab3 |       1 | 2024-07-25 11:29:11.124512+00 | 2024-07-25 11:29:11.124512+00 | "Yellowknife"      | "Sussex Drive"           | Door 5    | Stop 6    | M6O 2W9
---           3 |             2 |            1 | 9160d6ca-d5dd-4a9e-a512-0629a7a8593c |       1 | 2024-07-25 11:29:11.124512+00 | 2024-07-25 11:29:11.124512+00 | "Winnepeg"         | "Rue du Petit-Champlain" | Door 5    | Stop 6    | G2A 8M8
---           2 |             3 |              | f9dcbaad-a667-4337-8478-3ba149106251 |       1 | 2024-07-25 11:29:11.124512+00 | 2024-07-25 11:29:11.124512+00 | "Silver City"      | "Hawks Rd"               | Door 5    | Stop 6    | 6798
---             |             4 |           46 | 07edc2ec-e166-4ef9-aa61-9e26b3b3b469 |       1 | 2024-07-25 11:29:11.124512+00 | 2024-07-25 11:29:11.124512+00 | "West Valley City" | "Bourbon St"             |           |           | 62983-3972
+--  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |       city       |     address      | address_2 | address_3 | mailing_code 
+-- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+------------------+------------------+-----------+-----------+--------------
+--           3 |             1 |              | a80f8a9f-da99-41b1-a0a2-8b28deae0f67 |       1 | 2024-08-06 11:21:49.234176+00 | 2024-08-06 11:21:49.234176+00 | San Nicolas      | Sero Colorado 50 | Door 5    |           | 
+--           1 |             2 |            5 | 7da9678b-ff37-408c-a301-d8d772ae04e9 |       1 | 2024-08-06 11:21:49.234176+00 | 2024-08-06 11:21:49.234176+00 | St John's        | 65471 George St  | Door 5    | Stop 6    | A0P 9M6
+--           2 |             3 |              | a9d8cc49-fe60-4c42-8bc8-b876d13d6840 |       1 | 2024-08-06 11:21:49.234176+00 | 2024-08-06 11:21:49.234176+00 | Silver City      | 85 Sea View Dr   | Door 5    |           | 6798
+--           2 |             4 |           60 | 2e016ff5-c978-4445-b0c1-0a3bd2b4d8b3 |       1 | 2024-08-06 11:21:49.234176+00 | 2024-08-06 11:21:49.234176+00 | Austin           | 76359 Sixth St   | Door 5    | Stop 6    | 75167
+--             |             3 |              | 3eb679a9-5e2d-4cc6-98ab-4ac292a89b8b |       1 | 2024-08-06 11:21:49.234176+00 | 2024-08-06 11:21:49.234176+00 | Flying Fish Cove | 5 Jln Pantai     |           |           | 6798
 -- (5 rows)
 
 -- Add a business relid, which is only relevant if the type_relid is not null
 , ADD_BUSINESS_RELID AS (
   SELECT d.*
-        ,row_number() OVER () AS business_relid
+        ,row_number() OVER (PARTITION BY type_relid IS NULL) AS business_relid
     FROM GEN_ADDRESS d
 )
 -- SELECT * FROM ADD_BUSINESS_RELID;
---  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |      city      |         address          | address_2 | address_3 | mailing_code | business_relid 
--- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+----------------+--------------------------+-----------+-----------+--------------+----------------
---           1 |             1 |              | e89fc7f3-348b-403b-9fef-ae178ee71258 |       1 | 2024-07-25 11:32:13.101516+00 | 2024-07-25 11:32:13.101516+00 | "Moko"         | "Dominicanessenstraat"   | Door 5    | Stop 6    |              |              1
---           1 |             2 |            9 | cb236fdd-800a-402d-9574-045c2372808d |       1 | 2024-07-25 11:32:13.101516+00 | 2024-07-25 11:32:13.101516+00 | "Victoria"     | "Jasper Ave"             | Door 5    | Stop 6    | R6A 8X3      |              2
---           3 |             3 |              | 256c94df-ed59-4277-a681-fd794bec58b0 |       1 | 2024-07-25 11:32:13.101516+00 | 2024-07-25 11:32:13.101516+00 | "Poon Saan"    | "Short St"               | Door 5    | Stop 6    | 6798         |              3
---           1 |             4 |           63 | 008588ff-9b3d-4aa2-9846-a30876bd12a9 |       1 | 2024-07-25 11:32:13.101516+00 | 2024-07-25 11:32:13.101516+00 | "Fayetteville" | "Lombard St"             | Door 5    | Stop 6    | 61326-6247   |              4
---             |             2 |            4 | 557a9d7b-37f6-4685-a7d2-192727d8a1fb |       1 | 2024-07-25 11:32:13.101516+00 | 2024-07-25 11:32:13.101516+00 | "Winnepeg"     | "Rue du Petit-Champlain" |           |           | W3X 3D4      |              5
+--  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |       city       |       address        | address_2 | address_3 | mailing_code | business_relid 
+-- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+------------------+----------------------+-----------+-----------+--------------+----------------
+--           1 |             1 |              | 07055d28-7ecf-41e3-b00f-8ab52b6aad53 |       1 | 2024-08-06 11:29:54.673418+00 | 2024-08-06 11:29:54.673418+00 | Oranjestad       | Spinozastraat 67     | Door 5    |           |              |              1
+--           2 |             2 |            3 | 8e20903c-405d-472a-a0cb-a07387f1280c |       1 | 2024-08-06 11:29:54.673418+00 | 2024-08-06 11:29:54.673418+00 | Winnipeg         | 63639 Regent Ave W   | Door 5    |           | R3N 7K8      |              2
+--           1 |             4 |           60 | f8207c80-719d-4fd1-8252-25ec4901094e |       1 | 2024-08-06 11:29:54.673418+00 | 2024-08-06 11:29:54.673418+00 | Houston          | 40421 Westheimeer Rd | Door 5    |           | 79942        |              3
+--             |             1 |              | 1726ffc9-b62f-45e9-97f4-bcd786e36cca |       1 | 2024-08-06 11:29:54.673418+00 | 2024-08-06 11:29:54.673418+00 | Paradera         | Bloemond 86          |           |           |              |              1
+--             |             3 |              | 5ac08926-384a-4615-a9c5-5d45a82b6006 |       1 | 2024-08-06 11:29:54.673418+00 | 2024-08-06 11:29:54.673418+00 | Flying Fish Cove | 41 Jln Pantai        |           |           | 6798         |              2
+-- (5 rows)
+
+, MOD_BUSINESS_RELID AS (
+  SELECT d.type_relid
+        ,d.country_relid
+        ,d.region_relid
+        ,d.id
+        ,d.version
+        ,d.created
+        ,d.changed
+        ,d.city
+        ,d.address
+        ,d.address_2
+        ,d.address_3
+        ,d.mailing_code
+        ,CASE
+         WHEN d.type_relid IS NOT NULL
+         THEN d.business_relid
+         END business_relid
+    FROM ADD_BUSINESS_RELID d
+)
+-- SELECT * FROM MOD_BUSINESS_RELID;
+--  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |       city       |      address      | address_2 | address_3 | mailing_code | business_relid 
+-- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+------------------+-------------------+-----------+-----------+--------------+----------------
+--           2 |             1 |              | 74ee8544-8d52-440b-8bf1-9ac42679d553 |       1 | 2024-08-06 11:35:27.015575+00 | 2024-08-06 11:35:27.015575+00 | Oranjestad       | Spinozastraat 5   | Door 5    | Stop 6    |              |              1
+--           2 |             3 |              | 0dc192a3-e033-47f8-98f1-8974c30e0ad1 |       1 | 2024-08-06 11:35:27.015575+00 | 2024-08-06 11:35:27.015575+00 | Flying Fish Cove | 42 Jln Pantai     | Door 5    | Stop 6    | 6798         |              2
+--           2 |             4 |           54 | 6da7aa6c-51bb-4cf9-a41f-727ce58da160 |       1 | 2024-08-06 11:35:27.015575+00 | 2024-08-06 11:35:27.015575+00 | Harrisburg       | 92419 State St    | Door 5    |           | 15324        |              3
+--             |             2 |           12 | daff6eff-90c7-4b45-b46a-4b205818cf5c |       1 | 2024-08-06 11:35:27.015575+00 | 2024-08-06 11:35:27.015575+00 | Regina           | 21388 Winnipeg St |           |           | S9O 6F9      |               
+--             |             3 |              | cf01a764-522f-4296-aa97-c8094f43fdfc |       1 | 2024-08-06 11:35:27.015575+00 | 2024-08-06 11:35:27.015575+00 | Drumsite         | 97 Lam Lok Loh    |           |           | 6798         |               
 -- (5 rows)
 
 -- Insert addresses and return generated relids
