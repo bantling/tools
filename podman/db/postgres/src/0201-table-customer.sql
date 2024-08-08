@@ -16,6 +16,16 @@ SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_pk PRIMARY K
  )
 \gexec
 
+SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_uk UNIQUE(id)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'address_type'
+      AND CONSTRAINT_NAME = 'address_type_uk'
+ )
+\gexec
+
 -- Address
 CREATE TABLE IF NOT EXISTS tables.address(
    relid         SERIAL    NOT NULL
@@ -40,6 +50,16 @@ SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_pk PRIMARY KEY(relid)'
     WHERE TABLE_SCHEMA    = 'tables'
       AND TABLE_NAME      = 'address'
       AND CONSTRAINT_NAME = 'address_pk'
+ )
+\gexec
+
+SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_uk UNIQUE(id)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'address'
+      AND CONSTRAINT_NAME = 'address_uk'
  )
 \gexec
 
@@ -96,6 +116,16 @@ SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_pk PRI
  )
 \gexec
 
+SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_uk UNIQUE(id)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'customer_person'
+      AND CONSTRAINT_NAME = 'custommer_person_uk'
+ )
+\gexec
+
 SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_addresss_fk FOREIGN KEY(address_relid) REFERENCES tables.address(relid)'
  WHERE NOT EXISTS (
    SELECT NULL
@@ -123,6 +153,16 @@ SELECT 'ALTER TABLE tables.customer_business ADD CONSTRAINT customer_business_pk
     WHERE TABLE_SCHEMA    = 'tables'
       AND TABLE_NAME      = 'customer_business'
       AND CONSTRAINT_NAME = 'customer_business_pk'
+ )
+\gexec
+
+SELECT 'ALTER TABLE tables.customer_business ADD CONSTRAINT customer_business_uk UNIQUE(id)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'customer_business'
+      AND CONSTRAINT_NAME = 'customer_business_uk'
  )
 \gexec
 

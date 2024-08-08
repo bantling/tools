@@ -46,12 +46,12 @@ WITH PARAMS AS (
 --           1 |             1
 -- (5 rows)
 
--- Add number of regions for the chosen counntry, and minimum region relid
+-- Add number of regions for the chosen country, and minimum region relid
 -- Region relid is a bit tricky:
 -- country 1 region relids start at 1
 -- country 2 region relids start at (max relid for country 1) + 1
 -- country 3 region relids start at (max relid for country 2) + 1
--- provide minimum region relid for each randomly chosen country, which is null if the country has no regions
+-- provide minimum region relid for each randomly chosen country
 -- Both number of regions and minimum region relid are null for countries with no regions
 , ADD_NUM_REGIONS_MIN_RELID AS (
   SELECT d.*
@@ -1733,8 +1733,8 @@ WITH PARAMS AS (
     JOIN tables.region r
       ON r.relid = d.region_relid
 )
---  SELECT * FROM ADD_CITY_STREET_MCI;
---  type_relid | country_relid | num_regions | min_region_relid | region_relid |                       st_city_mci                       
+-- SELECT * FROM ADD_CITY_STREET_MCP;
+--  type_relid | country_relid | num_regions | min_region_relid | region_relid |                       st_city_mcp                       
 -- ------------+---------------+-------------+------------------+--------------+---------------------------------------------------------
 --           2 |             1 |             |                  |              | {"cn": "San Nicolas", "st": "Sero Colorado"}
 --           2 |             2 |          13 |                1 |            8 | {"cn": "Rankin Inlet", "st": "TikTaq Ave", "mcp": "X"}
@@ -1826,7 +1826,8 @@ WITH PARAMS AS (
   SELECT d.type_relid AS type_relid
         ,d.country_relid
         ,d.region_relid
-        ,gen_random_uuid()                                                           AS id
+        ,gen_random_uuid()                                                           AS address_id
+        ,gen_random_uuid()                                                           AS customer_id
         ,1                                                                           AS version
         ,current_timestamp                                                           AS created
         ,current_timestamp                                                           AS changed
@@ -1836,61 +1837,16 @@ WITH PARAMS AS (
         ,CASE WHEN (d.type_relid IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
         ,d.mailing_code
     FROM ADD_ADDRESS_MAILING_CODE d
-   ORDER BY d.type_relid IS NULL
+   ORDER BY d.type_relid
 )
 -- SELECT * FROM GEN_ADDRESS;
---  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |       city       |     address      | address_2 | address_3 | mailing_code 
--- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+------------------+------------------+-----------+-----------+--------------
---           3 |             1 |              | a80f8a9f-da99-41b1-a0a2-8b28deae0f67 |       1 | 2024-08-06 11:21:49.234176+00 | 2024-08-06 11:21:49.234176+00 | San Nicolas      | Sero Colorado 50 | Door 5    |           | 
---           1 |             2 |            5 | 7da9678b-ff37-408c-a301-d8d772ae04e9 |       1 | 2024-08-06 11:21:49.234176+00 | 2024-08-06 11:21:49.234176+00 | St John's        | 65471 George St  | Door 5    | Stop 6    | A0P 9M6
---           2 |             3 |              | a9d8cc49-fe60-4c42-8bc8-b876d13d6840 |       1 | 2024-08-06 11:21:49.234176+00 | 2024-08-06 11:21:49.234176+00 | Silver City      | 85 Sea View Dr   | Door 5    |           | 6798
---           2 |             4 |           60 | 2e016ff5-c978-4445-b0c1-0a3bd2b4d8b3 |       1 | 2024-08-06 11:21:49.234176+00 | 2024-08-06 11:21:49.234176+00 | Austin           | 76359 Sixth St   | Door 5    | Stop 6    | 75167
---             |             3 |              | 3eb679a9-5e2d-4cc6-98ab-4ac292a89b8b |       1 | 2024-08-06 11:21:49.234176+00 | 2024-08-06 11:21:49.234176+00 | Flying Fish Cove | 5 Jln Pantai     |           |           | 6798
--- (5 rows)
-
--- Add a business relid, which is only relevant if the type_relid is not null
-, ADD_BUSINESS_RELID AS (
-  SELECT d.*
-        ,row_number() OVER (PARTITION BY type_relid IS NULL) AS business_relid
-    FROM GEN_ADDRESS d
-)
--- SELECT * FROM ADD_BUSINESS_RELID;
---  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |       city       |       address        | address_2 | address_3 | mailing_code | business_relid 
--- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+------------------+----------------------+-----------+-----------+--------------+----------------
---           1 |             1 |              | 07055d28-7ecf-41e3-b00f-8ab52b6aad53 |       1 | 2024-08-06 11:29:54.673418+00 | 2024-08-06 11:29:54.673418+00 | Oranjestad       | Spinozastraat 67     | Door 5    |           |              |              1
---           2 |             2 |            3 | 8e20903c-405d-472a-a0cb-a07387f1280c |       1 | 2024-08-06 11:29:54.673418+00 | 2024-08-06 11:29:54.673418+00 | Winnipeg         | 63639 Regent Ave W   | Door 5    |           | R3N 7K8      |              2
---           1 |             4 |           60 | f8207c80-719d-4fd1-8252-25ec4901094e |       1 | 2024-08-06 11:29:54.673418+00 | 2024-08-06 11:29:54.673418+00 | Houston          | 40421 Westheimeer Rd | Door 5    |           | 79942        |              3
---             |             1 |              | 1726ffc9-b62f-45e9-97f4-bcd786e36cca |       1 | 2024-08-06 11:29:54.673418+00 | 2024-08-06 11:29:54.673418+00 | Paradera         | Bloemond 86          |           |           |              |              1
---             |             3 |              | 5ac08926-384a-4615-a9c5-5d45a82b6006 |       1 | 2024-08-06 11:29:54.673418+00 | 2024-08-06 11:29:54.673418+00 | Flying Fish Cove | 41 Jln Pantai        |           |           | 6798         |              2
--- (5 rows)
-
-, MOD_BUSINESS_RELID AS (
-  SELECT d.type_relid
-        ,d.country_relid
-        ,d.region_relid
-        ,d.id
-        ,d.version
-        ,d.created
-        ,d.changed
-        ,d.city
-        ,d.address
-        ,d.address_2
-        ,d.address_3
-        ,d.mailing_code
-        ,CASE
-         WHEN d.type_relid IS NOT NULL
-         THEN d.business_relid
-         END business_relid
-    FROM ADD_BUSINESS_RELID d
-)
--- SELECT * FROM MOD_BUSINESS_RELID;
---  type_relid | country_relid | region_relid |                  id                  | version |            created            |            changed            |       city       |      address      | address_2 | address_3 | mailing_code | business_relid 
--- ------------+---------------+--------------+--------------------------------------+---------+-------------------------------+-------------------------------+------------------+-------------------+-----------+-----------+--------------+----------------
---           2 |             1 |              | 74ee8544-8d52-440b-8bf1-9ac42679d553 |       1 | 2024-08-06 11:35:27.015575+00 | 2024-08-06 11:35:27.015575+00 | Oranjestad       | Spinozastraat 5   | Door 5    | Stop 6    |              |              1
---           2 |             3 |              | 0dc192a3-e033-47f8-98f1-8974c30e0ad1 |       1 | 2024-08-06 11:35:27.015575+00 | 2024-08-06 11:35:27.015575+00 | Flying Fish Cove | 42 Jln Pantai     | Door 5    | Stop 6    | 6798         |              2
---           2 |             4 |           54 | 6da7aa6c-51bb-4cf9-a41f-727ce58da160 |       1 | 2024-08-06 11:35:27.015575+00 | 2024-08-06 11:35:27.015575+00 | Harrisburg       | 92419 State St    | Door 5    |           | 15324        |              3
---             |             2 |           12 | daff6eff-90c7-4b45-b46a-4b205818cf5c |       1 | 2024-08-06 11:35:27.015575+00 | 2024-08-06 11:35:27.015575+00 | Regina           | 21388 Winnipeg St |           |           | S9O 6F9      |               
---             |             3 |              | cf01a764-522f-4296-aa97-c8094f43fdfc |       1 | 2024-08-06 11:35:27.015575+00 | 2024-08-06 11:35:27.015575+00 | Drumsite         | 97 Lam Lok Loh    |           |           | 6798         |               
+--  type_relid | country_relid | region_relid |              address_id              |             customer_id              | version |            created            |            changed            |    city    |     address     | address_2 | address_3 | mailing_code 
+-- ------------+---------------+--------------+--------------------------------------+--------------------------------------+---------+-------------------------------+-------------------------------+------------+-----------------+-----------+-----------+--------------
+--           1 |             1 |              | 90edd4e0-aa0c-42eb-b43a-9a9927d10fe0 | c4f741b3-f65b-466b-8345-c764fd8a3568 |       1 | 2024-08-07 11:56:54.501702+00 | 2024-08-07 11:56:54.501702+00 | Oranjestad | Spinozastraat 6 | Door 5    |           | 
+--           1 |             2 |            4 | 911dad43-a07f-4eb9-9be4-bac1b4935352 | 92f439dd-05a8-4b15-a2a3-13d230ab98a5 |       1 | 2024-08-07 11:56:54.501702+00 | 2024-08-07 11:56:54.501702+00 | Moncton    | 24343 King St   | Door 5    | Stop 6    | E7S 7D3
+--           1 |             3 |              | 529960ee-4ffc-4df0-91b0-bd605977710c | 8517b830-15c6-4d53-b23f-cc3349beb35b |       1 | 2024-08-07 11:56:54.501702+00 | 2024-08-07 11:56:54.501702+00 | Poon Saan  | 14 San Chye Loh | Door 5    | Stop 6    | 6798
+--           2 |             4 |           19 | 6d4847d9-fe0f-4b23-a782-c3aefea57d57 | 0f2ac23c-307a-47ad-84f3-56976da5c9ed |       1 | 2024-08-07 11:56:54.501702+00 | 2024-08-07 11:56:54.501702+00 | Sacramento | 72916 K St      | Door 5    |           | 92368-5361
+--             |             3 |              | bdb7e2c0-761a-499f-bb2d-6dfab08c697a | 4d891a78-c3b0-48e9-b952-fd02864306f4 |       1 | 2024-08-07 11:56:54.501702+00 | 2024-08-07 11:56:54.501702+00 | Poon Saan  | 18 San Chye Loh |           |           | 6798
 -- (5 rows)
 
 -- Insert addresses and return generated relids
@@ -1913,7 +1869,7 @@ WITH PARAMS AS (
      SELECT type_relid
            ,country_relid
            ,region_relid
-           ,id
+           ,address_id
            ,version
            ,created
            ,changed
@@ -1922,16 +1878,10 @@ WITH PARAMS AS (
            ,address_2
            ,address_3
            ,mailing_code
-       FROM MOD_PERSON_BUSINESS_RELIDS
-  RETURNING relid
+       FROM GEN_ADDRESS
+  RETURNING id, relid
 )
 -- SELECT * FROM INS_ADDRESS;
---  relid 
--- -------
---      1
---      2
---      3
--- ...
 
 -- Insert person customers and return generated relids
 , INS_CUSTOMER_PERSON AS (
@@ -1946,25 +1896,21 @@ WITH PARAMS AS (
               ,middle_name
               ,last_name
             )
-     SELECT relid
-           ,gen_random_uuid()
+     SELECT a.relid
+           ,t.customer_id
            ,1
            ,current_timestamp
            ,current_timestamp
            ,'John'
            ,'James'
            ,'Doe'
-       FROM GEN_ADDRESS
-      WHERE address_2 IS NULL
-  RETURNING relid
+       FROM GEN_ADDRESS t
+       JOIN INS_ADDRESS a
+         ON a.id = t.address_id
+      WHERE t.type_relid IS NULL
+  RETURNING id, relid
 )
 -- SELECT * FROM INS_CUSTOMER_PERSON;
---  relid 
--- -------
---      1
---      2
---      3
--- ...
 
 -- Insert business customers and return generated relids
 , INS_CUSTOMER_BUSINESS AS (
@@ -1982,18 +1928,10 @@ WITH PARAMS AS (
            ,current_timestamp
            ,'Biz'
        FROM GEN_ADDRESS
-      WHERE address_2 IS NOT NULL
-  RETURNING relid
+      WHERE type_relid IS NOT NULL
+  RETURNING id, relid
 )
--- SELECT * FROM INS_CUSTOMER_BUSINESS;
---  relid 
--- -------
---      1
---      2
---      3
---      4
---      5
--- (5 rows)
+-- SELECT * FROM INS_CUSTOMER_BUSINESS
 
 -- Insert join entries for business customer addresses
 , INS_CUSTOMER_BUSINESS_ADDRESS_JT AS (
@@ -2002,10 +1940,15 @@ WITH PARAMS AS (
                business_relid
               ,address_relid
             )
-     SELECT cbus.relid
-           ,addr.relid
-       FROM GEN_ADDRESS
-      WHERE address_2 IS NOT NULL
+     SELECT cb.relid
+           ,a.relid
+       FROM GEN_ADDRESS t
+       JOIN INS_CUSTOMER_BUSINESS cb
+         ON cb.id = t.customer_id
+       JOIN INS_ADDRESS a
+         ON a.id = t.address_id
+      WHERE t.type_relid IS NOT NULL
+  RETURNING NULL::uuid, NULL::int
 )
 SELECT *
   FROM INS_ADDRESS

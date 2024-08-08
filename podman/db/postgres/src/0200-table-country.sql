@@ -20,6 +20,16 @@ SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_pk PRIMARY KEY(relid)'
  )
 \gexec
 
+SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk UNIQUE(id)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'country'
+      AND CONSTRAINT_NAME = 'country_uk'
+ )
+\gexec
+
 -- Create region table
 CREATE TABLE IF NOT EXISTS tables.region(
    relid         SERIAL  NOT NULL
@@ -36,6 +46,16 @@ SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_pk PRIMARY KEY(relid, co
     WHERE TABLE_SCHEMA    = 'tables'
       AND TABLE_NAME      = 'region'
       AND CONSTRAINT_NAME = 'region_pk'
+ )
+\gexec
+
+SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk UNIQUE(relid, id)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'region'
+      AND CONSTRAINT_NAME = 'region_uk'
  )
 \gexec
 
