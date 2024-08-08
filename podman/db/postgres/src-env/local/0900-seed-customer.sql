@@ -1849,115 +1849,107 @@ WITH PARAMS AS (
 --             |             3 |              | bdb7e2c0-761a-499f-bb2d-6dfab08c697a | 4d891a78-c3b0-48e9-b952-fd02864306f4 |       1 | 2024-08-07 11:56:54.501702+00 | 2024-08-07 11:56:54.501702+00 | Poon Saan  | 18 San Chye Loh |           |           | 6798
 -- (5 rows)
 
--- Insert addresses and return generated relids
-, INS_ADDRESS AS (
-     INSERT
-       INTO tables.address(
-               type_relid
-              ,country_relid
-              ,region_relid
-              ,id
-              ,version
-              ,created
-              ,changed
-              ,city
-              ,address
-              ,address_2
-              ,address_3
-              ,mailing_code
-            )
-     SELECT type_relid
-           ,country_relid
-           ,region_relid
-           ,address_id
-           ,version
-           ,created
-           ,changed
-           ,city
-           ,address
-           ,address_2
-           ,address_3
-           ,mailing_code
-       FROM GEN_ADDRESS
-  RETURNING id, relid
-)
--- SELECT * FROM INS_ADDRESS;
+-- Insert addresses using generated data
+INSERT
+  INTO tables.address(
+          type_relid
+         ,country_relid
+         ,region_relid
+         ,id
+         ,version
+         ,created
+         ,changed
+         ,city
+         ,address
+         ,address_2
+         ,address_3
+         ,mailing_code
+       )
+SELECT type_relid
+      ,country_relid
+      ,region_relid
+      ,address_id
+      ,version
+      ,created
+      ,changed
+      ,city
+      ,address
+      ,address_2
+      ,address_3
+      ,mailing_code
+  FROM GEN_ADDRESS;
 
--- Insert person customers and return generated relids
-, INS_CUSTOMER_PERSON AS (
-     INSERT
-       INTO tables.customer_person(
-               address_relid
-              ,id
-              ,version
-              ,created
-              ,changed
-              ,first_name
-              ,middle_name
-              ,last_name
-            )
-     SELECT a.relid
-           ,t.customer_id
-           ,1
-           ,current_timestamp
-           ,current_timestamp
-           ,'John'
-           ,'James'
-           ,'Doe'
-       FROM GEN_ADDRESS t
-       JOIN INS_ADDRESS a
-         ON a.id = t.address_id
-      WHERE t.type_relid IS NULL
-  RETURNING id, relid
-)
--- SELECT * FROM INS_CUSTOMER_PERSON;
+-- Insert person customers with a reference to their addresses
+-- Order the addresses by their relids, joining the nth customer to the nth address
+-- The relids won't match:
+-- - the business relids will be from 1 to N
+-- - the addresss relids will not necessarily be consecutive, as they are intermixed with person addresses
+INSERT
+ INTO tables.customer_person(
+         address_relid
+        ,id
+        ,version
+        ,created
+        ,changed
+        ,first_name
+        ,middle_name
+        ,last_name
+      )
+SELECT t.relid
+      ,gen_random_uuid()
+      ,1
+      ,current_timestamp
+      ,current_timestamp
+      ,'John'
+      ,'James'
+      ,'Doe'
+  FROM tables.address t
+ WHERE t.type_relid IS NULL
+ ORDER
+    BY t.relid;
 
--- Insert business customers and return generated relids
-, INS_CUSTOMER_BUSINESS AS (
-     INSERT
-       INTO tables.customer_business(
-               id
-              ,version
-              ,created
-              ,changed
-              ,name
-            )
-     SELECT gen_random_uuid()
-           ,1
-           ,current_timestamp
-           ,current_timestamp
-           ,'Biz'
-       FROM GEN_ADDRESS
-      WHERE type_relid IS NOT NULL
-  RETURNING id, relid
-)
--- SELECT * FROM INS_CUSTOMER_BUSINESS
+-- Insert business customers, one per businness address
+INSERT
+  INTO tables.customer_business(
+           id
+          ,version
+          ,created
+          ,changed
+          ,name
+       )
+SELECT gen_random_uuid()
+      ,1
+      ,current_timestamp
+      ,current_timestamp
+      ,'Biz'
+  FROM tables.address t
+ WHERE t.type_relid IS NOT NULL;
 
--- Insert join entries for business customer addresses
-, INS_CUSTOMER_BUSINESS_ADDRESS_JT AS (
-     INSERT
-       INTO tables.customer_business_address_jt(
-               business_relid
-              ,address_relid
-            )
-     SELECT cb.relid
-           ,a.relid
-       FROM GEN_ADDRESS t
-       JOIN INS_CUSTOMER_BUSINESS cb
-         ON cb.id = t.customer_id
-       JOIN INS_ADDRESS a
-         ON a.id = t.address_id
-      WHERE t.type_relid IS NOT NULL
-  RETURNING NULL::uuid, NULL::int
-)
-SELECT *
-  FROM INS_ADDRESS
- UNION ALL
-SELECT *
-  FROM INS_CUSTOMER_PERSON
- UNION ALL
-SELECT *
-  FROM INS_CUSTOMER_BUSINESS
- UNION ALL
-SELECT *
-  FROM INS_CUSTOMER_BUSINESS_ADDRESS_JT;
+-- Insert join entries from business customers to their addresses
+-- Order the businesses and their addresses by their relids, joining the nth business to the nth address
+-- The relids won't match:
+-- - the business relids will be from 1 to N
+-- - the addresss relids will not necessarily be consecutive, as they are intermixed with person addresses
+-- So join the addresses to the businesses by generating row numbers
+INSERT
+  INTO tables.customer_business_address_jt(
+           business_relid
+          ,address_relid
+       )
+SELECT cb.relid
+      ,a.relid
+  FROM (
+          SELECT relid
+            FROM tables.customer_business
+           ORDER
+              BY 1
+       ) cb
+  JOIN (
+          SELECT relid
+                ,row_number() OVER() AS rownum
+            FROM tables.address
+           WHERE type_relid IS NOT NULL
+           ORDER
+              BY 1
+       ) a
+    ON a.rownum = cb.relid;
