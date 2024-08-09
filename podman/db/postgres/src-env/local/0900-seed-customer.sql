@@ -1936,20 +1936,14 @@ INSERT
            business_relid
           ,address_relid
        )
+WITH BUSINESS_ADDRESS AS (
+  SELECT relid
+        ,row_number() OVER() AS rownum
+    FROM tables.address
+   WHERE type_relid IS NOT NULL
+)
 SELECT cb.relid
       ,a.relid
-  FROM (
-          SELECT relid
-            FROM tables.customer_business
-           ORDER
-              BY 1
-       ) cb
-  JOIN (
-          SELECT relid
-                ,row_number() OVER() AS rownum
-            FROM tables.address
-           WHERE type_relid IS NOT NULL
-           ORDER
-              BY 1
-       ) a
+  FROM tables.customer_business cb
+  JOIN BUSINESS_ADDRESS
     ON a.rownum = cb.relid;
