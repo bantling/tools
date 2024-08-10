@@ -1945,5 +1945,5 @@ WITH BUSINESS_ADDRESS AS (
 SELECT cb.relid
       ,a.relid
   FROM tables.customer_business cb
-  JOIN BUSINESS_ADDRESS
+  JOIN BUSINESS_ADDRESS a
     ON a.rownum = cb.relid;
