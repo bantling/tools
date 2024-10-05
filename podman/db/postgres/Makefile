@@ -108,7 +108,7 @@ oci-pull:
 .Containerfile: Containerfile.in
 	echo ">>> Generating $@"
 	cp $< $@
-	if [ -n "$(SRC_ENV_ARG)" ]; then sed 's,.SRC_ENV_DIR ,,' $@ > $@.tmp; mv $@.tmp $@; fi
+	if [ -n "$(SRC_ENV_ARG)" ]; then sed 's,^.SRC_ENV_DIR ,,' $@ > $@.tmp; mv $@.tmp $@; fi
 
 # Build oci image
 # Pruning removes the unnamed initial stage images of multi stage builds
@@ -127,28 +127,29 @@ oci-build: .Containerfile
 # Run oci image
 # If there are no errors, "database system is ready to accept connections" occurs twice
 # If there are errors, "database system is ready to accept connections" occurs once, followed by ERROR line
+# Use a loop to check for one of two things:
+# - 2 logging lines that say "database system is ready to accept connections", indicating success
+# - At least 1 ERROR line, indicating failure
 .PHONY: oci-run
 oci-run:
 	echo ">>> Running postgres container"
-	podman create --name=$(DEPLOY_IMAGE_NAME) -e POSTGRES_DB=$(DB_NAME) -e POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" -p 5432:5432 $(DEPLOY_IMAGE_REF)
+	podman create \
+	  --name=$(DEPLOY_IMAGE_NAME) \
+	  -e POSTGRES_DB=$(DB_NAME) \
+	  -e POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" \
+	  -p 5432:5432 \
+	  $(DEPLOY_IMAGE_REF)
 	podman start $(DEPLOY_IMAGE_NAME)
 	while true; do \
-	  sleep 1; \
-	  printf "."; \
-	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "database system is ready to accept connections" | wc -l`" -lt 1 ] || { \
+		sleep 1; \
+		printf "."; \
+	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "database system is ready to accept connections" | wc -l`" -lt 2 ] || { \
 	    break; \
 	  }; \
-	done
-	while true; do \
-	  sleep 1; \
-	  printf "."; \
 	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "ERROR" | wc -l`" -lt 1 ] || { \
 	    echo; \
 	    podman logs $(DEPLOY_IMAGE_NAME); \
 	    exit 1; \
-	  }; \
-	  [ "`podman logs $(DEPLOY_IMAGE_NAME) 2>&1 | grep "database system is ready to accept connections" | wc -l`" -lt 2 ] || { \
-	    break; \
 	  }; \
 	done
 	echo
@@ -159,7 +160,7 @@ oci-run:
 oci-cli:
 	podman exec -it $(DEPLOY_IMAGE_NAME) psql -U postgres -d $(DB_NAME)
 
-# Run baash inside running postgres container
+# Run bash inside running postgres container
 .PHONY: oci-bash
 oci-bash:
 	podman exec -it $(DEPLOY_IMAGE_NAME) /bin/bash
