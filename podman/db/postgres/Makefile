@@ -29,7 +29,8 @@ DEPLOY_IMAGE_REF  := $(DEPLOY_IMAGE_NAME):$(DEPLOY_IMAGE_VER)
 
 # Dir of env source code (DML only)
 SRC_ENV     := local
-SRC_ENV_DIR := src-env/$(SRC_ENV)
+SRC_ENV_DIR := $(if $(SRC_ENV),src-env/$(SRC_ENV),)
+SRC_ENV_ARG := $(if $(SRC_ENV),--build-arg "SRC_ENV_DIR=$(SRC_ENV_DIR)",)
 
 # Database name, and app_exec user password
 DB_NAME           := pg_app
@@ -102,15 +103,23 @@ oci-pull:
 	  podman pull $(PG_IMAGE_REF); \
 	}
 
+# Always build Containerfile in case args have changed
+.PHONY: .Containerfile
+.Containerfile: Containerfile.in
+	echo ">>> Generating $@"
+	cp $< $@
+	if [ -n "$(SRC_ENV_ARG)" ]; then sed 's,.SRC_ENV_DIR ,,' $@ > $@.tmp; mv $@.tmp $@; fi
+
 # Build oci image
 # Pruning removes the unnamed initial stage images of multi stage builds
 .PHONY: oci-build
-oci-build: Containerfile
+oci-build: .Containerfile
 	echo ">>> Building postgres image"
 	podman build \
 	  --build-arg "PG_IMAGE_REF=$(PG_IMAGE_REF)" \
 	  --build-arg "APP_EXEC_PASS=$(APP_EXEC_PASS)" \
-	  --build-arg "SRC_ENV_DIR=$(SRC_ENV_DIR)" \
+	  $(SRC_ENV_ARG) \
+	  -f $< \
 	  -t $(DEPLOY_IMAGE_REF) \
 	  .
 	podman system prune -f
@@ -166,6 +175,7 @@ vars:
 	echo "DEPLOY_IMAGE_REF   = $(DEPLOY_IMAGE_REF)"
 	echo "SRC_ENV            = $(SRC_ENV)"
 	echo "SRC_ENV_DIR        = $(SRC_ENV_DIR)"
+	echo "SRC_ENV_ARG        = $(SRC_ENV_ARG)"
 	echo "DB_NAME            = $(DB_NAME)"
 	echo "POSTGRES_PASSWORD  = $(POSTGRES_PASSWORD)"
 	echo "APP_EXEC_PASS      = ${APP_EXEC_PASS}"

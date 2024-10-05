@@ -1,4 +1,5 @@
-.project
+.*
+!.gitignore
 asciidoc/top-level-readme/docs/readme/build
 cross-compile/*/make/*/build
 qemu-vms/freebsd/*amd*
