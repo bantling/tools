@@ -1,7 +1,6 @@
 -- Address types
 CREATE TABLE IF NOT EXISTS tables.address_type(
-   relid SERIAL  NOT NULL
-  ,id    UUID    NOT NULL
+   relid         BIGINT
   ,name  TEXT    NOT NULL
   ,ord   INTEGER NOT NULL -- ordering
 );
@@ -16,26 +15,12 @@ SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_pk PRIMARY K
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_uk UNIQUE(id)'
- WHERE NOT EXISTS (
-   SELECT NULL
-     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-    WHERE TABLE_SCHEMA    = 'tables'
-      AND TABLE_NAME      = 'address_type'
-      AND CONSTRAINT_NAME = 'address_type_uk'
- )
-\gexec
-
 -- Address
 CREATE TABLE IF NOT EXISTS tables.address(
-   relid         SERIAL    NOT NULL
-  ,type_relid    INTEGER
-  ,country_relid INTEGER   NOT NULL
-  ,region_relid  INTEGER
-  ,id            UUID      NOT NULL
-  ,version       INTEGER   NOT NULL
-  ,created       TIMESTAMP NOT NULL
-  ,changed       TIMESTAMP NOT NULL
+   relid         BIGINT
+  ,type_relid    BIGINT
+  ,country_relid BIGINT   NOT NULL
+  ,region_relid  BIGINT
   ,city          TEXT      NOT NULL
   ,address       TEXT      NOT NULL
   ,address_2     TEXT
@@ -50,16 +35,6 @@ SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_pk PRIMARY KEY(relid)'
     WHERE TABLE_SCHEMA    = 'tables'
       AND TABLE_NAME      = 'address'
       AND CONSTRAINT_NAME = 'address_pk'
- )
-\gexec
-
-SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_uk UNIQUE(id)'
- WHERE NOT EXISTS (
-   SELECT NULL
-     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-    WHERE TABLE_SCHEMA    = 'tables'
-      AND TABLE_NAME      = 'address'
-      AND CONSTRAINT_NAME = 'address_uk'
  )
 \gexec
 
@@ -95,12 +70,8 @@ SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_region_fk FOREIGN KEY(
 
 -- Individual Customer
 CREATE TABLE IF NOT EXISTS tables.customer_person(
-   relid         SERIAL    NOT NULL
-  ,address_relid INTEGER
-  ,id            UUID      NOT NULL
-  ,version       INTEGER   NOT NULL
-  ,created       TIMESTAMP NOT NULL
-  ,changed       TIMESTAMP NOT NULL
+   relid         BIGINT
+  ,address_relid BIGINT
   ,first_name    TEXT      NOT NULL
   ,middle_name   TEXT
   ,last_name     TEXT      NOT NULL
@@ -116,16 +87,6 @@ SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_pk PRI
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_uk UNIQUE(id)'
- WHERE NOT EXISTS (
-   SELECT NULL
-     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-    WHERE TABLE_SCHEMA    = 'tables'
-      AND TABLE_NAME      = 'customer_person'
-      AND CONSTRAINT_NAME = 'custommer_person_uk'
- )
-\gexec
-
 SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_addresss_fk FOREIGN KEY(address_relid) REFERENCES tables.address(relid)'
  WHERE NOT EXISTS (
    SELECT NULL
@@ -138,12 +99,8 @@ SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_addres
 
 -- Business Customer
 CREATE TABLE IF NOT EXISTS tables.customer_business(
-   relid   SERIAL    NOT NULL
-  ,id      UUID      NOT NULL
-  ,version INTEGER   NOT NULL
-  ,created TIMESTAMP NOT NULL
-  ,changed TIMESTAMP NOT NULL
-  ,name    TEXT      NOT NULL
+   relid BIGINT
+  ,name  TEXT   NOT NULL
 );
 
 SELECT 'ALTER TABLE tables.customer_business ADD CONSTRAINT customer_business_pk PRIMARY KEY(relid)'
@@ -156,48 +113,38 @@ SELECT 'ALTER TABLE tables.customer_business ADD CONSTRAINT customer_business_pk
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.customer_business ADD CONSTRAINT customer_business_uk UNIQUE(id)'
- WHERE NOT EXISTS (
-   SELECT NULL
-     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-    WHERE TABLE_SCHEMA    = 'tables'
-      AND TABLE_NAME      = 'customer_business'
-      AND CONSTRAINT_NAME = 'customer_business_uk'
- )
-\gexec
-
 -- Join a business with address(es)
 CREATE TABLE IF NOT EXISTS tables.customer_business_address_jt(
-   business_relid INTEGER
-  ,address_relid  INTEGER
+   business_relid BIGINT
+  ,address_relid  BIGINT
 );
 
-SELECT 'ALTER TABLE tables.customer_business_address_jt ADD CONSTRAINT customer_business_address_pk PRIMARY KEY(business_relid, address_relid)'
+SELECT 'ALTER TABLE tables.customer_business_address_jt ADD CONSTRAINT customer_business_address_jt_pk PRIMARY KEY(business_relid, address_relid)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
     WHERE TABLE_SCHEMA    = 'tables'
       AND TABLE_NAME      = 'customer_business_address'
-      AND CONSTRAINT_NAME = 'customer_business_address_pk'
+      AND CONSTRAINT_NAME = 'customer_business_address_jt_pk'
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.customer_business_address_jt ADD CONSTRAINT customer_business_address_bfk FOREIGN KEY(business_relid) REFERENCES tables.customer_business(relid)'
+SELECT 'ALTER TABLE tables.customer_business_address_jt ADD CONSTRAINT customer_business_address_jt_bfk FOREIGN KEY(business_relid) REFERENCES tables.customer_business(relid)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
     WHERE TABLE_SCHEMA    = 'tables'
       AND TABLE_NAME      = 'customer_business_address'
-      AND CONSTRAINT_NAME = 'customer_business_address_pk'
+      AND CONSTRAINT_NAME = 'customer_business_address_jt_bfk'
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.customer_business_address_jt ADD CONSTRAINT customer_business_address_afk FOREIGN KEY(address_relid) REFERENCES tables.address(relid)'
+SELECT 'ALTER TABLE tables.customer_business_address_jt ADD CONSTRAINT customer_business_address_jt_afk FOREIGN KEY(address_relid) REFERENCES tables.address(relid)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
     WHERE TABLE_SCHEMA    = 'tables'
       AND TABLE_NAME      = 'customer_business_address'
-      AND CONSTRAINT_NAME = 'customer_business_address_pk'
+      AND CONSTRAINT_NAME = 'customer_business_address_jt_afk'
  )
 \gexec
