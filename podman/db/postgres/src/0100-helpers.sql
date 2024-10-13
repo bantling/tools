@@ -9,24 +9,44 @@
 CREATE OR REPLACE FUNCTION code.TEST(P_TEST BOOLEAN, P_MSG TEXT) RETURNS BOOLEAN AS
 $$
 BEGIN
-  IF NOT P_TEST THEN
-    RAISE EXCEPTION '%', P_MSG;
-  END IF;
-  
-  RETURN TRUE;
+  CASE
+    WHEN  P_MSG IS NULL THEN
+      RAISE EXCEPTION 'P_MSG CANNOT BE NULL';
+
+    WHEN NOT COALESCE(P_TEST, FALSE) THEN
+      RAISE EXCEPTION '%', P_MSG;
+
+    ELSE
+      RETURN TRUE;
+  END CASE;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 -- Test TEST(P_TEST, P_MSG)
 DO $$
 DECLARE
-  V_RES BOOLEAN;
-  V_MSG TEXT;
+  V_DIED BOOLEAN;
+  V_MSG  TEXT;
 BEGIN
   BEGIN
-    V_RES := TRUE;
-    V_RES := code.TEST(FALSE, 'TEST');
-    V_RES := FALSE;
+    V_DIED := TRUE;
+    SELECT code.TEST(NULL, 'TEST');
+    V_DIED := FALSE;
+  EXCEPTION
+    WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
+      IF NOT V_MSG = 'TEST' THEN
+        RAISE EXCEPTION 'code.TEST must die with P_MSG when P_TEST is null';
+      END IF;  
+  END;
+  IF NOT V_DIED THEN
+    RAISE EXCEPTION 'code.TEST must die when P_TEST is null';
+  END IF;
+  
+  BEGIN
+    V_DIED := TRUE;
+    SELECT code.TEST(FALSE, 'TEST');
+    V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
       GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
@@ -34,15 +54,12 @@ BEGIN
         RAISE EXCEPTION 'code.TEST must die with P_MSG when P_TEST is false';
       END IF;  
   END;
-  
-  IF NOT V_RES THEN
+  IF NOT V_DIED THEN
     RAISE EXCEPTION 'code.TEST must die when P_TEST is false';
   END IF;
   
   BEGIN
-    V_RES := FALSE;
-    V_RES := code.TEST(TRUE, 'TEST');
-    IF NOT VRES THEN
+    IF NOT code.TEST(TRUE, 'TEST') THEN
       RAISE EXCEPTION 'code.TEST must succeed when P_TEST is true';
     END IF;
   EXCEPTION
@@ -112,10 +129,8 @@ BEGIN
     END IF;
     
   -- If a result is expected, is it the right result?
-  ELSE
-    IF NOT V_RES = P_RES THEN
-      RAISE EXCEPTION '%: The expected result ''%'' does not match the actual result ''%''', P_MSG, P_RES, V_RES;
-    END IF;
+  ELSIF NOT V_RES = P_RES THEN
+    RAISE EXCEPTION '%: The expected result ''%'' does not match the actual result ''%''', P_MSG, P_RES, V_RES;
   END IF;
   
   -- Success
@@ -263,14 +278,13 @@ $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 SELECT code.TEST(code.IIF(true , 'a'::TEXT, 'b') = 'a', 'IIF must return a');
 SELECT code.TEST(code.IIF(false, 'a'::TEXT, 'b') = 'b', 'IIF must return b');
 
-
--- BLANK_WS: a version of CONCAT_WS that treats empty strings like nulls, and coalesces consecutive empty/nulls
+-- NBLANK_WS: a version of CONCAT_WS that treats empty strings like nulls, and coalesces consecutive empty/nulls
 --   P_SEP : The separator string
 --   P_STRS: The strings to place a separator between
 --
--- Returns each non-null non-empty string in P_STRS, separaated by P_SEP
+-- Returns each non-null non-empty string in P_STRS, separated by P_SEP
 -- Unlike CONCAT_WS, the nulls and empty strings are removed first, eliminating consecutive separators 
-CREATE OR REPLACE FUNCTION code.BLANK_WS(P_SEP TEXT, P_STRS VARIADIC TEXT[] = NULL) RETURNS TEXT AS
+CREATE OR REPLACE FUNCTION code.NBLANK_WS(P_SEP TEXT, P_STRS VARIADIC TEXT[] = NULL) RETURNS TEXT AS
 $$
   SELECT STRING_AGG(strs, P_SEP)
     FROM (SELECT UNNEST(P_STRS) strs) t
@@ -278,9 +292,8 @@ $$
 $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 -- Test BLANK_WS
-SELECT code.TEST(code.BLANK_WS('-', null, 'a', '', 'b') = 'a-b', 'BLANK_WS must return a-b');
-SELECT code.TEST(code.BLANK_WS('-', null, null, 'a', '', '', 'b', '', null, 'c') = 'a-b-c', 'BLANK_WS must return a-b-c');
-
+SELECT code.TEST(code.NBLANK_WS('-', null, 'a', '', 'b') = 'a-b', 'NBLANK_WS must return a-b');
+SELECT code.TEST(code.NBLANK_WS('-', null, null, 'a', '', '', 'b', '', null, 'c') = 'a-b-c', 'NBLANK_WS must return a-b-c');
 
 -- TO_8601 converts a TIMESTAMP into an ISO 8601 string of the form
 -- YYYY-MM-DDTHH:MM:SS.sssZ
