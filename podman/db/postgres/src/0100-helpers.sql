@@ -275,8 +275,11 @@ $$
 $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 -- Test IIF
-SELECT code.TEST(code.IIF(true , 'a'::TEXT, 'b') = 'a', 'IIF must return a');
-SELECT code.TEST(code.IIF(false, 'a'::TEXT, 'b') = 'b', 'IIF must return b');
+SELECT DISTINCT code.TEST(code.IIF(expr, tval, fval) = res, 'IIF must return ' || res)
+  FROM (VALUES
+        (TRUE,  'a'::TEXT, 'b', 'a'),
+        (FALSE, 'a'::TEXT, 'b', 'b')
+       ) AS t (expr, tval, fval, res);
 
 -- NBLANK_WS: a version of CONCAT_WS that treats empty strings like nulls, and coalesces consecutive empty/nulls
 --   P_SEP : The separator string
@@ -291,9 +294,12 @@ $$
    WHERE LENGTH(COALESCE(strs, '')) > 0
 $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
--- Test BLANK_WS
-SELECT code.TEST(code.NBLANK_WS('-', null, 'a', '', 'b') = 'a-b', 'NBLANK_WS must return a-b');
-SELECT code.TEST(code.NBLANK_WS('-', null, null, 'a', '', '', 'b', '', null, 'c') = 'a-b-c', 'NBLANK_WS must return a-b-c');
+-- Test NBLANK_WS
+SELECT DISTINCT code.TEST(code.NBLANK_WS('-', VARIADIC args) = res, msg)
+  FROM (VALUES
+         (ARRAY[NULL, 'a' , '' , 'b'                       ], 'a-b'  , 'NBLANK_WS must return a-b'),
+         (ARRAY[NULL, NULL, 'a', '', '', 'b', '', NULL, 'c'], 'a-b-c', 'NBLANK_WS must return a-b-c')
+       ) AS t (args, res, msg);
 
 -- TO_8601 converts a TIMESTAMP into an ISO 8601 string of the form
 -- YYYY-MM-DDTHH:MM:SS.sssZ
@@ -305,9 +311,13 @@ $$
 $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 -- Test TO_8601
-SELECT code.TEST(code.TO_8601() = TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'TO_8601() must return NOW');
-SELECT code.TEST(code.TO_8601(NULL) = TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'TO_8601(NULL) must return NOW');
-SELECT code.TEST(code.TO_8601(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY') = TO_CHAR(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'TO_8601(NULL) must return NOW');
+SELECT DISTINCT * FROM (
+  SELECT code.TEST(code.TO_8601() = TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'TO_8601() must return NOW')
+  UNION ALL
+  SELECT code.TEST(code.TO_8601(NULL) = TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'TO_8601(NULL) must return NOW')
+  UNION ALL
+  SELECT code.TEST(code.TO_8601(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY') = TO_CHAR(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'TO_8601(NOW - 1 DAY) must return NOW - 1 DAY')
+) t;
 
 -- RELID_TO_ID converts a BIGINT to a base 62 string with a maximum of 11 chars
 -- Maximum signed BIGINT value is 9_223_372_036_854_775_807 -> AzL8n0Y58m7
@@ -344,41 +354,50 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 --- Test RELID_TO_ID
+SELECT code.TEST('RELID_TO_ID(NULL)', 'P_RELID cannot be null or 0', NULL, 'code.RELID_TO_ID', 'NULL');
+SELECT code.TEST('RELID_TO_ID(0)'   , 'P_RELID cannot be null or 0', NULL, 'code.RELID_TO_ID', '0'   );
 
-DO $$
+SELECT DISTINCT code.TEST(code.RELID_TO_ID(r) = i, 'RELID_TO_ID must return ' || i)
+  FROM (VALUES
+         (1, '1'),
+         (9, '9'),
+         (10, 'A'),
+         (10 + 25, 'Z'),       -- 35
+         (10 + 26, 'a'),       -- 36
+         (10 + 26 + 25, 'z'),  -- 61
+         (10 + 26 + 26, '10'), -- 62
+         (10_000_000_000, 'Aukyoa'),                -- = 10 * 916132832 + (36 + 20) * 14776336 + (36 + 10) * 238328 + (36 + 24) * 3844 + (36 + 14) * 62 + 36
+                                                    -- = 10 * 916132832 + 56 * 14776336        + 46 * 238328        + 60 * 3844        + 50 * 62        + 36
+                                                    -- = 9161328320     + 827474816            + 10963088           + 230640           + 3100           + 36
+         (9_223_372_036_854_775_807, 'AzL8n0Y58m7') -- = 10 * 839299365868340224 + (10 + 26 + 25) * 13537086546263552 + (10 + 11) * 218340105584896 + 8 * 3521614606208 + (10 + 26 + 12) * 56800235584 + 0 * 916132832 + (10 + 24) * 14776336 + 5 * 238328 + 8 * 3844 + (10 + 26 + 12) * 62 + 7
+                                                    -- = 10 * 839299365868340224 + 61 * 13537086546263552             + 21 * 218340105584896        + 8 * 3521614606208 + 49 * 56800235584             + 0 * 916132832 + 34 * 14776336        + 5 * 238328 + 8 * 3844 + 48 * 62             + 7    
+       ) AS t(r, i);
+
+-- ID_TO_RELID
+CREATE FUNCTION code.ID_TO_RELID(P_ID VARCHAR(11)) RETURNS BIGINT AS
+$$
 DECLARE
-  TMP BIGINT;
-  MSG TEXT;
+  DIGIT CHAR;
+  ASCII_DIGIT INT;
+  RELID BIGINT := 0;
 BEGIN
-  BEGIN
-    SELECT code.RELID_TO_ID(NULL) INTO TMP;
-    ASSERT 'RELID_TO_ID(NULL) must fail';
-  EXCEPTION
-    WHEN OTHERS THEN
-      GET STACKED DIAGNOSTICS MSG = MESSAGE_TEXT;
-      ASSERT MSG = 'P_RELID cannot be null or 0';
-  END;
+  FOREACH DIGIT IN ARRAY regexp_split_to_array(P_ID, '')
+  LOOP
+    -- Postgres database collation may or may not be case sensitive, which affects string comparisons using >= and <=.
+    -- This means that a statement like CASE DIGIT >= 'A' AND DIGIT <= 'Z' will match both both upper and lower case
+    -- letters if the collation is case insensitive.
+    -- Get the ASCII numeric value of the digit so we guarantee a case sensitive comparison regardless of collation. 
+    ASCII_DIGIT = ASCII(DIGIT);
+    RELID = RELID * 62;
+    
+    CASE
+      WHEN ASCII_DIGIT >= ASCII('0') AND ASCII_DIGIT <= ASCII('9') THEN RELID = RELID +           (ASCII_DIGIT - ASCII('0'));
+      WHEN ASCII_DIGIT >= ASCII('A') AND ASCII_DIGIT <= ASCII('Z') THEN RELID = RELID + 10 +      (ASCII_DIGIT - ASCII('A'));
+      ELSE                                                              RELID = RELID + 10 + 26 + (ASCII_DIGIT - ASCII('a'));
+    END CASE;
+  END LOOP;
   
-  BEGIN
-    SELECT code.RELID_TO_ID(0) INTO TMP;
-    ASSERT 'RELID_TO_ID(0) must fail';
-  EXCEPTION
-    WHEN OTHERS THEN
-      GET STACKED DIAGNOSTICS MSG = MESSAGE_TEXT;
-      ASSERT MSG = 'P_RELID cannot be null or 0';
-  END;
-  
-  SELECT COUNT(code.TEST(code.RELID_TO_ID(column1) = column2, CONCAT_WS(' ', 'expected', column2, 'got', column1)))
-    INTO TMP
-    FROM (VALUES
-           (1::BIGINT                , '1')
-          ,(10                       , 'A')
-          ,(10+25                    , 'Z')
-          ,(10+26                    , 'a')
-          ,(10+26+25                 , 'z')
-          ,(10+26+26                 , '10')
-          ,(10_000_000_000           , 'Aukyoa')
-          ,(9_223_372_036_854_775_807, 'AzL8n0Y58m7')
-         ) t;
+  RETURN RELID;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF STRICT PARALLEL SAFE;
+
