@@ -374,30 +374,37 @@ SELECT DISTINCT code.TEST(code.RELID_TO_ID(r) = i, 'RELID_TO_ID must return ' ||
        ) AS t(r, i);
 
 -- ID_TO_RELID
-CREATE FUNCTION code.ID_TO_RELID(P_ID VARCHAR(11)) RETURNS BIGINT AS
+CREATE OR REPLACE FUNCTION code.ID_TO_RELID(P_ID VARCHAR(11)) RETURNS BIGINT AS
 $$
 DECLARE
-  DIGIT CHAR;
-  ASCII_DIGIT INT;
-  RELID BIGINT := 0;
+  V_DIGIT       CHAR;
+  V_ASCII_DIGIT INT;
+  V_RELID       BIGINT := 0;
 BEGIN
-  FOREACH DIGIT IN ARRAY regexp_split_to_array(P_ID, '')
+  -- P_ID cannot be null or empty
+  IF LENGTH(COALESCE(P_ID,'')) = 0 THEN
+    RAISE EXCEPTION 'P_ID cannot be null or empty';
+  END IF;
+  
+  -- P_ID must be >= '1' and <= 'AzL8n0Y58m7'. Use C collation for ASCII sorting. 
+  IF (P_ID COLLATE "C" < '1' COLLATE "C") OR (P_ID COLLATE "C"> 'AzL8n0Y58m7' COLLATE "C") THEN
+    RAISE EXCEPTION 'P_ID must be in the range [1 .. AzL8n0Y58m7]';
+  END IF;
+
+  FOREACH V_DIGIT IN ARRAY regexp_split_to_array(P_ID, '')
   LOOP
-    -- Postgres database collation may or may not be case sensitive, which affects string comparisons using >= and <=.
-    -- This means that a statement like CASE DIGIT >= 'A' AND DIGIT <= 'Z' will match both both upper and lower case
-    -- letters if the collation is case insensitive.
-    -- Get the ASCII numeric value of the digit so we guarantee a case sensitive comparison regardless of collation. 
-    ASCII_DIGIT = ASCII(DIGIT);
-    RELID = RELID * 62;
+    -- Get the ASCII numeric value to guarantee an ASCII comparison 
+    V_ASCII_DIGIT = ASCII(V_DIGIT);
+    V_RELID = V_RELID * 62;
     
     CASE
-      WHEN ASCII_DIGIT >= ASCII('0') AND ASCII_DIGIT <= ASCII('9') THEN RELID = RELID +           (ASCII_DIGIT - ASCII('0'));
-      WHEN ASCII_DIGIT >= ASCII('A') AND ASCII_DIGIT <= ASCII('Z') THEN RELID = RELID + 10 +      (ASCII_DIGIT - ASCII('A'));
-      ELSE                                                              RELID = RELID + 10 + 26 + (ASCII_DIGIT - ASCII('a'));
+      WHEN V_ASCII_DIGIT >= ASCII('0') AND V_ASCII_DIGIT <= ASCII('9') THEN V_RELID = V_RELID +           (V_ASCII_DIGIT - ASCII('0'));
+      WHEN V_ASCII_DIGIT >= ASCII('A') AND V_ASCII_DIGIT <= ASCII('Z') THEN V_RELID = V_RELID + 10 +      (V_ASCII_DIGIT - ASCII('A'));
+      ELSE                                                                  V_RELID = V_RELID + 10 + 26 + (V_ASCII_DIGIT - ASCII('a'));
     END CASE;
   END LOOP;
   
-  RETURN RELID;
+  RETURN V_RELID;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF STRICT PARALLEL SAFE;
+$$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
