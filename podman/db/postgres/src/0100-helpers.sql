@@ -69,41 +69,37 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- TEST(TEXT, TEXT, TEXT, TEXT, ANYELEMENT...): test a function that may raise an exception
+-- TEST(TEXT, TEXT, TEXT, ANYELEMENT...): test a function for a case that raises an exception
 --   P_MSG    : string to include in exception if the test failed
---   P_ERR    : expected exception text, or null if no exception is expected
---   P_RES    : expected result, or null if an exception is expected
+--   P_ERR    : expected exception text
 --   P_FUNC   : string name of function
 --   P_ARGS   : optional variadic args to pass to the function
 --
---   NOTES:
---     1. If an exception is     expected, P_ERR must be non-null and P_RES must be null
---        If an exception is not expected, P_ERR must be     null and P_RES must be non-null 
---     2. P_RES and P_ARGS string values must be passed as a string that contains single quotes, eg the string 'foo',
---        which would be passed as an array element value of '''foo''' 
+--   NOTE: 
+--   P_ARGS are string values that are concatanated into an SQL string of the following form:
+--     SELECT <FUNCTION_NAME>(ARG1, ARG2, ...)
+--
+--   This means if you want to form the string SELECT FN('foo', true, 1), you would need to
+--   call TEST('msg', 'error text', 'FN', '''foo''', 'true', '1') 
 -- 
--- Returns true if invoking P_FUNC with P_ARGS returns P_RES, else it raises an exception with message P_MSG
+-- Returns true if invoking P_FUNC with P_ARGS raises an exception with message P_ERR
 -- It is a function so it can be used in select, making it easy and useful for unit tests
-CREATE OR REPLACE FUNCTION code.TEST(P_MSG TEXT, P_ERR TEXT, P_RES TEXT, P_FUNC TEXT, P_ARGS VARIADIC TEXT[] = NULL) RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION code.TEST(P_MSG TEXT, P_ERR TEXT, P_FUNC TEXT, P_ARGS VARIADIC TEXT[] = NULL) RETURNS BOOLEAN AS
 $$
 DECLARE
-  V_EXPECT_ERR BOOLEAN;
-  V_EXPECT_RES BOOLEAN;
-  V_CALL       TEXT;
-  V_RES        TEXT;
-  V_ERR        TEXT;
+  V_CALL TEXT;
+  V_RES  TEXT;
+  V_ERR  TEXT;
+  V_DIED BOOLEAN;
 BEGIN
   -- P_MSG cannot be NULL or EMPTY
   IF LENGTH(COALESCE(P_MSG, '')) = 0 THEN
     RAISE EXCEPTION 'P_MSG cannot be null or empty';
   END IF;
-   
-  -- Enforce that exactly one of P_ERR and P_RES is NON-NULL and NON-EMPTY
-  V_EXPECT_ERR := NOT LENGTH(COALESCE(P_ERR, '')) = 0;
-  V_EXPECT_RES := NOT LENGTH(COALESCE(P_RES, '')) = 0;
-  IF V_EXPECT_ERR = V_EXPECT_RES THEN
-    -- They are both NON-NULL/EMPTY
-    RAISE EXCEPTION 'P_ERR and P_RES are mututally exclusive, exactly one of them must be NON-NULL and NON-EMPTY';
+  
+  -- P_ERR cannot be NULL or EMPTY
+  IF LENGTH(COALESCE(P_ERR, '')) = 0 THEN
+    RAISE EXCEPTION 'P_ERR cannot be null or empty';
   END IF;
 
   BEGIN
@@ -111,153 +107,93 @@ BEGIN
     SELECT 'SELECT ' || P_FUNC || '(' || (SELECT COALESCE(STRING_AGG(t, ','), '') FROM UNNEST(P_ARGS) t) || ')' INTO V_CALL;
   
     -- Execute the call
+    V_DIED := TRUE;
     EXECUTE V_CALL INTO V_RES;
+    V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
       GET STACKED DIAGNOSTICS V_ERR = MESSAGE_TEXT;
-      
-      -- Is an exception expected?
-      IF NOT V_EXPECT_ERR THEN
-        RAISE EXCEPTION '%: An unexpected exception occurred: ''%''', P_MSG, V_ERR;
-      END IF;
   END;
   
-  -- If an exception is expected, does it have the right text?
-  IF V_EXPECT_ERR THEN
-    IF NOT V_ERR = P_ERR THEN
-      RAISE EXCEPTION '%: The expected exception message ''%'' does not match the actual message ''%''', P_MSG, P_ERR, V_ERR;
-    END IF;
+  CASE
+    -- Did an exception occur?
+    WHEN NOT V_DIED
+    THEN RAISE EXCEPTION '%s: An exception did not occur', P_MSG;
+  
+    -- If an exception is expected, does it have the right text?
+    WHEN NOT V_ERR = P_ERR
+    THEN RAISE EXCEPTION '%: The expected exception message ''%'' does not match the actual message ''%''', P_MSG, P_ERR, V_ERR;
     
-  -- If a result is expected, is it the right result?
-  ELSIF NOT V_RES = P_RES THEN
-    RAISE EXCEPTION '%: The expected result ''%'' does not match the actual result ''%''', P_MSG, P_RES, V_RES;
-  END IF;
+    ELSE NULL;
+  END CASE;
   
   -- Success
   RETURN TRUE;
 END;
 $$ LANGUAGE plpgsql;
 
--- Test TEST(P_MSG, P_ERR, P_RES, P_FUNC, P_ARGS...)
+-- Test TEST(P_MSG, P_ERR, P_FUNC, P_ARGS...)
 DO $$
 DECLARE
-  DIED BOOLEAN;
-  MSG TEXT;
-  V_RES BOOLEAN;
+  V_DIED BOOLEAN;
+  V_ERR  TEXT;
+  V_MSG TEXT;
+  V_RES  TEXT;
 BEGIN
   -- P_MSG cannot be null
   BEGIN
-    DIED := TRUE;
-    SELECT code.TEST(NULL, NULL, NULL, NULL);
-    DIED := FALSE;
+    V_DIED := TRUE;
+    SELECT code.TEST(NULL, NULL, NULL);
+    V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
-      GET STACKED DIAGNOSTICS MSG = MESSAGE_TEXT;
-      IF NOT MSG = 'P_MSG cannot be null or empty' THEN
+      GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
+      IF NOT V_MSG = 'P_MSG cannot be null or empty' THEN
         RAISE EXCEPTION 'code.TEST must die with P_MSG cannot be null or empty';
       END IF;
   END;
-  IF NOT DIED THEN
+  IF NOT V_DIED THEN
     RAISE EXCEPTION 'code.TEST must die when P_MSG is NULL';
   END IF;
   
   -- P_MSG cannot be empty
   BEGIN
-    DIED := TRUE;
-    SELECT code.TEST('', NULL, NULL, NULL);
-    DIED := FALSE;
+    V_DIED := TRUE;
+    SELECT code.TEST('', NULL, NULL);
+    V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
-      GET STACKED DIAGNOSTICS MSG = MESSAGE_TEXT;
-      IF NOT MSG = 'P_MSG cannot be null or empty' THEN
+      GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
+      IF NOT V_MSG = 'P_MSG cannot be null or empty' THEN
         RAISE EXCEPTION 'code.TEST must die with P_MSG cannot be null or empty';
       END IF;
   END;
-  IF NOT DIED THEN
+  IF NOT V_DIED THEN
     RAISE EXCEPTION 'code.TEST must die when P_MSG is empty';
-  END IF;
-  
-  -- Only one of P_ERR AND P_RES can be null/empty
-  BEGIN
-    DIED := TRUE;
-    SELECT code.TEST('P_MSG', NULL, NULL, NULL);
-    DIED := FALSE;
-  EXCEPTION
-    WHEN OTHERS THEN
-      GET STACKED DIAGNOSTICS MSG = MESSAGE_TEXT;
-      IF NOT MSG = 'P_ERR and P_RES are mututally exclusive, exactly one of them must be NON-NULL and NON-EMPTY' THEN
-        RAISE EXCEPTION 'code.TEST must die with P_ERR and P_RES are mututally exclusive';
-      END IF;
-  END;
-  IF NOT DIED THEN
-    RAISE EXCEPTION 'code.TEST must die when P_ERR and P_RES are both NULL';
-  END IF;
-  
-  -- Only one of P_ERR and P_RES can be non-null/empty
-  BEGIN
-    DIED := TRUE;
-    SELECT code.TEST('P_MSG', '1', '2', NULL);
-    DIED := FALSE;
-  EXCEPTION
-    WHEN OTHERS THEN
-      GET STACKED DIAGNOSTICS MSG = MESSAGE_TEXT;
-      IF NOT MSG = 'P_ERR and P_RES are mututally exclusive, exactly one of them must be NON-NULL and NON-EMPTY' THEN
-        RAISE EXCEPTION 'code.TEST must die with P_ERR and P_RES are mututally exclusive';
-      END IF;
-  END;
-  IF NOT DIED THEN
-    RAISE EXCEPTION 'code.TEST must die when P_ERR and P_RES are both non-NULL';
-  END IF;
-  
-  -- Test calling PI()
-  BEGIN
-    SELECT code.TEST('P_MSG', NULL, PI()::TEXT, 'PI') INTO V_RES;
-  EXCEPTION
-    WHEN OTHERS THEN
-      RAISE EXCEPTION 'code.TEST must succeed for PI()';
-  END;
-  IF NOT V_RES THEN
-    RAISE EXCEPTION 'code.TEST PI() must equal PI';
-  END IF;
-  
-  -- Test calling COALESCE(NULL, 1)
-  BEGIN
-    SELECT code.TEST('P_MSG', NULL, '1', 'COALESCE', 'NULL', '1') INTO V_RES;
-  EXCEPTION
-    WHEN OTHERS THEN
-      RAISE EXCEPTION 'code.TEST must succeed for COALESCE(NULL, 1)';
-  END;
-  IF NOT V_RES THEN
-    RAISE EXCEPTION 'code.TEST COALESCE(NULL, 1) must equal 1';
   END IF;
   
   -- Test error calling COALESCE(), where the error message provided IS correct
   BEGIN
-    DIED := TRUE;
-    SELECT code.TEST('SYNERR', 'syntax error at or near ")"', NULL, 'COALESCE') INTO V_RES;
-    DIED := FALSE;
+    SELECT code.TEST('SYNERR', 'syntax error at or near ")"', 'COALESCE') INTO V_RES;
   EXCEPTION
     WHEN OTHERS THEN
-      GET STACKED DIAGNOSTICS MSG = MESSAGE_TEXT;
-      RAISE EXCEPTION 'code.TEST COALESCE() DIED when we provided correct error message: %', MSG;
+      GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
+      RAISE EXCEPTION 'code.TEST COALESCE() DIED when we provided correct error message: %', V_MSG;
   END;
-  IF DIED THEN
-    RAISE EXCEPTION 'code.TEST must catch and handle COALESCE() exception when we provide correct error message';
-  END IF;
   
   -- Test error calling COALESCE(), where the error message provided IS NOT correct
   BEGIN
-    DIED := TRUE;
-    SELECT code.TEST('SYNERR', 'wrong error message', NULL, 'COALESCE') INTO V_RES;
-    DIED := FALSE;
+    V_DIED := TRUE;
+    SELECT code.TEST('SYNERR', 'wrong error message', 'COALESCE') INTO V_RES;
+    V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
-      GET STACKED DIAGNOSTICS MSG = MESSAGE_TEXT;
-      IF NOT MSG = 'SYNERR: The expected exception message ''wrong error message'' does not match the actual message ''syntax error at or near ")"''' THEN
+      GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
+      IF NOT V_MSG = 'SYNERR: The expected exception message ''wrong error message'' does not match the actual message ''syntax error at or near ")"''' THEN
         RAISE EXCEPTION 'code.TEST COALESCE() did not return incorrect error message';
       END IF;
   END;
-  IF NOT DIED THEN
+  IF NOT V_DIED THEN
     RAISE EXCEPTION 'code.TEST must die when COALESCE() fails and we provided wrong error message';
   END IF;
 END;
