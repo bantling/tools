@@ -1,12 +1,12 @@
 -- Helper functions that could be used in table definitions, views, or code
 
 -- TEST(BOOLEAN, TEXT): test that a condition succeeded for cases where no exception is raised
+--   P_MSG : string exception message if the test failed
 --   P_TEST: true if test succeeded, false if it failed
---   P_MSG : string to include in exception if the test failed
 -- 
 -- Returns true if the condition is true, else it raises an exception with the given error message
 -- It is a function so it can be used in select, making it easy and useful for unit tests
-CREATE OR REPLACE FUNCTION code.TEST(P_TEST BOOLEAN, P_MSG TEXT) RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION code.TEST(P_MSG TEXT, P_TEST BOOLEAN) RETURNS BOOLEAN AS
 $$
 BEGIN
   CASE
@@ -22,7 +22,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
--- Test TEST(P_TEST, P_MSG)
+-- Test TEST(P_MSG, P_TEST)
 DO $$
 DECLARE
   V_DIED BOOLEAN;
@@ -30,7 +30,22 @@ DECLARE
 BEGIN
   BEGIN
     V_DIED := TRUE;
-    SELECT code.TEST(NULL, 'TEST');
+    SELECT code.TEST(NULL, NULL);
+    V_DIED := FALSE;
+  EXCEPTION
+    WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
+      IF NOT V_MSG = 'P_MSG CANNOT BE NULL' THEN
+        RAISE EXCEPTION 'code.TEST must die with P_MSG CANNOT BE NULL';
+      END IF;  
+  END;
+  IF NOT V_DIED THEN
+    RAISE EXCEPTION 'code.TEST must die when P_MSG is NULL';
+  END IF;
+  
+  BEGIN
+    V_DIED := TRUE;
+    SELECT code.TEST('TEST', NULL);
     V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
@@ -45,7 +60,7 @@ BEGIN
   
   BEGIN
     V_DIED := TRUE;
-    SELECT code.TEST(FALSE, 'TEST');
+    SELECT code.TEST('TEST', FALSE);
     V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
@@ -59,7 +74,7 @@ BEGIN
   END IF;
   
   BEGIN
-    IF NOT code.TEST(TRUE, 'TEST') THEN
+    IF NOT code.TEST('TEST', TRUE) THEN
       RAISE EXCEPTION 'code.TEST must succeed when P_TEST is true';
     END IF;
   EXCEPTION
@@ -211,19 +226,19 @@ $$
 $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 -- Test IIF
-SELECT DISTINCT code.TEST(code.IIF(expr, tval, fval) = res, 'IIF must return ' || res)
+SELECT DISTINCT code.TEST('IIF must return ' || res, code.IIF(expr, tval, fval) = res) iif
   FROM (VALUES
         (TRUE,  'a'::TEXT, 'b', 'a'),
         (FALSE, 'a'::TEXT, 'b', 'b')
        ) AS t (expr, tval, fval, res);
 
--- NBLANK_WS: a version of CONCAT_WS that treats empty strings like nulls, and coalesces consecutive empty/nulls
+-- NEMPTY_WS: a version of CONCAT_WS that treats empty strings like nulls, and coalesces consecutive empty/nulls
 --   P_SEP : The separator string
 --   P_STRS: The strings to place a separator between
 --
 -- Returns each non-null non-empty string in P_STRS, separated by P_SEP
 -- Unlike CONCAT_WS, the nulls and empty strings are removed first, eliminating consecutive separators 
-CREATE OR REPLACE FUNCTION code.NBLANK_WS(P_SEP TEXT, P_STRS VARIADIC TEXT[] = NULL) RETURNS TEXT AS
+CREATE OR REPLACE FUNCTION code.NEMPTY_WS(P_SEP TEXT, P_STRS VARIADIC TEXT[] = NULL) RETURNS TEXT AS
 $$
   SELECT STRING_AGG(strs, P_SEP)
     FROM (SELECT UNNEST(P_STRS) strs) t
@@ -231,11 +246,12 @@ $$
 $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 -- Test NBLANK_WS
-SELECT DISTINCT code.TEST(code.NBLANK_WS('-', VARIADIC args) = res, msg)
+SELECT DISTINCT code.TEST(msg, code.NEMPTY_WS('-', VARIADIC args) = res) nempty_ws
   FROM (VALUES
-         (ARRAY[NULL, 'a' , '' , 'b'                       ], 'a-b'  , 'NBLANK_WS must return a-b'),
-         (ARRAY[NULL, NULL, 'a', '', '', 'b', '', NULL, 'c'], 'a-b-c', 'NBLANK_WS must return a-b-c')
-       ) AS t (args, res, msg);
+         ('NEMPTY_WS must return a-b'    , ARRAY[NULL, 'a' , '' , 'b'                       ], 'a-b'),
+         ('NEMPTY_WS must return a-b-c'  , ARRAY[NULL, NULL, 'a', '', '', 'b', '', NULL, 'c'], 'a-b-c'),
+         ('NEMPTY_WS must return a-b-c-d', ARRAY['a' , 'b' , 'c', 'd'                       ], 'a-b-c-d')
+       ) AS t (msg, args, res);
 
 -- TO_8601 converts a TIMESTAMP into an ISO 8601 string of the form
 -- YYYY-MM-DDTHH:MM:SS.sssZ
@@ -248,11 +264,11 @@ $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 -- Test TO_8601
 SELECT DISTINCT * FROM (
-  SELECT code.TEST(code.TO_8601() = TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'TO_8601() must return NOW')
+  SELECT code.TEST('TO_8601() must return NOW', code.TO_8601() = TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')) to_8601
   UNION ALL
-  SELECT code.TEST(code.TO_8601(NULL) = TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'TO_8601(NULL) must return NOW')
+  SELECT code.TEST('TO_8601(NULL) must return NOW', code.TO_8601(NULL) = TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
   UNION ALL
-  SELECT code.TEST(code.TO_8601(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY') = TO_CHAR(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'TO_8601(NOW - 1 DAY) must return NOW - 1 DAY')
+  SELECT code.TEST('TO_8601(NOW - 1 DAY) must return NOW - 1 DAY', code.TO_8601(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY') = TO_CHAR(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
 ) t;
 
 -- RELID_TO_ID converts a BIGINT to a base 62 string with a maximum of 11 chars
@@ -290,24 +306,27 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 --- Test RELID_TO_ID
-SELECT code.TEST('RELID_TO_ID(NULL)', 'P_RELID cannot be null or 0', NULL, 'code.RELID_TO_ID', 'NULL');
-SELECT code.TEST('RELID_TO_ID(0)'   , 'P_RELID cannot be null or 0', NULL, 'code.RELID_TO_ID', '0'   );
-
-SELECT DISTINCT code.TEST(code.RELID_TO_ID(r) = i, 'RELID_TO_ID must return ' || i)
-  FROM (VALUES
-         (1, '1'),
-         (9, '9'),
-         (10, 'A'),
-         (10 + 25, 'Z'),       -- 35
-         (10 + 26, 'a'),       -- 36
-         (10 + 26 + 25, 'z'),  -- 61
-         (10 + 26 + 26, '10'), -- 62
-         (10_000_000_000, 'Aukyoa'),                -- = 10 * 916132832 + (36 + 20) * 14776336 + (36 + 10) * 238328 + (36 + 24) * 3844 + (36 + 14) * 62 + 36
-                                                    -- = 10 * 916132832 + 56 * 14776336        + 46 * 238328        + 60 * 3844        + 50 * 62        + 36
-                                                    -- = 9161328320     + 827474816            + 10963088           + 230640           + 3100           + 36
-         (9_223_372_036_854_775_807, 'AzL8n0Y58m7') -- = 10 * 839299365868340224 + (10 + 26 + 25) * 13537086546263552 + (10 + 11) * 218340105584896 + 8 * 3521614606208 + (10 + 26 + 12) * 56800235584 + 0 * 916132832 + (10 + 24) * 14776336 + 5 * 238328 + 8 * 3844 + (10 + 26 + 12) * 62 + 7
-                                                    -- = 10 * 839299365868340224 + 61 * 13537086546263552             + 21 * 218340105584896        + 8 * 3521614606208 + 49 * 56800235584             + 0 * 916132832 + 34 * 14776336        + 5 * 238328 + 8 * 3844 + 48 * 62             + 7    
-       ) AS t(r, i);
+SELECT DISTINCT * FROM (
+  SELECT code.TEST('RELID_TO_ID(NULL)'            , 'P_RELID cannot be null or 0', 'code.RELID_TO_ID', 'NULL') relid_to_id
+  UNION  ALL
+  SELECT code.TEST('RELID_TO_ID(0)'               , 'P_RELID cannot be null or 0', 'code.RELID_TO_ID', '0'   )
+  UNION ALL
+  SELECT code.TEST('RELID_TO_ID must return ' || i, code.RELID_TO_ID(r) = i)
+    FROM (VALUES
+           (1, '1'),
+           (9, '9'),
+           (10, 'A'),
+           (10 + 25, 'Z'),       -- 35
+           (10 + 26, 'a'),       -- 36
+           (10 + 26 + 25, 'z'),  -- 61
+           (10 + 26 + 26, '10'), -- 62
+           (10_000_000_000, 'Aukyoa'),                -- = 10 * 916132832 + (36 + 20) * 14776336 + (36 + 10) * 238328 + (36 + 24) * 3844 + (36 + 14) * 62 + 36
+                                                      -- = 10 * 916132832 + 56 * 14776336        + 46 * 238328        + 60 * 3844        + 50 * 62        + 36
+                                                      -- = 9161328320     + 827474816            + 10963088           + 230640           + 3100           + 36
+           (9_223_372_036_854_775_807, 'AzL8n0Y58m7') -- = 10 * 839299365868340224 + (10 + 26 + 25) * 13537086546263552 + (10 + 11) * 218340105584896 + 8 * 3521614606208 + (10 + 26 + 12) * 56800235584 + 0 * 916132832 + (10 + 24) * 14776336 + 5 * 238328 + 8 * 3844 + (10 + 26 + 12) * 62 + 7
+                                                      -- = 10 * 839299365868340224 + 61 * 13537086546263552             + 21 * 218340105584896        + 8 * 3521614606208 + 49 * 56800235584             + 0 * 916132832 + 34 * 14776336        + 5 * 238328 + 8 * 3844 + 48 * 62             + 7    
+        ) AS t(r, i)
+) t;
 
 -- ID_TO_RELID
 CREATE OR REPLACE FUNCTION code.ID_TO_RELID(P_ID VARCHAR(11)) RETURNS BIGINT AS
