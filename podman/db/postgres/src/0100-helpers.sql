@@ -263,13 +263,12 @@ $$
 $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 -- Test TO_8601
-SELECT DISTINCT * FROM (
-  SELECT code.TEST('TO_8601() must return NOW', code.TO_8601() = TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')) to_8601
-  UNION ALL
-  SELECT code.TEST('TO_8601(NULL) must return NOW', code.TO_8601(NULL) = TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
-  UNION ALL
-  SELECT code.TEST('TO_8601(NOW - 1 DAY) must return NOW - 1 DAY', code.TO_8601(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY') = TO_CHAR(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
-) t;
+SELECT DISTINCT code.TEST(msg, code.IIF(ARRAY_LENGTH(ARG, 1) = 0, code.TO_8601(), code.TO_8601(ARG[1])) = res)
+  FROM (VALUES
+         ('TO_8601() must return NOW'                   , ARRAY[]::TIMESTAMP[]                              , TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+         ('TO_8601(NULL) must return NOW'               , ARRAY[NULL]::TIMESTAMP[]                          , TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+         ('TO_8601(NOW - 1 DAY) must return NOW - 1 DAY', ARRAY[NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY'], TO_CHAR(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+       ) AS t(msg, arg, res);
 
 -- RELID_TO_ID converts a BIGINT to a base 62 string with a maximum of 11 chars
 -- Maximum signed BIGINT value is 9_223_372_036_854_775_807 -> AzL8n0Y58m7
@@ -327,7 +326,10 @@ SELECT DISTINCT * FROM (
         ) AS t(r, i)
 ) t;
 
--- ID_TO_RELID
+-- ID_TO_RELID converts a base 62 string with a maximum of 11 chars to a BIGINT
+-- Maximum ID is AzL8n0Y58m7 -> signed BIGINT value is 9_223_372_036_854_775_807 
+--               12345678901
+-- Raises an exception if P_ID is NULL or 0, since valid ids start at 1 
 CREATE OR REPLACE FUNCTION code.ID_TO_RELID(P_ID VARCHAR(11)) RETURNS BIGINT AS
 $$
 DECLARE
@@ -364,9 +366,15 @@ $$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 --- Test ID_TO_RELID
 SELECT DISTINCT * FROM (
-  SELECT code.TEST('ID_TO_RELID(NULL)'           , 'P_ID cannot be null or empty', 'code.ID_TO_RELID', 'NULL') id_to_relid
+  SELECT code.TEST('ID_TO_RELID(NULL)'           , 'P_ID cannot be null or empty'                , 'code.ID_TO_RELID', 'NULL') id_to_relid
   UNION  ALL
-  SELECT code.TEST('ID_TO_RELID('''')'           , 'P_ID cannot be null or empty', 'code.ID_TO_RELID', '''''')
+  SELECT code.TEST('ID_TO_RELID('''')'           , 'P_ID cannot be null or empty'                , 'code.ID_TO_RELID', '''''')
+  UNION  ALL
+  SELECT code.TEST('ID_TO_RELID(''0'')'          , 'P_ID must be in the range [1 .. AzL8n0Y58m7]', 'code.ID_TO_RELID', '''0''')
+  UNION  ALL
+  SELECT code.TEST('ID_TO_RELID(''-1'')'         , 'P_ID must be in the range [1 .. AzL8n0Y58m7]', 'code.ID_TO_RELID', '''-1''')
+  UNION  ALL
+  SELECT code.TEST('ID_TO_RELID(''AzL8n0Y58m8'')', 'P_ID must be in the range [1 .. AzL8n0Y58m7]', 'code.ID_TO_RELID', '''AzL8n0Y58m8''')
   UNION ALL
   SELECT code.TEST('ID_TO_RELID must return ' || r, code.ID_TO_RELID(i) = r)
     FROM (VALUES

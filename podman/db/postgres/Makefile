@@ -108,7 +108,7 @@ oci-pull:
 .Containerfile: Containerfile.in
 	echo ">>> Generating $@"
 	cp $< $@
-	if [ -n "$(SRC_ENV_ARG)" ]; then sed 's,^.SRC_ENV_DIR ,,' $@ > $@.tmp; mv $@.tmp $@; fi
+	if [ -n "$(SRC_ENV_ARG)" ]; then echo "Include src-env"; sed 's,^.SRC_ENV_DIR ,,' $@ > $@.tmp; mv $@.tmp $@; fi
 
 # Build oci image
 # Pruning removes the unnamed initial stage images of multi stage builds

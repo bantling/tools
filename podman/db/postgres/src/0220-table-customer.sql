@@ -58,7 +58,7 @@ SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_country_fk FOREIGN KEY
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_region_fk FOREIGN KEY(region_relid, country_relid) REFERENCES tables.region(relid, country_relid)'
+SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_region_fk FOREIGN KEY(region_relid) REFERENCES tables.region(relid)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS

@@ -20,7 +20,7 @@ SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_pk PRIMARY KEY(relid)'
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_ck_mailing_fields CHECK((has_mailing_code = mailing_code_match IS NOT NULL) AND (has_mailing_code = mailing_code_format IS NOT NULL))'
+SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_ck_mailing_fields CHECK((has_mailing_code = (mailing_code_match IS NOT NULL)) AND (has_mailing_code = (mailing_code_format IS NOT NULL)))'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
