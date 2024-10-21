@@ -389,3 +389,34 @@ SELECT DISTINCT * FROM (
            ('AzL8n0Y58m7', 9_223_372_036_854_775_807)    
         ) AS t(i, r)
 ) t;
+
+-- NEXT_BASE gets the next relid by inserting an entry into base
+-- P_TBL is the table oid of the table to insert into
+-- P_DESC is the description
+-- P_TERMS is the terms
+-- P_EXTRA is the extra
+-- Returns all columns of the new row
+--
+-- Invoke by using a statement like SELECT code.NEXT_BASE('tables.country'::regclass::oid);
+CREATE OR REPLACE FUNCTION code.NEXT_BASE(P_TBL OID, P_DESC TEXT = NULL, P_TERMS TEXT = NULL, P_EXTRA JSONB = NULL) RETURNS tables.base AS
+$$
+  INSERT INTO tables.base(
+              tbloid
+             ,version
+             ,description
+             ,terms
+             ,extra
+             ,created
+             ,modified
+           )
+    VALUES (
+              P_TBL
+             ,1
+             ,P_DESC
+             ,TO_TSVECTOR('english', P_TERMS)
+             ,P_EXTRA
+             ,NOW() AT TIME ZONE 'UTC'
+             ,NOW() AT TIME ZONE 'UTC'
+           )
+ RETURNING *;
+$$ LANGUAGE sql;

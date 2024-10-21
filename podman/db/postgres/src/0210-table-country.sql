@@ -20,6 +20,16 @@ SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_pk PRIMARY KEY(relid)'
  )
 \gexec
 
+SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_relid_fk FOREIGN KEY(relid) REFERENCES tables.base(relid)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'country'
+      AND CONSTRAINT_NAME = 'country_fk'
+ )
+\gexec
+
 SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_ck_mailing_fields CHECK((has_mailing_code = (mailing_code_match IS NOT NULL)) AND (has_mailing_code = (mailing_code_format IS NOT NULL)))'
  WHERE NOT EXISTS (
    SELECT NULL
@@ -45,6 +55,16 @@ SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_pk PRIMARY KEY(relid)'
     WHERE TABLE_SCHEMA    = 'tables'
       AND TABLE_NAME      = 'region'
       AND CONSTRAINT_NAME = 'region_pk'
+ )
+\gexec
+
+SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_relid_fk FOREIGN KEY(relid) REFERENCES tables.base(relid)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'region'
+      AND CONSTRAINT_NAME = 'region_fk'
  )
 \gexec
 
