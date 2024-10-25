@@ -9,7 +9,7 @@ WITH PARAMS AS (
 -- SELECT * FROM PARAMS;
 --  num_rows | num_address_types | num_countries 
 -- ----------+-------------------+---------------
---         5 |                 3 |             3
+--         5 |                 3 |             4
 -- (1 row)
 
 -- Multiply the one params row by the num_rows value
@@ -28,22 +28,72 @@ WITH PARAMS AS (
 --         5 |                 3 |             4
 -- (5 rows)
 
--- Generate a new data set with random address type relids and random country relids
--- If a random type relid is 0, change it to null, as it represents a person address, and type relids are only for
+-- Generate a new data set with random address type and random country indexes
+-- If a random type index is 0, change it to null, as it represents a person address, and type relids are only for
 -- business addresses
-, GEN_ADDRESS_COUNTRY_RELID AS (
-  SELECT NULLIF((random() * d.num_address_types)::int, 0)      type_relid
-        ,      (random() * (d.num_countries     - 1) + 1)::int country_relid
+, GEN_ADDRESS_TYPE_COUNTRY_INDEX AS (
+  SELECT NULLIF((random() *  d.num_address_types)::int, 0)      address_type_index
+        ,      ( random() * (d.num_countries - 1)     + 1)::int country_index
     FROM ADD_ROWS d
 )
--- SELECT * FROM GEN_ADDRESS_COUNTRY_RELID;
---  type_relid | country_relid 
--- ------------+---------------
---           1 |             2
---           1 |             2
---             |             1
---           2 |             3
---           1 |             1
+-- SELECT * FROM GEN_ADDRESS_TYPE_COUNTRY_INDEX;
+--  address_type_index | country_index 
+-- --------------------+---------------
+--                   3 |             4
+--                   2 |             2
+--                     |             1
+--                   2 |             2
+--                     |             2
+-- (5 rows)
+
+-- Generate the list of ordered country relids with 1-based indexes
+, GEN_ADDRESS_TYPE_RELID_INDEXES AS (
+  SELECT relid
+        ,ROW_NUMBER() OVER() relid_index
+    FROM tables.address_type
+)
+-- SELECT * FROM GEN_ADDRESS_TYPE_RELID_INDEXES;
+--  relid | relid_index 
+-- -------+-------------
+--     73 |           1
+--     74 |           2
+--     75 |           3
+-- (3 rows)
+
+-- Generate the list of ordered country relids with 1-based indexes
+, GEN_COUNTRY_RELID_INDEXES AS (
+  SELECT relid
+        ,ROW_NUMBER() OVER() relid_index
+    FROM tables.country
+)
+-- SELECT * FROM GEN_COUNTRY_RELID_INDEXES;
+--  relid | relid_index 
+-- -------+-------------
+--      1 |           1
+--      2 |           2
+--      3 |           3
+--      4 |           4
+-- (4 rows)
+
+-- Since relids are global and may not be consecutive, convert the generated addresss type and country indexes into
+-- relids via mappings provided by GEN_ADDRESS_TYPE_RELID_INDEXES and GEN_COUNTRY_RELID_INDEXES
+, GEN_ADDRESS_TYPE_COUNTRY_RELID AS (
+  SELECT atri.relid_index address_type_relid
+        ,cri.relid_index country_relid
+    FROM GEN_ADDRESS_TYPE_COUNTRY_INDEX aci
+    LEFT JOIN GEN_ADDRESS_TYPE_RELID_INDEXES atri
+      ON atri.relid_index = aci.address_type_index
+    LEFT JOIN GEN_COUNTRY_RELID_INDEXES      cri
+      ON cri.relid_index = aci.country_index
+)
+SELECT * FROM GEN_ADDRESS_TYPE_COUNTRY_RELID;
+--  address_type_relid | country_relid 
+-- --------------------+---------------
+--                   1 |             4
+--                   2 |             4
+--                   2 |             3
+--                     |             4
+--                     |             2
 -- (5 rows)
 
 -- Add number of regions for the chosen country, and minimum region relid
