@@ -273,7 +273,7 @@ SELECT DISTINCT code.TEST(msg, code.IIF(ARRAY_LENGTH(ARG, 1) = 0, code.TO_8601()
 -- RELID_TO_ID converts a BIGINT to a base 62 string with a maximum of 11 chars
 -- Maximum signed BIGINT value is 9_223_372_036_854_775_807 -> AzL8n0Y58m7
 --                                                             12345678901
--- Raises an exception if P_RELID is NULL or 0, since valid relids start at 1
+-- Raises an exception if P_RELID is NULL or 0, since valid relids start at 1'
 CREATE OR REPLACE FUNCTION code.RELID_TO_ID(P_RELID BIGINT) RETURNS VARCHAR(11) AS
 $$
 DECLARE
@@ -326,7 +326,7 @@ SELECT DISTINCT * FROM (
         ) AS t(r, i)
 ) t;
 
--- ID_TO_RELID converts a base 62 string with a maximum of 11 chars to a BIGINT
+/*-- ID_TO_RELID converts a base 62 string with a maximum of 11 chars to a BIGINT
 -- Maximum ID is AzL8n0Y58m7 -> signed BIGINT value is 9_223_372_036_854_775_807 
 --               12345678901
 -- Raises an exception if P_ID is NULL or 0, since valid ids start at 1 
@@ -389,34 +389,4 @@ SELECT DISTINCT * FROM (
            ('AzL8n0Y58m7', 9_223_372_036_854_775_807)    
         ) AS t(i, r)
 ) t;
-
--- NEXT_BASE gets the next relid by inserting an entry into base
--- P_TBL is the table oid of the table to insert into
--- P_DESC is the description
--- P_TERMS is the terms
--- P_EXTRA is the extra
--- Returns all columns of the new row
---
--- Invoke by using a statement like SELECT code.NEXT_BASE('tables.country'::regclass::oid);
-CREATE OR REPLACE FUNCTION code.NEXT_BASE(P_TBL OID, P_DESC TEXT = NULL, P_TERMS TEXT = NULL, P_EXTRA JSONB = NULL) RETURNS tables.base AS
-$$
-  INSERT INTO tables.base(
-              tbloid
-             ,version
-             ,description
-             ,terms
-             ,extra
-             ,created
-             ,modified
-           )
-    VALUES (
-              P_TBL
-             ,1
-             ,P_DESC
-             ,TO_TSVECTOR('english', P_TERMS)
-             ,P_EXTRA
-             ,NOW() AT TIME ZONE 'UTC'
-             ,NOW() AT TIME ZONE 'UTC'
-           )
- RETURNING *;
-$$ LANGUAGE sql;
+*/

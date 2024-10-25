@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS tables.region(
   ,country_relid INTEGER NOT NULL
   ,name          TEXT    NOT NULL
   ,code          TEXT    NOT NULL
+  ,ord           INTEGER NOT NULL
 );
 
 SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_pk PRIMARY KEY(relid)'
