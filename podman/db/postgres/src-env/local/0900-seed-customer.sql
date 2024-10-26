@@ -28,7 +28,7 @@ WITH PARAMS AS (
 --         5 |                 3 |             4
 -- (5 rows)
 
--- Generate a new data set with random address type and random country indexes
+-- Generate a random address type and random country index for each row
 -- If a random type index is 0, change it to null, as it represents a person address, and type relids are only for
 -- business addresses
 , GEN_ADDRESS_TYPE_COUNTRY_INDEX AS (
@@ -46,10 +46,10 @@ WITH PARAMS AS (
 --                     |             2
 -- (5 rows)
 
--- Generate the list of ordered country relids with 1-based indexes
+-- Generate the list of ordered address type relids with 1-based indexes
 , GEN_ADDRESS_TYPE_RELID_INDEXES AS (
   SELECT relid
-        ,ROW_NUMBER() OVER() relid_index
+        ,ROW_NUMBER() OVER(ORDER BY ord) relid_index
     FROM tables.address_type
 )
 -- SELECT * FROM GEN_ADDRESS_TYPE_RELID_INDEXES;
@@ -63,7 +63,7 @@ WITH PARAMS AS (
 -- Generate the list of ordered country relids with 1-based indexes
 , GEN_COUNTRY_RELID_INDEXES AS (
   SELECT relid
-        ,ROW_NUMBER() OVER() relid_index
+        ,ROW_NUMBER() OVER(ORDER BY name) relid_index
     FROM tables.country
 )
 -- SELECT * FROM GEN_COUNTRY_RELID_INDEXES;
@@ -75,48 +75,65 @@ WITH PARAMS AS (
 --      4 |           4
 -- (4 rows)
 
+-- Generate the list of ordered region relids with 1-based indexes for each country
+, GEN_REGION_RELID_INDEXES AS (
+  SELECT relid
+        ,ROW_NUMBER() OVER(PARTITION BY country_relid ORDER BY ord) relid_index
+    FROM tables.region
+)
+-- SELECT * FROM GEN_REGION_RELID_INDEXES;
+--  relid | relid_index 
+-- -------+-------------
+--      5 |           1
+--      6 |           2
+--      7 |           3
+--      8 |           4
+-- ...
+--     18 |           1
+--     19 |           2
+--     20 |           3
+--     21 |           4
+-- ...
+-- (68 rows)
+
 -- Since relids are global and may not be consecutive, convert the generated addresss type and country indexes into
 -- relids via mappings provided by GEN_ADDRESS_TYPE_RELID_INDEXES and GEN_COUNTRY_RELID_INDEXES
 , GEN_ADDRESS_TYPE_COUNTRY_RELID AS (
-  SELECT atri.relid_index address_type_relid
-        ,cri.relid_index country_relid
+  SELECT atri.relid address_type_relid
+        , cri.relid country_relid
     FROM GEN_ADDRESS_TYPE_COUNTRY_INDEX aci
-    LEFT JOIN GEN_ADDRESS_TYPE_RELID_INDEXES atri
+    LEFT
+    JOIN GEN_ADDRESS_TYPE_RELID_INDEXES atri
       ON atri.relid_index = aci.address_type_index
-    LEFT JOIN GEN_COUNTRY_RELID_INDEXES      cri
-      ON cri.relid_index = aci.country_index
+    LEFT
+    JOIN GEN_COUNTRY_RELID_INDEXES      cri
+      ON  cri.relid_index = aci.country_index
 )
-SELECT * FROM GEN_ADDRESS_TYPE_COUNTRY_RELID;
+-- SELECT * FROM GEN_ADDRESS_TYPE_COUNTRY_RELID;
 --  address_type_relid | country_relid 
 -- --------------------+---------------
---                   1 |             4
---                   2 |             4
---                   2 |             3
---                     |             4
---                     |             2
+--                  73 |             3
+--                  73 |             2
+--                  74 |             4
+--                  75 |             3
+--                     |             3
 -- (5 rows)
 
 -- Add number of regions for the chosen country, and minimum region relid
--- Region relid is a bit tricky:
--- country 1 region relids start at 1
--- country 2 region relids start at (max relid for country 1) + 1
--- country 3 region relids start at (max relid for country 2) + 1
--- provide minimum region relid for each randomly chosen country
--- Both number of regions and minimum region relid are null for countries with no regions
 , ADD_NUM_REGIONS_MIN_RELID AS (
   SELECT d.*
-        ,NULLIF((SELECT COUNT(*) FROM tables.region r WHERE r.country_relid = d.country_relid), 0) num_regions
-        ,(SELECT MIN(relid) FROM tables.region r WHERE r.country_relid = d.country_relid)          min_region_relid
-    FROM GEN_ADDRESS_COUNTRY_RELID d
+        ,NULLIF((SELECT COUNT(*)   FROM tables.region r WHERE r.country_relid = d.country_relid), 0) num_regions
+        ,       (SELECT MIN(relid) FROM tables.region r WHERE r.country_relid = d.country_relid)     min_region_relid
+    FROM GEN_ADDRESS_TYPE_COUNTRY_RELID d
 )
 -- SELECT * FROM ADD_NUM_REGIONS_MIN_RELID;
---  type_relid | country_relid | num_regions | min_region_relid 
--- ------------+---------------+-------------+------------------
---           1 |             3 |             |                 
---           3 |             4 |          55 |               14
---             |             1 |             |                 
---           1 |             2 |          13 |                1
---           3 |             2 |          13 |                1
+--  address_type_relid | country_relid | num_regions | min_region_relid 
+-- --------------------+---------------+-------------+------------------
+--                  73 |             3 |             |                 
+--                  74 |             3 |             |                 
+--                  74 |             3 |             |                 
+--                  74 |             1 |             |                 
+--                     |             4 |          55 |               18
 -- (5 rows)
 
 -- Add a region relid
