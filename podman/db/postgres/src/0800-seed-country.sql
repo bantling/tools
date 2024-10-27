@@ -2,21 +2,25 @@
 -- See https://www.iban.com/country-codes for 2 and 3 char country codes
 -- See https://en.wikipedia.org/wiki/ISO_3166-2 for countries and region codes
 WITH COUNTRY_DATA AS (
-  SELECT *
+  SELECT s.*
     FROM (VALUES
            ('Aruba'           , 'AW'  , 'ABW' , false      , false           , NULL                                             , NULL               )
           ,('Canada'          , 'CA'  , 'CAN' , true       ,  true           , '^([A-Za-z][0-9][A-Za-z]) ?([0-9][A-Za-z][0-9])$','\1 \2'             )
           ,('Christmas Island', 'CX'  , 'CXR' , false      ,  true           , '^6798$'                                         ,'6798'              )
           ,('United States'   , 'US'  , 'USA' , true       ,  true           , '^([0-9]{5}(-[0-9]{4})?)$'                       ,'\1'                )
-         ) AS t(
+         ) AS s(
             name              , code_2, code_3, has_regions, has_mailing_code, mailing_code_match                             , mailing_code_format
          )
+    LEFT
+    JOIN tables.country t 
+      ON s.code_2 = t.code_2
+   WHERE t.relid IS NULL
 ),
 ROW_DATA AS (
   SELECT *
     FROM COUNTRY_DATA d
     JOIN LATERAL(
-           SELECT *
+           SELECT relid
              FROM code.NEXT_BASE('tables.country'::regclass::oid, d.name, d.name) t
           ) ON TRUE
 )
@@ -41,10 +45,12 @@ SELECT relid
   FROM ROW_DATA;
 
 -- Regions
+--
+-- ANY NEW DATA ADDED AFTER INITIAL GO LIVE MUST BE ADDED IN A NEW SRC DIRECTORY
+--
 WITH CA_REGION_DATA AS (
   SELECT (SELECT relid FROM tables.country WHERE code_2 = 'CA') country_relid
-        ,name
-        ,code
+        ,s.*
         ,ROW_NUMBER() OVER() AS ord
     FROM (VALUES
            ('Alberta'                  , 'AB')
@@ -60,15 +66,18 @@ WITH CA_REGION_DATA AS (
           ,('Quebec'                   , 'QC')
           ,('Saskatchewan'             , 'SK')
           ,('Yukon'                    , 'YT')
-        ) AS t(
+        ) AS s(
             name                       , code
-        ) 
+        )
+    LEFT
+    JOIN tables.region t
+      ON t.country_relid = (SELECT relid FROM tables.country WHERE code_2 = 'CA')
+      AND s.code = t.code
+   WHERE t.relid IS NULL
 )
---SELECT * FROM CA_REGION_DATA;
-,US_REGION_DATA AS (
+, US_REGION_DATA AS (
   SELECT (SELECT relid FROM tables.country WHERE code_2 = 'US') country_relid
-        ,name
-        ,code
+        ,s.*
         ,ROW_NUMBER() OVER() AS ord
     FROM (VALUES
            ('Alabama'                  , 'AL')
@@ -126,9 +135,14 @@ WITH CA_REGION_DATA AS (
           ,('Northern Mariana Islands' , 'MP')
           ,('Puerto Rico'              , 'PU')
           ,('Virgin Islands'           , 'VI')
-         ) AS t(
+         ) AS s(
            name                        , code
          )
+    LEFT
+    JOIN tables.region t
+      ON t.country_relid = (SELECT relid FROM tables.country WHERE code_2 = 'US')
+      AND s.code = t.code
+   WHERE t.relid IS NULL
 )
 -- SELECT * FROM US_REGION_DATA;
 ,ROW_DATA AS (

@@ -20,6 +20,36 @@ SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_pk PRIMARY KEY(relid)'
  )
 \gexec
 
+SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk_name UNIQUE KEY(name)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'country'
+      AND CONSTRAINT_NAME = 'country_uk_name'
+ )
+\gexec
+
+SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk_code_2 UNIQUE KEY(code_2)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'country'
+      AND CONSTRAINT_NAME = 'country_uk_code_2'
+ )
+\gexec
+
+SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk_code_3 UNIQUE KEY(code_3)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'country'
+      AND CONSTRAINT_NAME = 'country_uk_code_3'
+ )
+\gexec
+
 SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_relid_fk FOREIGN KEY(relid) REFERENCES tables.base(relid)'
  WHERE NOT EXISTS (
    SELECT NULL
@@ -56,6 +86,26 @@ SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_pk PRIMARY KEY(relid)'
     WHERE TABLE_SCHEMA    = 'tables'
       AND TABLE_NAME      = 'region'
       AND CONSTRAINT_NAME = 'region_pk'
+ )
+\gexec
+
+SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_name UNIQUE KEY(name, country_relid)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'region'
+      AND CONSTRAINT_NAME = 'region_uk_name'
+ )
+\gexec
+
+SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_code UNIQUE KEY(code, country_relid)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'region'
+      AND CONSTRAINT_NAME = 'region_uk_code'
  )
 \gexec
 

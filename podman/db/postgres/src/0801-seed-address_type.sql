@@ -1,12 +1,19 @@
 -- Seed address types
+--
+-- ANY NEW DATA ADDED AFTER INITIAL GO LIVE MUST BE ADDED IN A NEW SRC DIRECTORY
+--
 WITH ADDR_TYPE_DATA AS (
-  SELECT name
+  SELECT s.*
         ,ROW_NUMBER() OVER() AS ord
     FROM (VALUES
             ('Physical')
            ,('Mailing')
            ,('Billing')
-         ) AS t(name)
+         ) AS s(name)
+    LEFT
+    JOIN tables.address_type t 
+      ON s.name = t.name
+   WHERE t.relid IS NULL
 )
 ,ROW_DATA AS (
   SELECT *

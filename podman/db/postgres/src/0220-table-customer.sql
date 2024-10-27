@@ -15,14 +15,24 @@ SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_pk PRIMARY K
  )
 \gexec
 
+SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_uk_name UNIQUE KEY(name)'
+ WHERE NOT EXISTS (
+   SELECT NULL
+     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA    = 'tables'
+      AND TABLE_NAME      = 'address_type'
+      AND CONSTRAINT_NAME = 'address_type_uk_name'
+ )
+\gexec
+
 -- Address
 CREATE TABLE IF NOT EXISTS tables.address(
    relid         BIGINT
   ,type_relid    BIGINT
-  ,country_relid BIGINT   NOT NULL
+  ,country_relid BIGINT NOT NULL
   ,region_relid  BIGINT
-  ,city          TEXT      NOT NULL
-  ,address       TEXT      NOT NULL
+  ,city          TEXT   NOT NULL
+  ,address       TEXT   NOT NULL
   ,address_2     TEXT
   ,address_3     TEXT
   ,mailing_code  TEXT
@@ -72,9 +82,9 @@ SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_region_fk FOREIGN KEY(
 CREATE TABLE IF NOT EXISTS tables.customer_person(
    relid         BIGINT
   ,address_relid BIGINT
-  ,first_name    TEXT      NOT NULL
+  ,first_name    TEXT   NOT NULL
   ,middle_name   TEXT
-  ,last_name     TEXT      NOT NULL
+  ,last_name     TEXT   NOT NULL
 );
 
 SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_pk PRIMARY KEY(relid)'
