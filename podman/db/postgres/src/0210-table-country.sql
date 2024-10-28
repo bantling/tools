@@ -20,7 +20,7 @@ SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_pk PRIMARY KEY(relid)'
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk_name UNIQUE KEY(name)'
+SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk_name UNIQUE(name)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
@@ -30,7 +30,7 @@ SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk_name UNIQUE KEY(nam
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk_code_2 UNIQUE KEY(code_2)'
+SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk_code_2 UNIQUE(code_2)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
@@ -40,7 +40,7 @@ SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk_code_2 UNIQUE KEY(c
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk_code_3 UNIQUE KEY(code_3)'
+SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_uk_code_3 UNIQUE(code_3)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
@@ -89,7 +89,7 @@ SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_pk PRIMARY KEY(relid)'
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_name UNIQUE KEY(name, country_relid)'
+SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_name UNIQUE(name, country_relid)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
@@ -99,7 +99,7 @@ SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_name UNIQUE KEY(name,
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_code UNIQUE KEY(code, country_relid)'
+SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_code UNIQUE(code, country_relid)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS

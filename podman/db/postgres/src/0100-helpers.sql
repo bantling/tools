@@ -326,7 +326,7 @@ SELECT DISTINCT * FROM (
         ) AS t(r, i)
 ) t;
 
-/*-- ID_TO_RELID converts a base 62 string with a maximum of 11 chars to a BIGINT
+-- ID_TO_RELID converts a base 62 string with a maximum of 11 chars to a BIGINT
 -- Maximum ID is AzL8n0Y58m7 -> signed BIGINT value is 9_223_372_036_854_775_807 
 --               12345678901
 -- Raises an exception if P_ID is NULL or 0, since valid ids start at 1 
@@ -389,4 +389,3 @@ SELECT DISTINCT * FROM (
            ('AzL8n0Y58m7', 9_223_372_036_854_775_807)    
         ) AS t(i, r)
 ) t;
-*/

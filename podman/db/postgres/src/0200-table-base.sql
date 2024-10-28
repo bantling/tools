@@ -1,6 +1,5 @@
 CREATE TABLE IF NOT EXISTS tables.base(
-   relid       BIGSERIAL
-  ,id          VARCHAR(11)              GENERATED ALWAYS AS (code.RELID_TO_ID(relid)) STORED              
+   relid       BIGSERIAL              
   ,tbloid      OID                      NOT NULL
   ,version     INTEGER                  DEFAULT 1
   ,description TEXT

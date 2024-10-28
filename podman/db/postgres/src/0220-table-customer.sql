@@ -15,7 +15,7 @@ SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_pk PRIMARY K
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_uk_name UNIQUE KEY(name)'
+SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_uk_name UNIQUE(name)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
