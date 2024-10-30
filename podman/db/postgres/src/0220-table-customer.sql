@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS tables.address_type(
    relid         BIGINT
   ,name  TEXT    NOT NULL
-  ,ord   INTEGER NOT NULL -- ordering
+  ,ord   INTEGER NOT NULL
 );
 
 SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_pk PRIMARY KEY(relid)'

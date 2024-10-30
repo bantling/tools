@@ -1,6 +1,6 @@
 -- Helper functions that could be used in table definitions, views, or code
 
--- TEST(BOOLEAN, TEXT): test that a condition succeeded for cases where no exception is raised
+-- TEST(TEXT, BOOLEAN): test that a condition succeeded for cases where no exception is raised
 --   P_MSG : string exception message if the test failed
 --   P_TEST: true if test succeeded, false if it failed
 -- 
@@ -22,6 +22,56 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+-- TEST(TEXT, TEXT): test a function for a case that raises an exception
+--   P_ERR   : expected exception text
+--   P_QUERY : string query to execute
+-- 
+-- Returns true if executing P_QUERY raises an exception with message P_ERR
+-- It is a function so it can be used in select, making it easy and useful for unit tests
+CREATE OR REPLACE FUNCTION code.TEST(P_ERR TEXT, P_QUERY TEXT) RETURNS BOOLEAN AS
+$$
+DECLARE
+  V_ERR  TEXT;
+  V_DIED BOOLEAN;
+BEGIN
+  
+  -- P_ERR cannot be NULL or EMPTY
+  IF LENGTH(COALESCE(P_ERR, '')) = 0 THEN
+    RAISE EXCEPTION 'P_ERR cannot be null or empty';
+  END IF;
+  
+  -- P_QUERY cannot be NULL or EMPTY
+  IF LENGTH(COALESCE(P_QUERY, '')) = 0 THEN
+    RAISE EXCEPTION 'P_QUERY cannot be null or empty';
+  END IF;
+
+  BEGIN
+    -- Execute the call
+    V_DIED := TRUE;
+    EXECUTE P_QUERY;
+    V_DIED := FALSE;
+  EXCEPTION
+    WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS V_ERR = MESSAGE_TEXT;
+  END;
+  
+  CASE
+    -- Did an exception occur?
+    WHEN NOT V_DIED
+    THEN RAISE EXCEPTION 'Expected exception did not occur: %s', P_ERR;
+  
+    -- If an exception is expected, does it have the right text?
+    WHEN NOT V_ERR = P_ERR
+    THEN RAISE EXCEPTION 'The expected exception message ''%'' does not match the actual message ''%''', P_ERR, V_ERR;
+    
+    ELSE NULL;
+  END CASE;
+  
+  -- Success
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Test TEST(P_MSG, P_TEST)
 DO $$
 DECLARE
@@ -30,7 +80,7 @@ DECLARE
 BEGIN
   BEGIN
     V_DIED := TRUE;
-    SELECT code.TEST(NULL, NULL);
+    SELECT code.TEST(NULL, NULL::BOOLEAN);
     V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
@@ -45,7 +95,7 @@ BEGIN
   
   BEGIN
     V_DIED := TRUE;
-    SELECT code.TEST('TEST', NULL);
+    SELECT code.TEST('TEST', NULL::BOOLEAN);
     V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
@@ -84,70 +134,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- TEST(TEXT, TEXT, TEXT, ANYELEMENT...): test a function for a case that raises an exception
---   P_MSG    : string to include in exception if the test failed
---   P_ERR    : expected exception text
---   P_FUNC   : string name of function
---   P_ARGS   : optional variadic args to pass to the function
---
---   NOTE: 
---   P_ARGS are string values that are concatanated into an SQL string of the following form:
---     SELECT <FUNCTION_NAME>(ARG1, ARG2, ...)
---
---   This means if you want to form the string SELECT FN('foo', true, 1), you would need to
---   call TEST('msg', 'error text', 'FN', '''foo''', 'true', '1') 
--- 
--- Returns true if invoking P_FUNC with P_ARGS raises an exception with message P_ERR
--- It is a function so it can be used in select, making it easy and useful for unit tests
-CREATE OR REPLACE FUNCTION code.TEST(P_MSG TEXT, P_ERR TEXT, P_FUNC TEXT, P_ARGS VARIADIC TEXT[] = NULL) RETURNS BOOLEAN AS
-$$
-DECLARE
-  V_CALL TEXT;
-  V_RES  TEXT;
-  V_ERR  TEXT;
-  V_DIED BOOLEAN;
-BEGIN
-  -- P_MSG cannot be NULL or EMPTY
-  IF LENGTH(COALESCE(P_MSG, '')) = 0 THEN
-    RAISE EXCEPTION 'P_MSG cannot be null or empty';
-  END IF;
-  
-  -- P_ERR cannot be NULL or EMPTY
-  IF LENGTH(COALESCE(P_ERR, '')) = 0 THEN
-    RAISE EXCEPTION 'P_ERR cannot be null or empty';
-  END IF;
-
-  BEGIN
-    -- Construct a string function call, considering that there may be zero or more args passed to it
-    SELECT 'SELECT ' || P_FUNC || '(' || (SELECT COALESCE(STRING_AGG(t, ','), '') FROM UNNEST(P_ARGS) t) || ')' INTO V_CALL;
-  
-    -- Execute the call
-    V_DIED := TRUE;
-    EXECUTE V_CALL INTO V_RES;
-    V_DIED := FALSE;
-  EXCEPTION
-    WHEN OTHERS THEN
-      GET STACKED DIAGNOSTICS V_ERR = MESSAGE_TEXT;
-  END;
-  
-  CASE
-    -- Did an exception occur?
-    WHEN NOT V_DIED
-    THEN RAISE EXCEPTION '%s: An exception did not occur', P_MSG;
-  
-    -- If an exception is expected, does it have the right text?
-    WHEN NOT V_ERR = P_ERR
-    THEN RAISE EXCEPTION '%: The expected exception message ''%'' does not match the actual message ''%''', P_MSG, P_ERR, V_ERR;
-    
-    ELSE NULL;
-  END CASE;
-  
-  -- Success
-  RETURN TRUE;
-END;
-$$ LANGUAGE plpgsql;
-
--- Test TEST(P_MSG, P_ERR, P_FUNC, P_ARGS...)
+-- Test TEST(P_ERR, P_QUERY)
 DO $$
 DECLARE
   V_DIED BOOLEAN;
@@ -155,15 +142,15 @@ DECLARE
   V_MSG TEXT;
   V_RES  TEXT;
 BEGIN
-  -- P_MSG cannot be null
+  -- P_ERR cannot be null
   BEGIN
     V_DIED := TRUE;
-    SELECT code.TEST(NULL, NULL, NULL);
+    SELECT code.TEST(NULL, NULL::TEXT);
     V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
       GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
-      IF NOT V_MSG = 'P_MSG cannot be null or empty' THEN
+      IF NOT V_MSG = 'P_ERR cannot be null or empty' THEN
         RAISE EXCEPTION 'code.TEST must die with P_MSG cannot be null or empty';
       END IF;
   END;
@@ -171,15 +158,15 @@ BEGIN
     RAISE EXCEPTION 'code.TEST must die when P_MSG is NULL';
   END IF;
   
-  -- P_MSG cannot be empty
+  -- P_ERR cannot be empty
   BEGIN
     V_DIED := TRUE;
-    SELECT code.TEST('', NULL, NULL);
+    SELECT code.TEST('', NULL::TEXT);
     V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
       GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
-      IF NOT V_MSG = 'P_MSG cannot be null or empty' THEN
+      IF NOT V_MSG = 'P_ERR cannot be null or empty' THEN
         RAISE EXCEPTION 'code.TEST must die with P_MSG cannot be null or empty';
       END IF;
   END;
@@ -189,7 +176,7 @@ BEGIN
   
   -- Test error calling COALESCE(), where the error message provided IS correct
   BEGIN
-    SELECT code.TEST('SYNERR', 'syntax error at or near ")"', 'COALESCE') INTO V_RES;
+    SELECT code.TEST('syntax error at or near ")"', 'SELECT COALESCE()') INTO V_RES;
   EXCEPTION
     WHEN OTHERS THEN
       GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
@@ -199,12 +186,12 @@ BEGIN
   -- Test error calling COALESCE(), where the error message provided IS NOT correct
   BEGIN
     V_DIED := TRUE;
-    SELECT code.TEST('SYNERR', 'wrong error message', 'COALESCE') INTO V_RES;
+    SELECT code.TEST('wrong error message', 'SELECT COALESCE()') INTO V_RES;
     V_DIED := FALSE;
   EXCEPTION
     WHEN OTHERS THEN
       GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
-      IF NOT V_MSG = 'SYNERR: The expected exception message ''wrong error message'' does not match the actual message ''syntax error at or near ")"''' THEN
+      IF NOT V_MSG = 'The expected exception message ''wrong error message'' does not match the actual message ''syntax error at or near ")"''' THEN
         RAISE EXCEPTION 'code.TEST COALESCE() did not return incorrect error message';
       END IF;
   END;
@@ -245,7 +232,7 @@ $$
    WHERE LENGTH(COALESCE(strs, '')) > 0
 $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
--- Test NBLANK_WS
+-- Test NEMPTY_WS
 SELECT DISTINCT code.TEST(msg, code.NEMPTY_WS('-', VARIADIC args) = res) nempty_ws
   FROM (VALUES
          ('NEMPTY_WS must return a-b'    , ARRAY[NULL, 'a' , '' , 'b'                       ], 'a-b'),
@@ -265,8 +252,8 @@ $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 -- Test TO_8601
 SELECT DISTINCT code.TEST(msg, code.IIF(ARRAY_LENGTH(ARG, 1) = 0, code.TO_8601(), code.TO_8601(ARG[1])) = res)
   FROM (VALUES
-         ('TO_8601() must return NOW'                   , ARRAY[]::TIMESTAMP[]                              , TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
-         ('TO_8601(NULL) must return NOW'               , ARRAY[NULL]::TIMESTAMP[]                          , TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+         ('TO_8601() must return NOW'                   , ARRAY[]::TIMESTAMP[]                              , TO_CHAR(NOW() AT TIME ZONE 'UTC'                   , 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+         ('TO_8601(NULL) must return NOW'               , ARRAY[NULL]::TIMESTAMP[]                          , TO_CHAR(NOW() AT TIME ZONE 'UTC'                   , 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
          ('TO_8601(NOW - 1 DAY) must return NOW - 1 DAY', ARRAY[NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY'], TO_CHAR(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
        ) AS t(msg, arg, res);
 
@@ -306,9 +293,9 @@ $$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 --- Test RELID_TO_ID
 SELECT DISTINCT * FROM (
-  SELECT code.TEST('RELID_TO_ID(NULL)'            , 'P_RELID cannot be null or 0', 'code.RELID_TO_ID', 'NULL') relid_to_id
+  SELECT code.TEST('P_RELID cannot be null or 0', 'SELECT code.RELID_TO_ID(NULL)') relid_to_id
   UNION  ALL
-  SELECT code.TEST('RELID_TO_ID(0)'               , 'P_RELID cannot be null or 0', 'code.RELID_TO_ID', '0'   )
+  SELECT code.TEST('P_RELID cannot be null or 0', 'SELECT code.RELID_TO_ID(0)'   )
   UNION ALL
   SELECT code.TEST('RELID_TO_ID must return ' || i, code.RELID_TO_ID(r) = i)
     FROM (VALUES
@@ -366,15 +353,15 @@ $$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 --- Test ID_TO_RELID
 SELECT DISTINCT * FROM (
-  SELECT code.TEST('ID_TO_RELID(NULL)'           , 'P_ID cannot be null or empty'                , 'code.ID_TO_RELID', 'NULL') id_to_relid
+  SELECT code.TEST('P_ID cannot be null or empty'                , 'SELECT code.ID_TO_RELID(NULL)') id_to_relid
   UNION  ALL
-  SELECT code.TEST('ID_TO_RELID('''')'           , 'P_ID cannot be null or empty'                , 'code.ID_TO_RELID', '''''')
+  SELECT code.TEST('P_ID cannot be null or empty'                , 'SELECT code.ID_TO_RELID('''')')
   UNION  ALL
-  SELECT code.TEST('ID_TO_RELID(''0'')'          , 'P_ID must be in the range [1 .. AzL8n0Y58m7]', 'code.ID_TO_RELID', '''0''')
+  SELECT code.TEST('P_ID must be in the range [1 .. AzL8n0Y58m7]', 'SELECT code.ID_TO_RELID(''0'')')
   UNION  ALL
-  SELECT code.TEST('ID_TO_RELID(''-1'')'         , 'P_ID must be in the range [1 .. AzL8n0Y58m7]', 'code.ID_TO_RELID', '''-1''')
+  SELECT code.TEST('P_ID must be in the range [1 .. AzL8n0Y58m7]', 'SELECT code.ID_TO_RELID(''-1'')')
   UNION  ALL
-  SELECT code.TEST('ID_TO_RELID(''AzL8n0Y58m8'')', 'P_ID must be in the range [1 .. AzL8n0Y58m7]', 'code.ID_TO_RELID', '''AzL8n0Y58m8''')
+  SELECT code.TEST('P_ID must be in the range [1 .. AzL8n0Y58m7]', 'SELECT code.ID_TO_RELID(''AzL8n0Y58m8'')')
   UNION ALL
   SELECT code.TEST('ID_TO_RELID must return ' || r, code.ID_TO_RELID(i) = r)
     FROM (VALUES

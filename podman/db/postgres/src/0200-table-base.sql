@@ -20,16 +20,16 @@ SELECT 'ALTER TABLE tables.base ADD CONSTRAINT base_pk PRIMARY KEY(relid)'
 \gexec
 
 -- Index on base descriptor field for full text searches
-CREATE INDEX IF NOT EXISTS global_ix_terms ON tables.base USING GIN(terms);
+CREATE INDEX IF NOT EXISTS base_ix_terms ON tables.base USING GIN(terms);
 
 -- Index on extra field for json key value comparisons
-CREATE INDEX IF NOT EXISTS global_ix_extra ON tables.base USING GIN(extra JSONB_PATH_OPS);
+CREATE INDEX IF NOT EXISTS base_ix_extra ON tables.base USING GIN(extra JSONB_PATH_OPS);
 
 -- Index on created field for created date comparisons
-CREATE INDEX IF NOT EXISTS global_ix_created ON tables.base (created);
+CREATE INDEX IF NOT EXISTS base_ix_created ON tables.base (created);
 
 -- Index on modified field for modified date comparisons
-CREATE INDEX IF NOT EXISTS global_ix_modified ON tables.base (modified);
+CREATE INDEX IF NOT EXISTS base_ix_modified ON tables.base (modified);
 
 -- NEXT_BASE gets the next relid by inserting an entry into base
 -- P_TBL is the table oid of the table to insert into
@@ -61,3 +61,24 @@ $$
            )
  RETURNING *;
 $$ LANGUAGE sql;
+
+/*
+A trigger function that must be applied to any table where rows can be updated.
+Updates the base table modified date.
+
+The trigger must be created as follows for a table named foo:
+ 
+CREATE OR REPLACE TRIGGER country_tg AFTER UPDATE ON tables.foo
+REFERENCING NEW TABLE AS NEW
+FOR EACH STATEMENT EXECUTE FUNCTION code.UPDATE_BASE();
+*/ 
+CREATE FUNCTION code.UPDATE_BASE() RETURNS trigger AS
+$$
+BEGIN
+  RAISE NOTICE 'Updating base modified date for changes to table %', TG_TABLE_NAME;
+  UPDATE tables.base
+     SET modified = NOW() AT TIME ZONE 'UTC';
+   
+   RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;

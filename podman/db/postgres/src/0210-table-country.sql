@@ -8,7 +8,13 @@ CREATE TABLE IF NOT EXISTS tables.country(
   ,has_mailing_code    BOOLEAN NOT NULL
   ,mailing_code_match  TEXT
   ,mailing_code_format TEXT
+  ,ord                 INTEGER NOT NULL
 );
+
+-- Update base table modified dates for each update statement
+CREATE OR REPLACE TRIGGER country_tg AFTER UPDATE ON tables.country
+REFERENCING NEW TABLE AS NEW
+FOR EACH STATEMENT EXECUTE FUNCTION code.UPDATE_BASE();
 
 SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
