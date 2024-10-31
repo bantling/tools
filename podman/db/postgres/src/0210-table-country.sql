@@ -103,7 +103,7 @@ SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_pk PRIMARY KEY(relid)'
 \gexec
 
 -- Unique (name, country)
-SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_name UNIQUE(name, country_relid)'
+SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_name_country UNIQUE(name, country_relid)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
@@ -114,7 +114,7 @@ SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_name UNIQUE(name, cou
 \gexec
 
 -- Unique (code, country)
-SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_code UNIQUE(code, country_relid)'
+SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_uk_code_country UNIQUE(code, country_relid)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS

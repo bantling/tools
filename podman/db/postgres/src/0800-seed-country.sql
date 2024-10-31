@@ -26,18 +26,14 @@ INSERT INTO tables.country(
   ,mailing_code_format
   ,ord
 )
-SELECT c.name as description
-      ,TO_TSVECTOR('english', c.name) as terms
+SELECT c.name AS description
+      ,TO_TSVECTOR('english', c.code_2) AS terms
       ,c.*
   FROM COUNTRY_DATA c
-    ON CONFLICT(code_2) DO
+    ON CONFLICT(name) DO
 UPDATE
-   SET name        = excluded.name
-      ,description = excluded.name
-      ,ord         = excluded.ord
-      ,terms       = TO_TSVECTOR('english', excluded.name)
- WHERE tables.country.name != excluded.name
-    OR tables.country.ord  != excluded.ord;
+   SET                ord  = excluded.ord
+ WHERE tables.country.ord != excluded.ord;
 
 -- Regions
 WITH CA_REGION_DATA AS (
@@ -139,15 +135,18 @@ WITH CA_REGION_DATA AS (
 )
 -- SELECT * FROM REGION_DATA;
 INSERT INTO tables.region(
-  relid
+  description
+ ,terms
  ,country_relid
  ,name
  ,code
  ,ord
 )
-SELECT relid
-      ,country_relid
-      ,name
-      ,code
-      ,ord
-  FROM REGION_DATA;
+SELECT r.name as description
+      ,TO_TSVECTOR('english', r.code) AS terms
+      ,r.*
+  FROM REGION_DATA r
+    ON CONFLICT(name, country_relid) DO
+UPDATE
+   SET               ord  = excluded.ord
+ WHERE tables.region.ord != excluded.ord;
