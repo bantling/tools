@@ -1,9 +1,10 @@
--- Address types
+-- ========================
+-- == address type table ==
+-- ========================
 CREATE TABLE IF NOT EXISTS tables.address_type(
-   relid         BIGINT
-  ,name  TEXT    NOT NULL
+   name  TEXT    NOT NULL
   ,ord   INTEGER NOT NULL
-);
+) INHERITS(tables.base);
 
 SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
@@ -25,10 +26,11 @@ SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_uk_name UNIQ
  )
 \gexec
 
--- Address
+-- ===================
+-- == address table ==
+-- ===================
 CREATE TABLE IF NOT EXISTS tables.address(
-   relid         BIGINT
-  ,type_relid    BIGINT
+   type_relid    BIGINT
   ,country_relid BIGINT NOT NULL
   ,region_relid  BIGINT
   ,city          TEXT   NOT NULL
@@ -36,7 +38,7 @@ CREATE TABLE IF NOT EXISTS tables.address(
   ,address_2     TEXT
   ,address_3     TEXT
   ,mailing_code  TEXT
-);
+) INHERITS(tables.base);
 
 SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
@@ -78,14 +80,15 @@ SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_region_fk FOREIGN KEY(
  )
 \gexec
 
--- Individual Customer
+-- =====================
+-- customer person table
+-- =====================
 CREATE TABLE IF NOT EXISTS tables.customer_person(
-   relid         BIGINT
-  ,address_relid BIGINT
+   address_relid BIGINT
   ,first_name    TEXT   NOT NULL
   ,middle_name   TEXT
   ,last_name     TEXT   NOT NULL
-);
+) INHERITS(tables.base);
 
 SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
@@ -107,11 +110,12 @@ SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_addres
  )
 \gexec
 
--- Business Customer
+-- ==========================
+-- == business customer table
+-- ==========================
 CREATE TABLE IF NOT EXISTS tables.customer_business(
-   relid BIGINT
-  ,name  TEXT   NOT NULL
-);
+   name  TEXT   NOT NULL
+) INHERITS(tables.base);
 
 SELECT 'ALTER TABLE tables.customer_business ADD CONSTRAINT customer_business_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
@@ -123,7 +127,9 @@ SELECT 'ALTER TABLE tables.customer_business ADD CONSTRAINT customer_business_pk
  )
 \gexec
 
--- Join a business with address(es)
+-- =================================
+-- == business address join table ==
+-- =================================
 CREATE TABLE IF NOT EXISTS tables.customer_business_address_jt(
    business_relid BIGINT
   ,address_relid  BIGINT

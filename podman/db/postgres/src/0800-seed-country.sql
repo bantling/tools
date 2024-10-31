@@ -1,47 +1,22 @@
 -- Seed data for country and region tables
 -- See https://www.iban.com/country-codes for 2 and 3 char country codes
 -- See https://en.wikipedia.org/wiki/ISO_3166-2 for countries and region codes
---
--- When using ROW_NUMBER() to generate the order of the countries/regions, the ordering will match the order listed in
--- the VALUES clauses.
--- But when combining:
---   a left join onto the country/region tables to filter out already inserted values
---   a lateral join for calls to code.NEXT_BASE
--- The result is that the code.NEXT_BASE calls are in random order, causing generated relids to be in random order.
---
--- This is beneficial for seed algorithms that depend on countries, as they must be written to handle unordered relids.
--- In the case of regions, the random ordering is across all regions, regardless of country.
 WITH COUNTRY_DATA AS (
   SELECT s.*
         ,ROW_NUMBER() OVER() AS ord
     FROM (VALUES
-           ('United States'   , 'US'  , 'USA' , true       ,  true           , '^([0-9]{5}(-[0-9]{4})?)$'                       ,'\1'                )
-          ,('Aruba'           , 'AW'  , 'ABW' , false      , false           , NULL                                             , NULL               )
+           ('Aruba'           , 'AW'  , 'ABW' , false      , false           , NULL                                             , NULL               )
           ,('Canada'          , 'CA'  , 'CAN' , true       ,  true           , '^([A-Za-z][0-9][A-Za-z]) ?([0-9][A-Za-z][0-9])$','\1 \2'             )
           ,('Christmas Island', 'CX'  , 'CXR' , false      ,  true           , '^6798$'                                         ,'6798'              )
+          ,('United States'   , 'US'  , 'USA' , true       ,  true           , '^([0-9]{5}(-[0-9]{4})?)$'                       ,'\1'                )
          ) AS s(
             name              , code_2, code_3, has_regions, has_mailing_code, mailing_code_match                               , mailing_code_format
          )
 )
 -- SELECT * FROM COUNTRY_DATA;
-,ROW_DATA AS (
-  SELECT s.*
-        ,t.*
-        ,c.code_2 IS NOT NULL AS dup
-    FROM COUNTRY_DATA s
-    JOIN LATERAL(
-           SELECT relid
-             FROM code.NEXT_BASE('tables.country'::regclass::oid, s.name, s.name)
-         ) t
-      ON TRUE
-    LEFT
-    JOIN tables.country c
-      ON c.code_2 = s.code_2
-   WHERE 
-)
--- SELECT * FROM ROW_DATA;
 INSERT INTO tables.country(
-   relid
+   description
+  ,terms
   ,name
   ,code_2
   ,code_3
@@ -51,24 +26,20 @@ INSERT INTO tables.country(
   ,mailing_code_format
   ,ord
 )
-SELECT relid
-      ,name
-      ,code_2
-      ,code_3
-      ,has_regions
-      ,has_mailing_code
-      ,mailing_code_match
-      ,mailing_code_format
-      ,ord
-  FROM ROW_DATA
-    ON CONFLICT(code_2)
-    DO UPDATE SET ord = excluded.ord
-        WHERE tables.country.ord != excluded.ord;
+SELECT c.name as description
+      ,TO_TSVECTOR('english', c.name) as terms
+      ,c.*
+  FROM COUNTRY_DATA c
+    ON CONFLICT(code_2) DO
+UPDATE
+   SET name        = excluded.name
+      ,description = excluded.name
+      ,ord         = excluded.ord
+      ,terms       = TO_TSVECTOR('english', excluded.name)
+ WHERE tables.country.name != excluded.name
+    OR tables.country.ord  != excluded.ord;
 
 -- Regions
---
--- ANY NEW DATA ADDED AFTER INITIAL GO LIVE MUST BE ADDED IN A NEW SRC DIRECTORY
---
 WITH CA_REGION_DATA AS (
   SELECT (SELECT relid FROM tables.country WHERE code_2 = 'CA') AS country_relid
         ,s.*
@@ -90,6 +61,7 @@ WITH CA_REGION_DATA AS (
             name                       , code
         )
 )
+-- SELECT * FROM CA_REGION_DATA;
 , US_REGION_DATA AS (
   SELECT (SELECT relid FROM tables.country WHERE code_2 = 'US') country_relid
         ,s.*
@@ -166,22 +138,6 @@ WITH CA_REGION_DATA AS (
   ) s
 )
 -- SELECT * FROM REGION_DATA;
-,ROW_DATA AS (
-  SELECT s.*
-        ,t.*
-    FROM REGION_DATA s
-    LEFT
-    JOIN tables.region r
-      ON r.country_relid = s.country_relid
-     AND r.code = s.code
-    JOIN LATERAL (
-           SELECT *
-             FROM code.NEXT_BASE('tables.region'::regclass::oid, s.name, s.name)
-         ) t
-      ON TRUE
-   WHERE r.code IS NULL  
-)
--- SELECT * FROM ROW_DATA
 INSERT INTO tables.region(
   relid
  ,country_relid
@@ -194,4 +150,4 @@ SELECT relid
       ,name
       ,code
       ,ord
-  FROM ROW_DATA;
+  FROM REGION_DATA;

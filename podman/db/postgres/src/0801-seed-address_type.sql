@@ -1,4 +1,4 @@
--- Seed address types
+/*-- Seed address types
 --
 -- ANY NEW DATA ADDED AFTER INITIAL GO LIVE MUST BE ADDED IN A NEW SRC DIRECTORY
 --
@@ -32,3 +32,4 @@ SELECT relid
       ,name
       ,ord
   FROM ROW_DATA;
+*/
