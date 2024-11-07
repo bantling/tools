@@ -236,18 +236,18 @@ $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 -- Test NEMPTY_WS
 SELECT DISTINCT code.TEST(msg, code.NEMPTY_WS('-', VARIADIC args) = res) nempty_ws
   FROM (VALUES
-         ('NEMPTY_WS must return a'      , ARRAY['a'                                        ], 'a'),
-         ('NEMPTY_WS must return a'      , ARRAY[NULL, 'a'                                  ], 'a'),
-         ('NEMPTY_WS must return a'      , ARRAY['a', NULL                                  ], 'a'),
-         ('NEMPTY_WS must return a'      , ARRAY[NULL, 'a', NULL                            ], 'a'),
-         ('NEMPTY_WS must return a'      , ARRAY['', 'a'                                    ], 'a'),
-         ('NEMPTY_WS must return a'      , ARRAY['a', ''                                    ], 'a'),
-         ('NEMPTY_WS must return a'      , ARRAY['', 'a', ''                                ], 'a'),
-         ('NEMPTY_WS must return a'      , ARRAY[NULL, 'a', ''                              ], 'a'),
-         ('NEMPTY_WS must return a'      , ARRAY['', 'a', NULL                              ], 'a'),
-         ('NEMPTY_WS must return a-b'    , ARRAY[NULL, 'a' , '' , 'b'                       ], 'a-b'),
-         ('NEMPTY_WS must return a-b-c'  , ARRAY[NULL, NULL, 'a', '', '', 'b', '', NULL, 'c'], 'a-b-c'),
-         ('NEMPTY_WS must return a-b-c-d', ARRAY['a' , 'b' , 'c', 'd'                       ], 'a-b-c-d')
+          ('NEMPTY_WS must return a'      , ARRAY['a'                                        ], 'a')
+         ,('NEMPTY_WS must return a'      , ARRAY[NULL, 'a'                                  ], 'a')
+         ,('NEMPTY_WS must return a'      , ARRAY['a', NULL                                  ], 'a')
+         ,('NEMPTY_WS must return a'      , ARRAY[NULL, 'a', NULL                            ], 'a')
+         ,('NEMPTY_WS must return a'      , ARRAY['', 'a'                                    ], 'a')
+         ,('NEMPTY_WS must return a'      , ARRAY['a', ''                                    ], 'a')
+         ,('NEMPTY_WS must return a'      , ARRAY['', 'a', ''                                ], 'a')
+         ,('NEMPTY_WS must return a'      , ARRAY[NULL, 'a', ''                              ], 'a')
+         ,('NEMPTY_WS must return a'      , ARRAY['', 'a', NULL                              ], 'a')
+         ,('NEMPTY_WS must return a-b'    , ARRAY[NULL, 'a' , '' , 'b'                       ], 'a-b')
+         ,('NEMPTY_WS must return a-b-c'  , ARRAY[NULL, NULL, 'a', '', '', 'b', '', NULL, 'c'], 'a-b-c')
+         ,('NEMPTY_WS must return a-b-c-d', ARRAY['a' , 'b' , 'c', 'd'                       ], 'a-b-c-d')
        ) AS t (msg, args, res);
 
 -- TO_8601 converts a TIMESTAMP into an ISO 8601 string of the form
@@ -262,9 +262,9 @@ $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 -- Test TO_8601
 SELECT DISTINCT code.TEST(msg, code.IIF(ARRAY_LENGTH(ARG, 1) = 0, code.TO_8601(), code.TO_8601(ARG[1])) = res)
   FROM (VALUES
-         ('TO_8601() must return NOW'                   , ARRAY[]::TIMESTAMP[]                              , TO_CHAR(NOW() AT TIME ZONE 'UTC'                   , 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
-         ('TO_8601(NULL) must return NOW'               , ARRAY[NULL]::TIMESTAMP[]                          , TO_CHAR(NOW() AT TIME ZONE 'UTC'                   , 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
-         ('TO_8601(NOW - 1 DAY) must return NOW - 1 DAY', ARRAY[NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY'], TO_CHAR(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+          ('TO_8601() must return NOW'                   , ARRAY[]::TIMESTAMP[]                              , TO_CHAR(NOW() AT TIME ZONE 'UTC'                   , 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+         ,('TO_8601(NULL) must return NOW'               , ARRAY[NULL]::TIMESTAMP[]                          , TO_CHAR(NOW() AT TIME ZONE 'UTC'                   , 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+         ,('TO_8601(NOW - 1 DAY) must return NOW - 1 DAY', ARRAY[NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY'], TO_CHAR(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
        ) AS t(msg, arg, res);
 
 -- RELID_TO_ID converts a BIGINT to a base 62 string with a maximum of 11 chars
@@ -399,14 +399,14 @@ SELECT DISTINCT * FROM (
    UNION ALL
   SELECT code.TEST('ID_TO_RELID must return ' || r, code.ID_TO_RELID(i) = r)
     FROM (VALUES
-           ('1'          , 1                        ),
-           ('9'          , 9                        ),
-           ('A'          , 10                       ),
-           ('Z'          , 10 + 25                  ),
-           ('a'          , 10 + 26                  ),
-           ('z'          , 10 + 26 + 25             ),
-           ('10'         , 10 + 26 + 26             ),
-           ('Aukyoa'     , 10_000_000_000           ),
-           ('AzL8n0Y58m7', 9_223_372_036_854_775_807)    
+            ('1'          , 1                        )
+           ,('9'          , 9                        )
+           ,('A'          , 10                       )
+           ,('Z'          , 10 + 25                  )
+           ,('a'          , 10 + 26                  )
+           ,('z'          , 10 + 26 + 25             )
+           ,('10'         , 10 + 26 + 26             )
+           ,('Aukyoa'     , 10_000_000_000           )
+           ,('AzL8n0Y58m7', 9_223_372_036_854_775_807)    
         ) AS t(i, r)
 ) t;
