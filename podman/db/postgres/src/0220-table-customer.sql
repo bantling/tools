@@ -6,6 +6,12 @@ CREATE TABLE IF NOT EXISTS tables.address_type(
   ,ord   INTEGER NOT NULL
 ) INHERITS(tables.base);
 
+-- Base trigger
+CREATE OR REPLACE TRIGGER address_type_tg_modified_row
+BEFORE INSERT OR UPDATE ON tables.address_type
+FOR EACH ROW
+EXECUTE FUNCTION base_tg_modified_row_fn();
+
 SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
    SELECT NULL
@@ -39,6 +45,12 @@ CREATE TABLE IF NOT EXISTS tables.address(
   ,address_3     TEXT
   ,mailing_code  TEXT
 ) INHERITS(tables.base);
+
+-- Base trigger
+CREATE OR REPLACE TRIGGER address_tg_modified_row
+BEFORE INSERT OR UPDATE ON tables.address
+FOR EACH ROW
+EXECUTE FUNCTION base_tg_modified_row_fn();
 
 SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
@@ -90,13 +102,19 @@ CREATE TABLE IF NOT EXISTS tables.customer_person(
   ,last_name     TEXT   NOT NULL
 ) INHERITS(tables.base);
 
+-- Base trigger
+CREATE OR REPLACE TRIGGER customer_person_tg_modified_row
+BEFORE INSERT OR UPDATE ON tables.customer_person
+FOR EACH ROW
+EXECUTE FUNCTION base_tg_modified_row_fn();
+
 SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
     WHERE TABLE_SCHEMA    = 'tables'
       AND TABLE_NAME      = 'customer_person'
-      AND CONSTRAINT_NAME = 'custommer_person_pk'
+      AND CONSTRAINT_NAME = 'customer_person_pk'
  )
 \gexec
 
@@ -116,6 +134,12 @@ SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_addres
 CREATE TABLE IF NOT EXISTS tables.customer_business(
    name  TEXT   NOT NULL
 ) INHERITS(tables.base);
+
+-- Base trigger
+CREATE OR REPLACE TRIGGER customer_business_tg_modified_row
+BEFORE INSERT OR UPDATE ON tables.customer_business
+FOR EACH ROW
+EXECUTE FUNCTION base_tg_modified_row_fn();
 
 SELECT 'ALTER TABLE tables.customer_business ADD CONSTRAINT customer_business_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (

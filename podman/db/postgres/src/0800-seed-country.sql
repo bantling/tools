@@ -26,8 +26,8 @@ INSERT INTO tables.country(
   ,mailing_code_format
   ,ord
 )
-SELECT c.name AS description
-      ,TO_TSVECTOR('english', c.code_2) AS terms
+SELECT c.name                           AS description
+      ,TO_TSVECTOR('english', c.name || ' ' || c.code_2 || ' ' || c.code_3) AS terms
       ,c.*
   FROM COUNTRY_DATA c
     ON CONFLICT(name) DO
@@ -143,7 +143,7 @@ INSERT INTO tables.region(
  ,ord
 )
 SELECT r.name as description
-      ,TO_TSVECTOR('english', r.code) AS terms
+      ,TO_TSVECTOR('english', r.name || ' ' || r.code) AS terms
       ,r.*
   FROM REGION_DATA r
     ON CONFLICT(name, country_relid) DO
