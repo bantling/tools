@@ -215,8 +215,9 @@ $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 -- Test IIF
 SELECT DISTINCT code.TEST(format('code.IIF(%s, %s, %s) must return %s', expr, tval, fval, res), code.IIF(expr, tval, fval) = res) iif
   FROM (VALUES
-        (TRUE,  'a'::TEXT, 'b', 'a'),
-        (FALSE, 'a'::TEXT, 'b', 'b')
+        (TRUE,  'a'::TEXT , 'b', 'a'),
+        (FALSE, 'a'::TEXT , 'b', 'b'),
+        (FALSE, NULL::TEXT, 'b', 'b')
        ) AS t (expr, tval, fval, res);
 
 -- NEMPTY_WS: a version of CONCAT_WS that treats empty strings like nulls, and coalesces consecutive empty/nulls
@@ -302,12 +303,13 @@ $$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 --- Test RELID_TO_ID
 SELECT DISTINCT * FROM (
-  SELECT code.TEST('P_RELID cannot be NULL or < 1', 'SELECT code.RELID_TO_ID(NULL)') relid_to_id
-  UNION  ALL
-  SELECT code.TEST('P_RELID cannot be NULL or < 1', 'SELECT code.RELID_TO_ID(0)'   )
-  UNION ALL
-  SELECT code.TEST('P_RELID cannot be NULL or < 1', 'SELECT code.RELID_TO_ID(-1)'  )
-  UNION ALL
+  SELECT code.TEST(msg, q)
+    FROM (VALUES
+            ('P_RELID cannot be NULL or < 1', 'SELECT code.RELID_TO_ID(NULL)')
+           ,('P_RELID cannot be NULL or < 1', 'SELECT code.RELID_TO_ID(0)'   )
+           ,('P_RELID cannot be NULL or < 1', 'SELECT code.RELID_TO_ID(-1)'  )
+         ) AS t(msg, q)
+   UNION ALL
   SELECT code.TEST('RELID_TO_ID must return ' || i, code.RELID_TO_ID(r) = i)
     FROM (VALUES
            (1                        , '1'          ),
@@ -381,22 +383,20 @@ $$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 --- Test ID_TO_RELID
 SELECT DISTINCT * FROM (
-  SELECT code.TEST('P_ID cannot be null or empty'                , 'SELECT code.ID_TO_RELID(NULL)') id_to_relid
-  UNION  ALL
-  SELECT code.TEST('P_ID cannot be null or empty'                , 'SELECT code.ID_TO_RELID('''')')
-  UNION  ALL
-  SELECT code.TEST('P_ID must be in the range [1 .. AzL8n0Y58m7]', 'SELECT code.ID_TO_RELID(''0'')')
-  UNION  ALL
-  SELECT code.TEST('P_ID must be in the range [1 .. AzL8n0Y58m7]', 'SELECT code.ID_TO_RELID(''AzL8n0Y58m8'')')
-  UNION  ALL
-  SELECT code.TEST('P_ID digit ''-'' (ASCII 0x2D) is invalid: only characters in the ranges of 0..9, A..Z, and a..z are valid', 'SELECT code.ID_TO_RELID(''-1'')')
-  UNION  ALL
-  SELECT code.TEST('P_ID digit '':'' (ASCII 0x3A) is invalid: only characters in the ranges of 0..9, A..Z, and a..z are valid', 'SELECT code.ID_TO_RELID(''1:'')')
-  UNION  ALL
-  SELECT code.TEST('P_ID digit ''['' (ASCII 0x5B) is invalid: only characters in the ranges of 0..9, A..Z, and a..z are valid', 'SELECT code.ID_TO_RELID(''11['')')
-  UNION  ALL
-  SELECT code.TEST('P_ID digit ''{'' (ASCII 0x7B) is invalid: only characters in the ranges of 0..9, A..Z, and a..z are valid', 'SELECT code.ID_TO_RELID(''111{'')')
-  UNION ALL
+  SELECT code.TEST(msg, q)
+    FROM (VALUES
+            ('P_ID cannot be null or empty'                , 'SELECT code.ID_TO_RELID(NULL)')
+           ,('P_ID cannot be null or empty'                , 'SELECT code.ID_TO_RELID('''')')
+
+           ,('P_ID must be in the range [1 .. AzL8n0Y58m7]', 'SELECT code.ID_TO_RELID(''0'')'          )
+           ,('P_ID must be in the range [1 .. AzL8n0Y58m7]', 'SELECT code.ID_TO_RELID(''AzL8n0Y58m8'')')
+
+           ,('P_ID digit ''-'' (ASCII 0x2D) is invalid: only characters in the ranges of 0..9, A..Z, and a..z are valid', 'SELECT code.ID_TO_RELID(''-1'')'  )
+           ,('P_ID digit '':'' (ASCII 0x3A) is invalid: only characters in the ranges of 0..9, A..Z, and a..z are valid', 'SELECT code.ID_TO_RELID(''1:'')'  )
+           ,('P_ID digit ''['' (ASCII 0x5B) is invalid: only characters in the ranges of 0..9, A..Z, and a..z are valid', 'SELECT code.ID_TO_RELID(''11['')' )
+           ,('P_ID digit ''{'' (ASCII 0x7B) is invalid: only characters in the ranges of 0..9, A..Z, and a..z are valid', 'SELECT code.ID_TO_RELID(''111{'')')
+         ) AS t(msg, q)
+   UNION ALL
   SELECT code.TEST('ID_TO_RELID must return ' || r, code.ID_TO_RELID(i) = r)
     FROM (VALUES
            ('1'          , 1                        ),
