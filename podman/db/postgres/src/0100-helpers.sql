@@ -201,24 +201,41 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- IIF: A useful polymorphic function some other vendors have that Postgres lacks
+-- IIF: A polymorphic function some other vendors have that Postgres lacks
 --   P_EXPR     : A boolean expression
 --   P_TRUE_VAL : value to return if P_EXPR is true
---   P_FALSE_VAL: value to return if P_EXPR is false
+--   P_FALSE_VAL: value to return if P_EXPR is false or null
 --
--- Returns P_TRUE_VAL if P_EXPR is true, else P_FALSE_VAL
+-- Returns P_TRUE_VAL (which may be null) if P_EXPR is true, else P_FALSE_VAL (which may be null)
+-- Raises an exception if P_TRUE_VAL and P_FALSE_VAL value are both null
 CREATE OR REPLACE FUNCTION code.IIF(P_EXPR BOOLEAN, P_TRUE_VAL ANYELEMENT, P_FALSE_VAL ANYELEMENT) RETURNS ANYELEMENT AS
 $$
-  SELECT CASE WHEN P_EXPR THEN P_TRUE_VAL ELSE P_FALSE_VAL END
-$$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
+BEGIN 
+  IF (P_TRUE_VAL IS NULL) AND (P_FALSE_VAL IS NULL) THEN
+    RAISE EXCEPTION 'P_TRUE_VAL and P_FALSE_VAL cannot both be null';
+  END IF;
+  
+  RETURN CASE WHEN P_EXPR THEN P_TRUE_VAL ELSE P_FALSE_VAL END;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 -- Test IIF
-SELECT DISTINCT code.TEST(format('code.IIF(%s, %s, %s) must return %s', expr, tval, fval, res), code.IIF(expr, tval, fval) = res) iif
-  FROM (VALUES
-        (TRUE,  'a'::TEXT , 'b', 'a'),
-        (FALSE, 'a'::TEXT , 'b', 'b'),
-        (FALSE, NULL::TEXT, 'b', 'b')
-       ) AS t (expr, tval, fval, res);
+SELECT DISTINCT *
+  FROM (
+    SELECT code.TEST('P_TRUE_VAL and P_FALSE_VAL cannot both be null', 'SELECT code.IIF(TRUE, NULL::TEXT, NULL)')
+     UNION ALL
+    SELECT code.TEST(format('code.IIF(%s, %s, %s) must return %s', expr, tval, fval, res), code.IIF(expr, tval, fval) IS NOT DISTINCT FROM res) iif
+      FROM (VALUES
+              (TRUE , 'a'::TEXT , 'b' , 'a' )
+             ,(FALSE, 'a'::TEXT , 'b' , 'b' )
+             
+             ,(TRUE , NULL::TEXT, 'b' , NULL)
+             ,(FALSE, NULL::TEXT, 'b' , 'b' )
+             
+             ,(TRUE , 'a'::TEXT , NULL, 'a' )
+             ,(FALSE, 'a'::TEXT , NULL, NULL)
+           ) AS t (expr, tval, fval, res)
+  ) t;
 
 -- NEMPTY_WS: a version of CONCAT_WS that treats empty strings like nulls, and coalesces consecutive empty/nulls
 --   P_SEP : The separator string
