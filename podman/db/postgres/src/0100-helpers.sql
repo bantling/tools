@@ -28,6 +28,8 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 -- 
 -- Returns true if executing P_QUERY raises an exception with message P_ERR
 -- It is a function so it can be used in select, making it easy and useful for unit tests
+-- If the query does not fail, or fails with a different exception message, then
+-- an exception is raised with P_ERR and P_QUERY in the text
 CREATE OR REPLACE FUNCTION code.TEST(P_ERR TEXT, P_QUERY TEXT) RETURNS BOOLEAN AS
 $$
 DECLARE
@@ -62,7 +64,7 @@ BEGIN
   
     -- If an exception is expected, does it have the right text?
     WHEN NOT V_ERR = P_ERR
-    THEN RAISE EXCEPTION 'The expected exception message ''%'' does not match the actual message ''%''', P_ERR, V_ERR;
+    THEN RAISE EXCEPTION 'The expected exception message ''%'' does not match the actual message ''%'' for ''%''', P_ERR, V_ERR, P_QUERY;
     
     ELSE NULL;
   END CASE;
@@ -191,8 +193,8 @@ BEGIN
   EXCEPTION
     WHEN OTHERS THEN
       GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
-      IF NOT V_MSG = 'The expected exception message ''wrong error message'' does not match the actual message ''syntax error at or near ")"''' THEN
-        RAISE EXCEPTION 'code.TEST COALESCE() with wrong error message did not return expected error message';
+      IF NOT V_MSG = 'The expected exception message ''wrong error message'' does not match the actual message ''syntax error at or near ")"'' for ''SELECT COALESCE()''' THEN
+        RAISE EXCEPTION 'code.TEST COALESCE() with wrong error message did not return expected error message: %', V_MSG;
       END IF;
   END;
   IF NOT V_DIED THEN
@@ -224,16 +226,16 @@ SELECT DISTINCT *
   FROM (
     SELECT code.TEST('P_TRUE_VAL and P_FALSE_VAL cannot both be null', 'SELECT code.IIF(TRUE, NULL::TEXT, NULL)')
      UNION ALL
-    SELECT code.TEST(format('code.IIF(%s, %s, %s) must return %s', expr, tval, fval, res), code.IIF(expr, tval, fval) IS NOT DISTINCT FROM res) iif
+    SELECT code.TEST(format('code.IIF(%s, %s, %s) must return %s', expr, tval, fval, res), code.IIF(expr, tval, fval) IS NOT DISTINCT FROM res)
       FROM (VALUES
-              (TRUE , 'a'::TEXT , 'b' , 'a' )
-             ,(FALSE, 'a'::TEXT , 'b' , 'b' )
-             
-             ,(TRUE , NULL::TEXT, 'b' , NULL)
+              (TRUE , NULL::TEXT, 'b' , NULL)
              ,(FALSE, NULL::TEXT, 'b' , 'b' )
              
              ,(TRUE , 'a'::TEXT , NULL, 'a' )
              ,(FALSE, 'a'::TEXT , NULL, NULL)
+             
+             ,(TRUE , 'a'::TEXT , 'b' , 'a' )
+             ,(FALSE, 'a'::TEXT , 'b' , 'b' )
            ) AS t (expr, tval, fval, res)
   ) t;
 
@@ -253,19 +255,21 @@ $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 -- Test NEMPTY_WS
 SELECT DISTINCT code.TEST(msg, code.NEMPTY_WS('-', VARIADIC args) IS NOT DISTINCT FROM res) nempty_ws
   FROM (VALUES
-          ('NEMPTY_WS must return NULL'   , ARRAY[                                           ], 'a')
-         ,('NEMPTY_WS must return a'      , ARRAY['a'                                        ], 'a')
-         ,('NEMPTY_WS must return a'      , ARRAY[NULL, 'a'                                  ], 'a')
-         ,('NEMPTY_WS must return a'      , ARRAY['a', NULL                                  ], 'a')
-         ,('NEMPTY_WS must return a'      , ARRAY[NULL, 'a', NULL                            ], 'a')
-         ,('NEMPTY_WS must return a'      , ARRAY['', 'a'                                    ], 'a')
-         ,('NEMPTY_WS must return a'      , ARRAY['a', ''                                    ], 'a')
-         ,('NEMPTY_WS must return a'      , ARRAY['', 'a', ''                                ], 'a')
-         ,('NEMPTY_WS must return a'      , ARRAY[NULL, 'a', ''                              ], 'a')
-         ,('NEMPTY_WS must return a'      , ARRAY['', 'a', NULL                              ], 'a')
-         ,('NEMPTY_WS must return a-b'    , ARRAY[NULL, 'a' , '' , 'b'                       ], 'a-b')
-         ,('NEMPTY_WS must return a-b-c'  , ARRAY[NULL, NULL, 'a', '', '', 'b', '', NULL, 'c'], 'a-b-c')
-         ,('NEMPTY_WS must return a-b-c-d', ARRAY['a' , 'b' , 'c', 'd'                       ], 'a-b-c-d')
+          ('NEMPTY_WS must return NULL 1' , ARRAY[                                             ]::TEXT[], NULL     )
+         ,('NEMPTY_WS must return NULL 2' , ARRAY[NULL                                         ]::TEXT[], NULL     )
+         ,('NEMPTY_WS must return NULL 3' , ARRAY[NULL, NULL                                   ]::TEXT[], NULL     )
+         ,('NEMPTY_WS must return a'      , ARRAY['a'                                          ]        , 'a'      )
+         ,('NEMPTY_WS must return a'      , ARRAY[NULL, 'a'                                    ]        , 'a'      )
+         ,('NEMPTY_WS must return a'      , ARRAY['a' , NULL                                   ]        , 'a'      )
+         ,('NEMPTY_WS must return a'      , ARRAY[NULL, 'a' , NULL                             ]        , 'a'      )
+         ,('NEMPTY_WS must return a'      , ARRAY[''  , 'a'                                    ]        , 'a'      )     
+         ,('NEMPTY_WS must return a'      , ARRAY['a' , ''                                     ]        , 'a'      )
+         ,('NEMPTY_WS must return a'      , ARRAY[''  , 'a' , ''                               ]        , 'a'      )
+         ,('NEMPTY_WS must return a'      , ARRAY[NULL, 'a' , ''                               ]        , 'a'      )
+         ,('NEMPTY_WS must return a'      , ARRAY[''  , 'a' , NULL                             ]        , 'a'      )
+         ,('NEMPTY_WS must return a-b'    , ARRAY[NULL, 'a' , ''  , 'b'                        ]        , 'a-b'    )
+         ,('NEMPTY_WS must return a-b-c'  , ARRAY[NULL, NULL, 'a' , '' , '', 'b', '', NULL, 'c']        , 'a-b-c'  )
+         ,('NEMPTY_WS must return a-b-c-d', ARRAY['a' , 'b' , 'c' , 'd'                        ]        , 'a-b-c-d')
        ) AS t (msg, args, res);
 
 -- TO_8601 converts a TIMESTAMP into an ISO 8601 string of the form
@@ -403,8 +407,8 @@ $$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF PARALLEL SAFE;
 SELECT DISTINCT * FROM (
   SELECT code.TEST(msg, q)
     FROM (VALUES
-            ('P_ID cannot be null or empty'                , 'SELECT code.ID_TO_RELID(NULL)')
-           ,('P_ID cannot be null or empty'                , 'SELECT code.ID_TO_RELID('''')')
+            ('P_ID cannot be null or empty', 'SELECT code.ID_TO_RELID(NULL)')
+           ,('P_ID cannot be null or empty', 'SELECT code.ID_TO_RELID('''')')
 
            ,('P_ID must be in the range [1 .. AzL8n0Y58m7]', 'SELECT code.ID_TO_RELID(''0'')'          )
            ,('P_ID must be in the range [1 .. AzL8n0Y58m7]', 'SELECT code.ID_TO_RELID(''AzL8n0Y58m8'')')
