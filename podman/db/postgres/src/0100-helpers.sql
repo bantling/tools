@@ -251,9 +251,10 @@ $$
 $$ LANGUAGE SQL IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 -- Test NEMPTY_WS
-SELECT DISTINCT code.TEST(msg, code.NEMPTY_WS('-', VARIADIC args) = res) nempty_ws
+SELECT DISTINCT code.TEST(msg, code.NEMPTY_WS('-', VARIADIC args) IS NOT DISTINCT FROM res) nempty_ws
   FROM (VALUES
-          ('NEMPTY_WS must return a'      , ARRAY['a'                                        ], 'a')
+          ('NEMPTY_WS must return NULL'   , ARRAY[                                           ], 'a')
+         ,('NEMPTY_WS must return a'      , ARRAY['a'                                        ], 'a')
          ,('NEMPTY_WS must return a'      , ARRAY[NULL, 'a'                                  ], 'a')
          ,('NEMPTY_WS must return a'      , ARRAY['a', NULL                                  ], 'a')
          ,('NEMPTY_WS must return a'      , ARRAY[NULL, 'a', NULL                            ], 'a')
