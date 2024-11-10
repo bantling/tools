@@ -87,6 +87,7 @@ country_relid | relid | region_relid_index
 */
 
 -- Generate random address type indexes
+-- NULL indexes indicate a personal address, non-null indicates a business address
 ,GEN_ADDRESS_TYPE_INDEXES AS (
  SELECT (random() * (SELECT COUNT(*) - 1 FROM ADDRESS_TYPE_RELID_INDEXES) + 1)::INT AS address_type_ix
        ,row_number
@@ -144,6 +145,10 @@ country_relid | relid | region_relid_index
 (5 rows)
 */
 
+SELECT
+  FROM GEN_ADDRESS_TYPE_INDEXES gati
+  JOIN 
+
 -- Translate  address type, country, and region indexes into relids 
 ,ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS AS (
   SELECT atri.relid AS country_relid
@@ -154,6 +159,7 @@ country_relid | relid | region_relid_index
       ON cri.relid_index  = gati.relid_index
     JOIN GEN_COUNTRY_INDEXES
 )
+SELECT * FROM ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS;
 SELECT relid::TEXT
       ,relid_index::TEXT
   FROM ADDRESS_TYPE_RELID_INDEXES

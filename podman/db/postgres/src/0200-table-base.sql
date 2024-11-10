@@ -64,4 +64,4 @@ BEGIN
   
   RETURN NEW;
 END;
-$$ language plpgsql;
+$$ LANGUAGE plpgsql;

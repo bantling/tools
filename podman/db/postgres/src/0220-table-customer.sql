@@ -188,3 +188,22 @@ SELECT 'ALTER TABLE tables.customer_business_address_jt ADD CONSTRAINT customer_
       AND CONSTRAINT_NAME = 'customer_business_address_jt_afk'
  )
 \gexec
+
+-- Trigger function to ensure that address related to a customer_business_address have an address type
+CREATE OR REPLACE FUNCTION customer_business_address_jt_tg_address_type_fn() RETURNS trigger AS
+$$
+BEGIN
+  IF (SELECT type_relid IS NULL FROM tables.address WHERE relid = NEW.address_relid) THEN
+    -- The related address has no address type
+    RAISE EXCEPTION 'A customer business address must have an address type';
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE PLPGSQL;
+
+-- Base trigger
+CREATE OR REPLACE TRIGGER customer_business_address_jt_tg_modified_row
+BEFORE INSERT OR UPDATE ON tables.customer_business_address_jt
+FOR EACH ROW
+EXECUTE FUNCTION customer_business_address_jt_tg_address_type_fn();
