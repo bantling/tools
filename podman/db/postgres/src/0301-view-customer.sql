@@ -77,7 +77,7 @@ SELECT jsonb_build_object(
                            JOIN tables.region r
                              ON r.relid = a.region_relid  
                            JOIN tables.address_type t
-                             ON t.relid = a.type_relid
+                             ON t.relid = a.address_type_relid
                            JOIN tables.customer_business_address_jt cba
                              ON cba.business_relid = cb.relid
                             AND cba.address_relid  = a.relid

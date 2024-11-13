@@ -181,7 +181,9 @@ WITH PARAMS AS (
 */
 
 -- Generate {st: street, cn: city, mcp: mailing code prefix (optional)} object for chosen country/region
-, ADD_CITY_STREET_MCP AS (
+-- 74 |             4 |           71 | 
+-- 75 |             4 |           71 | 
+,ADD_CITY_STREET_MCP AS (
   SELECT d.*
         ,CASE c.code_2
          WHEN 'AW' THEN -- Aruba
@@ -247,7 +249,7 @@ WITH PARAMS AS (
                   ,'cn'
                   ,'Victoria'
                 )
-               ,jsonb_build_array(
+               ,jsonb_build_object(
                    'st'
                    ,'Robson St'
                    ,'cn'
@@ -264,7 +266,7 @@ WITH PARAMS AS (
                   ,'cn' 
                   ,'Winnipeg'
                 )
-               ,jsonb_build_array(
+               ,jsonb_build_object(
                    'st'
                   ,'Rosser Ave'
                   ,'cn'
@@ -413,7 +415,7 @@ WITH PARAMS AS (
                ) -> random()::int ||
                     jsonb_build_object(
                        'mcp',
-                       json_build_array('G', 'H', 'J') -> (random() * 2)::int
+                       jsonb_build_array('G', 'H', 'J') -> (random() * 2)::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
            WHEN 'SK' THEN
@@ -528,27 +530,6 @@ WITH PARAMS AS (
                     jsonb_build_object(
                        'mcp',
                        (995 + (random() * (999 - 995))::int)::text
-                    )
-               -- ) v, generate_series(1, 1000) n) t order by 1;
-           WHEN 'AS' THEN -- American Samoa
-               -- select distinct v from (select (
-               jsonb_build_array(
-                  jsonb_build_object(
-                     'st'
-                    ,'Route 011'
-                    ,'cn'
-                    ,'American Samoa, Eastern District, Vaifanua County, Faalefu'
-                  )
-                 ,jsonb_build_object(
-                     'st'
-                    ,'Mason Gelns'
-                    ,'cn'
-                    ,'American Samoa, Western District, Leasina County, Aasu, A''asu'
-                  )
-               ) -> random()::int ||
-                    jsonb_build_object(
-                       'mcp',
-                       '967'
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
            WHEN 'AZ' THEN -- Arizona
@@ -668,6 +649,27 @@ WITH PARAMS AS (
                          '0' || (60 + (random() * (69 - 60))::int)::text
                       )
                -- ) v, generate_series(1, 1000) n) t order by 1;
+           WHEN 'DE' THEN -- Delaware
+               -- select distinct v from (select (
+               jsonb_build_array(
+                  jsonb_build_object(
+                     'st'
+                    ,'Division St'
+                    ,'cn'
+                    ,'Dover'
+                  )
+                 ,jsonb_build_object(
+                     'st'
+                    ,'Market St'
+                    ,'cn'
+                    ,'Wilington'
+                  )
+               ) -> random()::int ||
+                    jsonb_build_object(
+                       'mcp',
+                       (197 + (random() * (199 - 197))::int)::text
+                    )
+               -- ) v, generate_series(1, 1000) n) t order by 1;
            WHEN 'DC' THEN -- District of Columbia
                -- select distinct v from (select (
                jsonb_build_array(
@@ -695,27 +697,6 @@ WITH PARAMS AS (
                                  SELECT 569
                               ) t
                        ) -> (random() * (205 - 200 - 1 + 1))::int
-                    )
-               -- ) v, generate_series(1, 1000) n) t order by 1;
-           WHEN 'DE' THEN -- Delaware
-               -- select distinct v from (select (
-               jsonb_build_array(
-                  jsonb_build_object(
-                     'st'
-                    ,'Division St'
-                    ,'cn'
-                    ,'Dover'
-                  )
-                 ,jsonb_build_object(
-                     'st'
-                    ,'Market St'
-                    ,'cn'
-                    ,'Wilington'
-                  )
-               ) -> random()::int ||
-                    jsonb_build_object(
-                       'mcp',
-                       (197 + (random() * (199 - 197))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
            WHEN 'FL' THEN -- Florida
@@ -771,24 +752,6 @@ WITH PARAMS AS (
                               ) t
                        ) -> (random() * ((319 - 300) + 2))::int
                     )
-               -- ) v, generate_series(1, 1000) n) t order by 1;
-           WHEN 'GU' THEN -- Guam
-               -- select distinct v from (select (
-               jsonb_build_array(
-                  jsonb_build_object(
-                     'st'
-                    ,'Marine Corps Dr'
-                    ,'cn'
-                    ,'Hagåtña'
-                  )
-                 ,jsonb_build_object(
-                     'st'
-                    ,'Buena Vista Ave'
-                    ,'cn'
-                    ,'Dededo'
-                  )
-               ) -> random()::int ||
-                    jsonb_build_object('mcp', '969')
                -- ) v, generate_series(1, 1000) n) t order by 1;
            WHEN 'HI' THEN -- Hawaii
                -- select distinct v from (select (
@@ -1330,48 +1293,6 @@ WITH PARAMS AS (
                        ) -> (random() * (149 - 100 + 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-           WHEN 'ND' THEN -- North Dakota
-               -- select distinct v from (select (
-               jsonb_build_array(
-                  jsonb_build_object(
-                     'st'
-                    ,'4th St'
-                    ,'cn'
-                    ,'Bismarck'
-                  )
-                 ,jsonb_build_object(
-                     'st'
-                    ,'13th Ave S'
-                    ,'cn'
-                    ,'Fargo'
-                  )
-               ) -> random()::int ||
-                    jsonb_build_object(
-                       'mcp',
-                       (580 + (random() * (588 - 580))::int)::text
-                    )
-               -- ) v, generate_series(1, 1000) n) t order by 1;
-           WHEN 'MP' THEN -- Northern Mariana Islands
-               -- select distinct v from (select (
-               jsonb_build_array(
-                  jsonb_build_object(
-                     'st'
-                    ,'Tapochao Rd'
-                    ,'cn'
-                    ,'Saipan'
-                  )
-                 ,jsonb_build_object(
-                     'st'
-                    ,'Ayuyu Dr'
-                    ,'cn'
-                    ,'Marpi'
-                  )
-               ) -> random()::int ||
-                    jsonb_build_object(
-                       'mcp',
-                       '969'
-                    )
-               -- ) v, generate_series(1, 1000) n) t order by 1;
            WHEN 'NC' THEN -- North Carolina
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1391,6 +1312,27 @@ WITH PARAMS AS (
                     jsonb_build_object(
                        'mcp',
                        (270 + (random() * (289 - 270))::int)::text
+                    )
+               -- ) v, generate_series(1, 1000) n) t order by 1;
+           WHEN 'ND' THEN -- North Dakota
+               -- select distinct v from (select (
+               jsonb_build_array(
+                  jsonb_build_object(
+                     'st'
+                    ,'4th St'
+                    ,'cn'
+                    ,'Bismarck'
+                  )
+                 ,jsonb_build_object(
+                     'st'
+                    ,'13th Ave S'
+                    ,'cn'
+                    ,'Fargo'
+                  )
+               ) -> random()::int ||
+                    jsonb_build_object(
+                       'mcp',
+                       (580 + (random() * (588 - 580))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
            WHEN 'OH' THEN -- Ohio
@@ -1481,33 +1423,6 @@ WITH PARAMS AS (
                     jsonb_build_object(
                        'mcp',
                        (150 + (random() * (196 - 150))::int)::text
-                    )
-               -- ) v, generate_series(1, 1000) n) t order by 1;
-           WHEN 'PR' THEN -- Puerto Rico
-               -- select distinct v from (select (
-               jsonb_build_array(
-                  jsonb_build_object(
-                     'st'
-                    ,'C Aragón'
-                    ,'cn'
-                    ,'San Juan'
-                  )
-                 ,jsonb_build_object(
-                     'st'
-                    ,'Ave Hostos'
-                    ,'cn'
-                    ,'Bayamón'
-                  )
-               ) -> random()::int ||
-                    jsonb_build_object(
-                       'mcp',
-                       (SELECT jsonb_agg('00' || v::text)
-                         FROM (
-                                 SELECT generate_series(6, 9) v
-                                 EXCEPT
-                                 SELECT 8
-                              ) t
-                       ) -> (random() * (9 - 6 - 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
            WHEN 'RI' THEN -- Rhode Island
@@ -1673,27 +1588,6 @@ WITH PARAMS AS (
                        ) -> (random() * (59 - 50 - 1))::int
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
-           WHEN 'VI' THEN -- Virgin Islands
-               -- select distinct v from (select (
-               jsonb_build_array(
-                  jsonb_build_object(
-                     'st'
-                    ,'Harbour Ridge Rd'
-                    ,'cn'
-                    ,'Charlotte Amalie'
-                  )
-                 ,jsonb_build_object(
-                     'st'
-                    ,'Alfred Andrews St'
-                    ,'cn'
-                    ,'St Croix'
-                  )
-               ) -> random()::int ||
-                    jsonb_build_object(
-                       'mcp',
-                       '008'
-                    )
-               -- ) v, generate_series(1, 1000) n) t order by 1;
            WHEN 'VA' THEN -- Virginia
                -- select distinct v from (select (
                jsonb_build_array(
@@ -1817,6 +1711,114 @@ WITH PARAMS AS (
                        (820 + (random() * (831 - 820))::int)::text
                     )
                -- ) v, generate_series(1, 1000) n) t order by 1;
+           WHEN 'AS' THEN -- American Samoa
+               -- select distinct v from (select (
+               jsonb_build_array(
+                  jsonb_build_object(
+                     'st'
+                    ,'Route 011'
+                    ,'cn'
+                    ,'American Samoa, Eastern District, Vaifanua County, Faalefu'
+                  )
+                 ,jsonb_build_object(
+                     'st'
+                    ,'Mason Gelns'
+                    ,'cn'
+                    ,'American Samoa, Western District, Leasina County, Aasu, A''asu'
+                  )
+               ) -> random()::int ||
+                    jsonb_build_object(
+                       'mcp',
+                       '967'
+                    )
+               -- ) v, generate_series(1, 1000) n) t order by 1;
+           WHEN 'GU' THEN -- Guam
+               -- select distinct v from (select (
+               jsonb_build_array(
+                  jsonb_build_object(
+                     'st'
+                    ,'Marine Corps Dr'
+                    ,'cn'
+                    ,'Hagåtña'
+                  )
+                 ,jsonb_build_object(
+                     'st'
+                    ,'Buena Vista Ave'
+                    ,'cn'
+                    ,'Dededo'
+                  )
+               ) -> random()::int ||
+                    jsonb_build_object('mcp', '969')
+               -- ) v, generate_series(1, 1000) n) t order by 1;
+           WHEN 'MP' THEN -- Northern Mariana Islands
+               -- select distinct v from (select (
+               jsonb_build_array(
+                  jsonb_build_object(
+                     'st'
+                    ,'Tapochao Rd'
+                    ,'cn'
+                    ,'Saipan'
+                  )
+                 ,jsonb_build_object(
+                     'st'
+                    ,'Ayuyu Dr'
+                    ,'cn'
+                    ,'Marpi'
+                  )
+               ) -> random()::int ||
+                    jsonb_build_object(
+                       'mcp',
+                       '969'
+                    )
+               -- ) v, generate_series(1, 1000) n) t order by 1;
+           WHEN 'PU' THEN -- Puerto Rico
+               -- select distinct v from (select (
+               jsonb_build_array(
+                  jsonb_build_object(
+                     'st'
+                    ,'C Aragón'
+                    ,'cn'
+                    ,'San Juan'
+                  )
+                 ,jsonb_build_object(
+                     'st'
+                    ,'Ave Hostos'
+                    ,'cn'
+                    ,'Bayamón'
+                  )
+               ) -> random()::int ||
+                    jsonb_build_object(
+                       'mcp',
+                       (SELECT jsonb_agg('00' || v::text)
+                         FROM (
+                                 SELECT generate_series(6, 9) v
+                                 EXCEPT
+                                 SELECT 8
+                              ) t
+                       ) -> (random() * (9 - 6 - 1))::int
+                    )
+               -- ) v, generate_series(1, 1000) n) t order by 1;
+           WHEN 'VI' THEN -- Virgin Islands
+               -- select distinct v from (select (
+               jsonb_build_array(
+                  jsonb_build_object(
+                     'st'
+                    ,'Harbour Ridge Rd'
+                    ,'cn'
+                    ,'Charlotte Amalie'
+                  )
+                 ,jsonb_build_object(
+                     'st'
+                    ,'Alfred Andrews St'
+                    ,'cn'
+                    ,'St Croix'
+                  )
+               ) -> random()::int ||
+                    jsonb_build_object(
+                       'mcp',
+                       '008'
+                    )
+               -- ) v, generate_series(1, 1000) n) t order by 1;
             END
           END st_city_mcp
     FROM TR_ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS d
@@ -1838,7 +1840,7 @@ WITH PARAMS AS (
 (5 rows)
 */
 
-, ADD_ADDRESS_MAILING_CODE AS (
+,ADD_ADDRESS_MAILING_CODE AS (
   SELECT d.*
         ,CASE c.code_2
          WHEN 'AW' THEN -- Aruba: street civic (max 2 digits)
@@ -1907,7 +1909,7 @@ WITH PARAMS AS (
     JOIN tables.region r
       ON r.relid = d.region_relid
 )
- SELECT * FROM ADD_ADDRESS_MAILING_CODE;
+-- SELECT * FROM ADD_ADDRESS_MAILING_CODE;
 /*
  address_type_relid | country_relid | region_relid |                       st_city_mcp                        |        address        | mailing_code 
 --------------------+---------------+--------------+----------------------------------------------------------+-----------------------+--------------
@@ -1919,62 +1921,64 @@ WITH PARAMS AS (
 (5 rows)
 */
 
-, GEN_ADDRESS AS (
-  SELECT d.type_relid AS type_relid
+,GEN_ADDRESS AS (
+  SELECT d.address_type_relid
         ,d.country_relid
         ,d.region_relid
-        ,gen_random_uuid()                                                           AS address_id
-        ,gen_random_uuid()                                                           AS customer_id
-        ,1                                                                           AS version
-        ,current_timestamp                                                           AS created
-        ,current_timestamp                                                           AS changed
-        ,d.st_city_mcp ->> 'cn'                                                      AS city
-        ,d.address                                                                   AS address
-        ,CASE WHEN d.type_relid IS NOT NULL THEN 'Door 5' END                        AS address_2
-        ,CASE WHEN (d.type_relid IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
+        ,d.st_city_mcp ->> 'cn'                                                              AS city
+        ,d.address                                                                           AS address
+        ,CASE WHEN  d.address_type_relid IS NOT NULL  THEN 'Door 5' END                      AS address_2
+        ,CASE WHEN (d.address_type_relid IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
         ,d.mailing_code
     FROM ADD_ADDRESS_MAILING_CODE d
-   ORDER BY d.type_relid
 )
 -- SELECT * FROM GEN_ADDRESS;
---  type_relid | country_relid | region_relid |              address_id              |             customer_id              | version |            created            |            changed            |    city    |     address     | address_2 | address_3 | mailing_code 
--- ------------+---------------+--------------+--------------------------------------+--------------------------------------+---------+-------------------------------+-------------------------------+------------+-----------------+-----------+-----------+--------------
---           1 |             1 |              | 90edd4e0-aa0c-42eb-b43a-9a9927d10fe0 | c4f741b3-f65b-466b-8345-c764fd8a3568 |       1 | 2024-08-07 11:56:54.501702+00 | 2024-08-07 11:56:54.501702+00 | Oranjestad | Spinozastraat 6 | Door 5    |           | 
---           1 |             2 |            4 | 911dad43-a07f-4eb9-9be4-bac1b4935352 | 92f439dd-05a8-4b15-a2a3-13d230ab98a5 |       1 | 2024-08-07 11:56:54.501702+00 | 2024-08-07 11:56:54.501702+00 | Moncton    | 24343 King St   | Door 5    | Stop 6    | E7S 7D3
---           1 |             3 |              | 529960ee-4ffc-4df0-91b0-bd605977710c | 8517b830-15c6-4d53-b23f-cc3349beb35b |       1 | 2024-08-07 11:56:54.501702+00 | 2024-08-07 11:56:54.501702+00 | Poon Saan  | 14 San Chye Loh | Door 5    | Stop 6    | 6798
---           2 |             4 |           19 | 6d4847d9-fe0f-4b23-a782-c3aefea57d57 | 0f2ac23c-307a-47ad-84f3-56976da5c9ed |       1 | 2024-08-07 11:56:54.501702+00 | 2024-08-07 11:56:54.501702+00 | Sacramento | 72916 K St      | Door 5    |           | 92368-5361
---             |             3 |              | bdb7e2c0-761a-499f-bb2d-6dfab08c697a | 4d891a78-c3b0-48e9-b952-fd02864306f4 |       1 | 2024-08-07 11:56:54.501702+00 | 2024-08-07 11:56:54.501702+00 | Poon Saan  | 18 San Chye Loh |           |           | 6798
--- (5 rows)
+/*
+ address_type_relid | country_relid | region_relid |   city    |          address          | address_2 | address_3 | mailing_code 
+--------------------+---------------+--------------+-----------+---------------------------+-----------+-----------+--------------
+                 75 |             1 |              | Noord     | Caya Frans Figaroa 11     | Door 5    |           | 
+                    |             2 |           16 | Saskatoon | 49988 Broadway Ave        |           |           | S3O 3B7
+                 74 |             2 |           15 | Montreal  | 11531 Sainte-Catherine St | Door 5    |           | H8L 7X1
+                 75 |             3 |              | Poon Saan | 54 San Chye Loh           | Door 5    | Stop 6    | 6798
+                    |             4 |           22 | San Diego | 76469 San Diego Ave       |           |           | 94642
+(5 rows)
+*/
 
--- Insert addresses using generated data
-INSERT
-  INTO tables.address(
-          type_relid
-         ,country_relid
-         ,region_relid
-         ,id
-         ,version
-         ,created
-         ,changed
-         ,city
-         ,address
-         ,address_2
-         ,address_3
-         ,mailing_code
-       )
-SELECT type_relid
-      ,country_relid
-      ,region_relid
-      ,address_id
-      ,version
-      ,created
-      ,changed
-      ,city
-      ,address
-      ,address_2
-      ,address_3
-      ,mailing_code
-  FROM GEN_ADDRESS;
+,INS_ADDRESS AS (
+  -- Insert addresses using generated data
+  INSERT
+    INTO tables.address(
+            address_type_relid
+           ,country_relid
+           ,region_relid
+           ,city
+           ,address
+           ,address_2
+           ,address_3
+           ,mailing_code
+         )
+  SELECT address_type_relid
+        ,country_relid
+        ,region_relid
+        ,city
+        ,address
+        ,address_2
+        ,address_3
+        ,mailing_code
+    FROM GEN_ADDRESS
+  RETURNING *
+) 
+-- SELECT * FROM INS_ADDRESS;
+/*
+ relid | version | description | terms | extra |            created            |           modified            | address_type_relid | country_relid | region_relid |    city     |      address       | address_2 | address_3 | mailing_code 
+-------+---------+-------------+-------+-------+-------------------------------+-------------------------------+--------------------+---------------+--------------+-------------+--------------------+-----------+-----------+--------------
+   132 |       1 |             |       |       | 2024-11-13 13:18:00.316919+00 | 2024-11-13 13:18:00.316919+00 |                 75 |             1 |              | Oranjestad  | Spinozastraat 22   | Door 5    |           | 
+   133 |       1 |             |       |       | 2024-11-13 13:18:00.316919+00 | 2024-11-13 13:18:00.316919+00 |                 75 |             2 |           14 | Summerside  | 49235 Water St     | Door 5    | Stop 6    | C2T 1E8
+   134 |       1 |             |       |       | 2024-11-13 13:18:00.316919+00 | 2024-11-13 13:18:00.316919+00 |                    |             3 |              | Poon Saan   | 64 San Chye Loh    |           |           | 6798
+   135 |       1 |             |       |       | 2024-11-13 13:18:00.316919+00 | 2024-11-13 13:18:00.316919+00 |                    |             3 |              | Silver City | 70 Sea View Dr     |           |           | 6798
+   136 |       1 |             |       |       | 2024-11-13 13:18:00.316919+00 | 2024-11-13 13:18:00.316919+00 |                 76 |             4 |           54 | Tulsa       | 77908 S Zenith ave | Door 5    | Stop 6    | 73161
+(5 rows)
+*/
 
 -- Insert person customers with a reference to their addresses
 -- Order the addresses by their relids, joining the nth customer to the nth address

@@ -36,14 +36,14 @@ SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_uk_name UNIQ
 -- == address table ==
 -- ===================
 CREATE TABLE IF NOT EXISTS tables.address(
-   type_relid    BIGINT
-  ,country_relid BIGINT NOT NULL
-  ,region_relid  BIGINT
-  ,city          TEXT   NOT NULL
-  ,address       TEXT   NOT NULL
-  ,address_2     TEXT
-  ,address_3     TEXT
-  ,mailing_code  TEXT
+   address_type_relid BIGINT
+  ,country_relid      BIGINT NOT NULL
+  ,region_relid       BIGINT
+  ,city               TEXT   NOT NULL
+  ,address            TEXT   NOT NULL
+  ,address_2          TEXT
+  ,address_3          TEXT
+  ,mailing_code       TEXT
 ) INHERITS(tables.base);
 
 -- Base trigger
@@ -62,7 +62,7 @@ SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_pk PRIMARY KEY(relid)'
  )
 \gexec
 
-SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_type_fk FOREIGN KEY(type_relid) REFERENCES tables.address_type(relid)'
+SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_type_fk FOREIGN KEY(address_type_relid) REFERENCES tables.address_type(relid)'
  WHERE NOT EXISTS (
    SELECT NULL
      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
@@ -193,7 +193,7 @@ SELECT 'ALTER TABLE tables.customer_business_address_jt ADD CONSTRAINT customer_
 CREATE OR REPLACE FUNCTION customer_business_address_jt_tg_address_type_fn() RETURNS trigger AS
 $$
 BEGIN
-  IF (SELECT type_relid IS NULL FROM tables.address WHERE relid = NEW.address_relid) THEN
+  IF (SELECT address_type_relid IS NULL FROM tables.address WHERE relid = NEW.address_relid) THEN
     -- The related address has no address type
     RAISE EXCEPTION 'A customer business address must have an address type';
   END IF;
