@@ -14,21 +14,21 @@ WITH PARAMS AS (
 */
 
 -- Multiply the one params row by the num_rows value
-,ADD_ROWS AS (
+,GEN_ROWS AS (
  SELECT p.*
        ,ROW_NUMBER() OVER()
    FROM PARAMS p
        ,generate_series(1, num_rows) r
 )
--- SELECT * FROM ADD_ROWS;
+-- SELECT * FROM GEN_ROWS;
 /*
- num_rows 
-----------
-        5 
-        5 
-        5 
-        5 
-        5 
+ num_rows | row_number 
+----------+------------
+        5 |          1
+        5 |          2
+        5 |          3
+        5 |          4
+        5 |          5
 (5 rows)
 */
 
@@ -92,7 +92,7 @@ WITH PARAMS AS (
 ,GEN_ADDRESS_TYPE_INDEXES AS (
  SELECT code.IIF(random() >= 0.5, (random() * (SELECT COUNT(*) - 1 FROM ADDRESS_TYPE_RELID_INDEXES) + 1)::INT, NULL) AS ix
        ,row_number
-   FROM ADD_ROWS
+   FROM GEN_ROWS
 )
 -- SELECT * FROM GEN_ADDRESS_TYPE_INDEXES;
 /*
@@ -110,7 +110,7 @@ WITH PARAMS AS (
 ,GEN_COUNTRY_INDEXES AS (
  SELECT (random() * (SELECT COUNT(*) - 1 FROM COUNTRY_RELID_INDEXES) + 1)::INT AS ix
        ,row_number
-   FROM ADD_ROWS
+   FROM GEN_ROWS
 )
 -- SELECT * FROM GEN_COUNTRY_INDEXES;
 /*
@@ -146,32 +146,41 @@ WITH PARAMS AS (
 (5 rows)
 */
 
--- Translate  address type, country, and region indexes into relids 
-,ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS AS (
+-- Translate  address type, country, and region indexes into relids
+-- - address types are optional: only business addresses have them
+-- - regions are optional: not all couintries have them
+,TR_ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS AS (
   SELECT  atri.relid AS address_type_relid
---        ,  cri.relid AS country_relid
---        ,rribc.relid AS region_relid
+        ,  cri.relid AS country_relid
+        ,rribc.relid AS region_relid
     FROM GEN_ADDRESS_TYPE_INDEXES gati
     LEFT
     JOIN ADDRESS_TYPE_RELID_INDEXES atri
       ON atri.ix = gati.ix
-/*    LEFT
     JOIN GEN_COUNTRY_INDEXES gci
       ON gci.row_number = gati.row_number
-    LEFT
     JOIN COUNTRY_RELID_INDEXES cri
-      ON cri.ix = gati.ix
-    LEFT
+      ON cri.ix = gci.ix
     JOIN GEN_REGION_INDEXES gri
       ON gri.row_number = gati.row_number
     LEFT
     JOIN REGION_RELID_INDEXES_BY_COUNTRY rribc
       ON rribc.country_relid = cri.relid
-     AND rribc.ix = gati.ix*/
+     AND rribc.ix = gri.ix
 )
-SELECT * FROM ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS;
+-- SELECT * FROM TR_ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS;
+/*
+ address_type_relid | country_relid | region_relid 
+--------------------+---------------+--------------
+                 75 |             3 |             
+                    |             3 |             
+                    |             1 |             
+                    |             4 |           58
+                    |             2 |            9
+(5 rows)
+*/
 
--- Add {st: street, cn: city, mcp: mailing code prefix (optional)} object for chosen country/region
+-- Generate {st: street, cn: city, mcp: mailing code prefix (optional)} object for chosen country/region
 , ADD_CITY_STREET_MCP AS (
   SELECT d.*
         ,CASE c.code_2
@@ -1810,7 +1819,7 @@ SELECT * FROM ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS;
                -- ) v, generate_series(1, 1000) n) t order by 1;
             END
           END st_city_mcp
-    FROM ADD_REGION_RELID d
+    FROM TR_ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS d
     JOIN tables.country c
       ON c.relid = d.country_relid
     LEFT
@@ -1818,14 +1827,16 @@ SELECT * FROM ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS;
       ON r.relid = d.region_relid
 )
 -- SELECT * FROM ADD_CITY_STREET_MCP;
---  type_relid | country_relid | num_regions | min_region_relid | region_relid |                       st_city_mcp                       
--- ------------+---------------+-------------+------------------+--------------+---------------------------------------------------------
---           2 |             1 |             |                  |              | {"cn": "San Nicolas", "st": "Sero Colorado"}
---           2 |             2 |          13 |                1 |            8 | {"cn": "Rankin Inlet", "st": "TikTaq Ave", "mcp": "X"}
---           3 |             2 |          13 |                1 |            6 | {"cn": "Hay River", "st": "Poplar Rd", "mcp": "X"}
---             |             3 |             |                  |              | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}
---           2 |             4 |          55 |               14 |           59 | {"cn": "Nashville", "st": "Edgehill Ave", "mcp": "373"}
--- (5 rows)
+/*
+ address_type_relid | country_relid | region_relid |                      st_city_mcp                       
+--------------------+---------------+--------------+--------------------------------------------------------
+                 74 |             2 |           12 | {"cn": "Iqaluit", "st": "Mivvik St", "mcp": "X"}
+                 75 |             4 |           27 | {"cn": "Jacksonville", "st": "Laura St", "mcp": "320"}
+                    |             3 |              | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}
+                    |             3 |              | {"cn": "Poon Saan", "st": "San Chye Loh"}
+                    |             1 |              | {"cn": "Oranjestad", "st": "Spinozastraat"}
+(5 rows)
+*/
 
 , ADD_ADDRESS_MAILING_CODE AS (
   SELECT d.*
@@ -1896,15 +1907,17 @@ SELECT * FROM ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS;
     JOIN tables.region r
       ON r.relid = d.region_relid
 )
--- SELECT * FROM ADD_ADDRESS_MAILING_CODE;
---  type_relid | country_relid | num_regions | min_region_relid | region_relid |                     st_city_mcp                      |     address     | mailing_code 
--- ------------+---------------+-------------+------------------+--------------+------------------------------------------------------+-----------------+--------------
---           3 |             1 |             |                  |              | {"cn": "Oranjestad", "st": "Spinozastraat"}          | Spinozastraat 6 | 
---           1 |             2 |          13 |                1 |           10 | {"cn": "Summerside", "st": "Water St", "mcp": "C"}   | 31925 Water St  | C1X 5K5
---           2 |             3 |             |                  |              | {"cn": "Silver City", "st": "Sea View Dr"}           | 11 Sea View Dr  | 6798
---             |             3 |             |                  |              | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}       | 56 Jln Pantai   | 6798
---           1 |             4 |          55 |               14 |           37 | {"cn": "Annapolis", "st": "Bladen St", "mcp": "011"} | 92592 Bladen St | 01112
--- (5 rows)
+ SELECT * FROM ADD_ADDRESS_MAILING_CODE;
+/*
+ address_type_relid | country_relid | region_relid |                       st_city_mcp                        |        address        | mailing_code 
+--------------------+---------------+--------------+----------------------------------------------------------+-----------------------+--------------
+                    |             1 |              | {"cn": "Santa Cruz", "st": "San Fuego"}                  | San Fuego 78          | 
+                    |             2 |           12 | {"cn": "Rankin Inlet", "st": "TikTaq Ave", "mcp": "X"}   | 26344 TikTaq Ave      | X2H 5L3
+                    |             2 |           17 | {"cn": "Dawson City", "st": "4th Ave", "mcp": "Y"}       | 30554 4th Ave         | Y1V 8X8
+                    |             3 |              | {"cn": "Poon Saan", "st": "San Chye Loh"}                | 23 San Chye Loh       | 6798
+                 73 |             4 |           34 | {"cn": "Wichita", "st": "S Hydraulic Ave", "mcp": "678"} | 35314 S Hydraulic Ave | 67824
+(5 rows)
+*/
 
 , GEN_ADDRESS AS (
   SELECT d.type_relid AS type_relid
