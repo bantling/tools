@@ -7,10 +7,10 @@ CREATE TABLE IF NOT EXISTS tables.address_type(
 ) INHERITS(tables.base);
 
 -- Base trigger
-CREATE OR REPLACE TRIGGER address_type_tg_modified_row
+CREATE OR REPLACE TRIGGER address_type_tg
 BEFORE INSERT OR UPDATE ON tables.address_type
 FOR EACH ROW
-EXECUTE FUNCTION base_tg_modified_row_fn();
+EXECUTE FUNCTION base_tg_fn();
 
 SELECT 'ALTER TABLE tables.address_type ADD CONSTRAINT address_type_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
@@ -47,10 +47,10 @@ CREATE TABLE IF NOT EXISTS tables.address(
 ) INHERITS(tables.base);
 
 -- Base trigger
-CREATE OR REPLACE TRIGGER address_tg_modified_row
+CREATE OR REPLACE TRIGGER address_tg
 BEFORE INSERT OR UPDATE ON tables.address
 FOR EACH ROW
-EXECUTE FUNCTION base_tg_modified_row_fn();
+EXECUTE FUNCTION base_tg_fn();
 
 SELECT 'ALTER TABLE tables.address ADD CONSTRAINT address_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
@@ -103,10 +103,10 @@ CREATE TABLE IF NOT EXISTS tables.customer_person(
 ) INHERITS(tables.base);
 
 -- Base trigger
-CREATE OR REPLACE TRIGGER customer_person_tg_modified_row
+CREATE OR REPLACE TRIGGER customer_person_tg
 BEFORE INSERT OR UPDATE ON tables.customer_person
 FOR EACH ROW
-EXECUTE FUNCTION base_tg_modified_row_fn();
+EXECUTE FUNCTION base_tg_fn();
 
 SELECT 'ALTER TABLE tables.customer_person ADD CONSTRAINT customer_person_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
@@ -136,10 +136,10 @@ CREATE TABLE IF NOT EXISTS tables.customer_business(
 ) INHERITS(tables.base);
 
 -- Base trigger
-CREATE OR REPLACE TRIGGER customer_business_tg_modified_row
+CREATE OR REPLACE TRIGGER customer_business_tg
 BEFORE INSERT OR UPDATE ON tables.customer_business
 FOR EACH ROW
-EXECUTE FUNCTION base_tg_modified_row_fn();
+EXECUTE FUNCTION base_tg_fn();
 
 SELECT 'ALTER TABLE tables.customer_business ADD CONSTRAINT customer_business_pk PRIMARY KEY(relid)'
  WHERE NOT EXISTS (
@@ -189,8 +189,8 @@ SELECT 'ALTER TABLE tables.customer_business_address_jt ADD CONSTRAINT customer_
  )
 \gexec
 
--- Trigger function to ensure that address related to a customer_business_address have an address type
-CREATE OR REPLACE FUNCTION customer_business_address_jt_tg_address_type_fn() RETURNS trigger AS
+-- Trigger function to ensure that customer_business_address rows have an address type
+CREATE OR REPLACE FUNCTION customer_business_address_jt_tg_fn() RETURNS trigger AS
 $$
 BEGIN
   IF (SELECT address_type_relid IS NULL FROM tables.address WHERE relid = NEW.address_relid) THEN
@@ -200,10 +200,10 @@ BEGIN
   
   RETURN NEW;
 END;
-$$ LANGUAGE PLPGSQL;
+$$ LANGUAGE plpgsql;
 
 -- Base trigger
-CREATE OR REPLACE TRIGGER customer_business_address_jt_tg_modified_row
+CREATE OR REPLACE TRIGGER customer_business_address_jt_tg
 BEFORE INSERT OR UPDATE ON tables.customer_business_address_jt
 FOR EACH ROW
-EXECUTE FUNCTION customer_business_address_jt_tg_address_type_fn();
+EXECUTE FUNCTION customer_business_address_jt_tg_fn();

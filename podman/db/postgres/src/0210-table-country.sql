@@ -13,10 +13,10 @@ CREATE TABLE IF NOT EXISTS tables.country(
 ) INHERITS (tables.base);
 
 -- Base trigger
-CREATE OR REPLACE TRIGGER country_tg_modified_row
+CREATE OR REPLACE TRIGGER country_tg
 BEFORE INSERT OR UPDATE ON tables.country
 FOR EACH ROW
-EXECUTE FUNCTION base_tg_modified_row_fn();
+EXECUTE FUNCTION base_tg_fn();
 
 -- Primary key
 SELECT 'ALTER TABLE tables.country ADD CONSTRAINT country_pk PRIMARY KEY(relid)'
@@ -86,10 +86,10 @@ CREATE TABLE IF NOT EXISTS tables.region(
 ) INHERITS(tables.base);
 
 -- Base trigger
-CREATE OR REPLACE TRIGGER region_tg_modified_row
+CREATE OR REPLACE TRIGGER region_tg
 BEFORE INSERT OR UPDATE ON tables.region
 FOR EACH ROW
-EXECUTE FUNCTION base_tg_modified_row_fn();
+EXECUTE FUNCTION base_tg_fn();
 
 -- Primary key
 SELECT 'ALTER TABLE tables.region ADD CONSTRAINT region_pk PRIMARY KEY(relid)'

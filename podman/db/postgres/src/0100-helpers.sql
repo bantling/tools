@@ -1,8 +1,8 @@
 -- Helper functions that could be used in table definitions, views, or code
 
 -- TEST(TEXT, BOOLEAN): test that a condition succeeded for cases where no exception is raised
---   P_MSG : string exception message if the test failed
---   P_TEST: true if test succeeded, false if it failed
+--   P_MSG : string exception message if the test failed (cannot be null or empty)
+--   P_TEST: true if test succeeded, null or false if it failed
 -- 
 -- Returns true if the condition is true, else it raises an exception with the given error message
 -- It is a function so it can be used in select, making it easy and useful for unit tests
@@ -10,8 +10,8 @@ CREATE OR REPLACE FUNCTION code.TEST(P_MSG TEXT, P_TEST BOOLEAN) RETURNS BOOLEAN
 $$
 BEGIN
   CASE
-    WHEN P_MSG IS NULL THEN
-      RAISE EXCEPTION 'P_MSG CANNOT BE NULL';
+    WHEN LENGTH(COALESCE(P_MSG, '')) = 0 THEN
+      RAISE EXCEPTION 'P_MSG cannot be null or empty';
 
     WHEN NOT COALESCE(P_TEST, FALSE) THEN
       RAISE EXCEPTION '%', P_MSG;
@@ -23,8 +23,8 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 -- TEST(TEXT, TEXT): test a function for a case that raises an exception
---   P_ERR   : expected exception text
---   P_QUERY : string query to execute
+--   P_ERR   : expected exception text (cannot be null or empty)
+--   P_QUERY : string query to execute (cannot be null or empty)
 -- 
 -- Returns true if executing P_QUERY raises an exception with message P_ERR
 -- It is a function so it can be used in select, making it easy and useful for unit tests
@@ -60,7 +60,7 @@ BEGIN
   CASE
     -- Did an exception occur?
     WHEN NOT V_DIED
-    THEN RAISE EXCEPTION 'Expected exception did not occur: %s', P_ERR;
+    THEN RAISE EXCEPTION 'Expected exception ''%'' did not occur', P_ERR;
   
     -- If an exception is expected, does it have the right text?
     WHEN NOT V_ERR = P_ERR
@@ -87,12 +87,27 @@ BEGIN
   EXCEPTION
     WHEN OTHERS THEN
       GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
-      IF NOT V_MSG = 'P_MSG CANNOT BE NULL' THEN
-        RAISE EXCEPTION 'code.TEST must die with P_MSG CANNOT BE NULL';
+      IF NOT V_MSG = 'P_MSG cannot be null or empty' THEN
+        RAISE EXCEPTION 'code.TEST must die with P_MSG cannot be null or empty';
       END IF;  
   END;
   IF NOT V_DIED THEN
     RAISE EXCEPTION 'code.TEST must die when P_MSG is NULL';
+  END IF;
+  
+  BEGIN
+    V_DIED := TRUE;
+    SELECT code.TEST('', NULL::BOOLEAN);
+    V_DIED := FALSE;
+  EXCEPTION
+    WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
+      IF NOT V_MSG = 'P_MSG cannot be null or empty' THEN
+        RAISE EXCEPTION 'code.TEST must die with P_MSG cannot be null or empty';
+      END IF;  
+  END;
+  IF NOT V_DIED THEN
+    RAISE EXCEPTION 'code.TEST must die when P_MSG is empty';
   END IF;
   
   BEGIN
@@ -176,6 +191,38 @@ BEGIN
     RAISE EXCEPTION 'code.TEST must die when P_MSG is empty';
   END IF;
   
+  -- P_QUERY cannot be null
+  BEGIN
+    V_DIED := TRUE;
+    SELECT code.TEST('ERR', NULL::TEXT);
+    V_DIED := FALSE;
+  EXCEPTION
+    WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
+      IF NOT V_MSG = 'P_QUERY cannot be null or empty' THEN
+        RAISE EXCEPTION 'code.TEST must die with P_QUERY cannot be null or empty';
+      END IF;
+  END;
+  IF NOT V_DIED THEN
+    RAISE EXCEPTION 'code.TEST must die when P_QUERY is NULL';
+  END IF;
+  
+  -- P_QUERY cannot be empty
+  BEGIN
+    V_DIED := TRUE;
+    SELECT code.TEST('ERR', NULL::TEXT);
+    V_DIED := FALSE;
+  EXCEPTION
+    WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS V_MSG = MESSAGE_TEXT;
+      IF NOT V_MSG = 'P_QUERY cannot be null or empty' THEN
+        RAISE EXCEPTION 'code.TEST must die with P_QUERY cannot be null or empty';
+      END IF;
+  END;
+  IF NOT V_DIED THEN
+    RAISE EXCEPTION 'code.TEST must die when P_QUERY is empty';
+  END IF;
+  
   -- Test error calling COALESCE(), where the error message provided IS correct
   BEGIN
     SELECT code.TEST('syntax error at or near ")"', 'SELECT COALESCE()') INTO V_RES;
@@ -209,7 +256,7 @@ $$ LANGUAGE plpgsql;
 --   P_FALSE_VAL: value to return if P_EXPR is false or null
 --
 -- Returns P_TRUE_VAL (which may be null) if P_EXPR is true, else P_FALSE_VAL (which may be null)
--- Raises an exception if P_TRUE_VAL and P_FALSE_VAL value are both null
+-- Raises an exception if P_TRUE_VAL and P_FALSE_VAL are both null
 CREATE OR REPLACE FUNCTION code.IIF(P_EXPR BOOLEAN, P_TRUE_VAL ANYELEMENT, P_FALSE_VAL ANYELEMENT) RETURNS ANYELEMENT AS
 $$
 BEGIN 
@@ -245,7 +292,7 @@ SELECT DISTINCT *
 --
 -- Returns each non-null non-empty string in P_STRS, separated by P_SEP
 -- Unlike CONCAT_WS, the nulls and empty strings are removed first, eliminating consecutive separators 
-CREATE OR REPLACE FUNCTION code.NEMPTY_WS(P_SEP TEXT, P_STRS VARIADIC TEXT[] = NULL) RETURNS TEXT AS
+CREATE OR REPLACE FUNCTION code.NEMPTY_WS(P_SEP TEXT, P_STRS VARIADIC TEXT[]) RETURNS TEXT AS
 $$
   SELECT STRING_AGG(strs, P_SEP)
     FROM (SELECT UNNEST(P_STRS) strs) t
@@ -325,14 +372,14 @@ $$ LANGUAGE plpgsql IMMUTABLE LEAKPROOF PARALLEL SAFE;
 
 --- Test RELID_TO_ID
 SELECT DISTINCT * FROM (
-  SELECT code.TEST(msg, q)
+  SELECT code.TEST('P_RELID cannot be NULL or < 1', q)
     FROM (VALUES
-            ('P_RELID cannot be NULL or < 1', 'SELECT code.RELID_TO_ID(NULL)')
-           ,('P_RELID cannot be NULL or < 1', 'SELECT code.RELID_TO_ID(0)'   )
-           ,('P_RELID cannot be NULL or < 1', 'SELECT code.RELID_TO_ID(-1)'  )
-         ) AS t(msg, q)
+            ('SELECT code.RELID_TO_ID(NULL)')
+           ,('SELECT code.RELID_TO_ID(0)'   )
+           ,('SELECT code.RELID_TO_ID(-1)'  )
+         ) AS t(q)
    UNION ALL
-  SELECT code.TEST('RELID_TO_ID must return ' || i, code.RELID_TO_ID(r) = i)
+  SELECT code.TEST(format('RELID_TO_ID(%s) must return %s', r, i), code.RELID_TO_ID(r) = i)
     FROM (VALUES
            (1                        , '1'          ),
            (9                        , '9'          ),
@@ -351,14 +398,15 @@ SELECT DISTINCT * FROM (
 -- ID_TO_RELID converts a base 62 string with a maximum of 11 chars to a BIGINT
 -- Maximum ID is AzL8n0Y58m7 -> signed BIGINT value is 9_223_372_036_854_775_807 
 --               12345678901
--- Raises an exception if P_ID is NULL or 0, since valid ids start at 1 
+-- Raises an exception if P_ID is NULL or 0, since valid ids start at 1
+-- Uses C collation for ASCII case-sensitive sorting regardless of database collation
 CREATE OR REPLACE FUNCTION code.ID_TO_RELID(P_ID VARCHAR(11)) RETURNS BIGINT AS
 $$
 DECLARE
-  --                                        12345678901
+  --                                              12345678901
   C_LPAD_ID  CONSTANT CHAR(11) := LPAD(P_ID, 11, '00000000000') COLLATE "C";
-  C_LPAD_MIN CONSTANT CHAR(11) := '00000000001'                 COLLATE "C";
-  C_LPAD_MAX CONSTANT CHAR(11) := 'AzL8n0Y58m7'                 COLLATE "C";
+  C_LPAD_MIN CONSTANT CHAR(11) :=                '00000000001'  COLLATE "C";
+  C_LPAD_MAX CONSTANT CHAR(11) :=                'AzL8n0Y58m7'  COLLATE "C";
   
   C_0        CONSTANT INT := ASCII('0');
   C_9        CONSTANT INT := ASCII('9');
@@ -380,7 +428,7 @@ BEGIN
     RAISE EXCEPTION 'P_ID cannot be null or empty';
   END IF;
   
-  -- P_ID must be >= '1' and <= 'AzL8n0Y58m7'. Use C collation for ASCII sorting. 
+  -- P_ID must be >= '1' and <= 'AzL8n0Y58m7'
   IF (C_LPAD_ID < C_LPAD_MIN) OR (C_LPAD_ID > C_LPAD_MAX) THEN
     RAISE EXCEPTION 'P_ID must be in the range [1 .. AzL8n0Y58m7]';
   END IF;
@@ -392,9 +440,9 @@ BEGIN
     V_RELID = V_RELID * 62;
     
     CASE
-      WHEN V_ASCII_DIGIT >= C_0     AND V_ASCII_DIGIT <= C_9     THEN V_RELID = V_RELID +                            (V_ASCII_DIGIT - C_0);
-      WHEN V_ASCII_DIGIT >= C_CAP_A AND V_ASCII_DIGIT <= C_CAP_Z THEN V_RELID = V_RELID + C_COUNT_DIGITS +           (V_ASCII_DIGIT - C_CAP_A);
-      WHEN V_ASCII_DIGIT >= C_LIT_A AND V_ASCII_DIGIT <= C_LIT_Z THEN V_RELID = V_RELID + C_COUNT_DIGITS_AND_LOWER + (V_ASCII_DIGIT - C_LIT_A);
+      WHEN V_ASCII_DIGIT BETWEEN C_0     AND C_9     THEN V_RELID = V_RELID +                            (V_ASCII_DIGIT - C_0);
+      WHEN V_ASCII_DIGIT BETWEEN C_CAP_A AND C_CAP_Z THEN V_RELID = V_RELID + C_COUNT_DIGITS +           (V_ASCII_DIGIT - C_CAP_A);
+      WHEN V_ASCII_DIGIT BETWEEN C_LIT_A AND C_LIT_Z THEN V_RELID = V_RELID + C_COUNT_DIGITS_AND_LOWER + (V_ASCII_DIGIT - C_LIT_A);
       ELSE RAISE EXCEPTION 'P_ID digit ''%'' (ASCII 0x%) is invalid: only characters in the ranges of 0..9, A..Z, and a..z are valid', V_DIGIT, UPPER(TO_HEX(V_ASCII_DIGIT));
     END CASE;
   END LOOP;
@@ -419,7 +467,7 @@ SELECT DISTINCT * FROM (
            ,('P_ID digit ''{'' (ASCII 0x7B) is invalid: only characters in the ranges of 0..9, A..Z, and a..z are valid', 'SELECT code.ID_TO_RELID(''111{'')')
          ) AS t(msg, q)
    UNION ALL
-  SELECT code.TEST('ID_TO_RELID must return ' || r, code.ID_TO_RELID(i) = r)
+  SELECT code.TEST(format('ID_TO_RELID must return %s', r), code.ID_TO_RELID(i) = r)
     FROM (VALUES
             ('1'          , 1                        )
            ,('9'          , 9                        )

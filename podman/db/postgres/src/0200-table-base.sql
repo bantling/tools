@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS base_ix_modified ON tables.base (modified);
 -- - current timestamp is not an immutable function, so cannot be used for a generated column
 -- - this trigger must be separately applied to each child table
 -- - it is not applied to the base table, as that would not accomplish anything
-CREATE OR REPLACE FUNCTION base_tg_modified_row_fn() RETURNS trigger AS
+CREATE OR REPLACE FUNCTION base_tg_fn() RETURNS trigger AS
 $$
 DECLARE
   V_CT TIMESTAMP := NOW() AT TIME ZONE 'UTC';
