@@ -1934,16 +1934,15 @@ WITH PARAMS AS (
 )
 -- SELECT * FROM GEN_ADDRESS;
 /*
- address_type_relid | country_relid | region_relid |   city    |          address          | address_2 | address_3 | mailing_code 
---------------------+---------------+--------------+-----------+---------------------------+-----------+-----------+--------------
-                 75 |             1 |              | Noord     | Caya Frans Figaroa 11     | Door 5    |           | 
-                    |             2 |           16 | Saskatoon | 49988 Broadway Ave        |           |           | S3O 3B7
-                 74 |             2 |           15 | Montreal  | 11531 Sainte-Catherine St | Door 5    |           | H8L 7X1
-                 75 |             3 |              | Poon Saan | 54 San Chye Loh           | Door 5    | Stop 6    | 6798
-                    |             4 |           22 | San Diego | 76469 San Diego Ave       |           |           | 94642
+ address_type_relid | country_relid | region_relid |       city       |        address        | address_2 | address_3 | mailing_code 
+--------------------+---------------+--------------+------------------+-----------------------+-----------+-----------+--------------
+                    |             1 |              | Noord            | Caya Frans Figaroa 35 |           |           | 
+                 76 |             1 |              | San Nicolas      | Sero Colorado 43      | Door 5    | Stop 6    | 
+                    |             2 |            7 | Brandon          | 95297 Rosser Ave      |           |           | R3I 8V5
+                 74 |             3 |              | Flying Fish Cove | 87 Jln Pantai         | Door 5    |           | 6798
+                    |             4 |           44 | Billings         | 61354 Clark Ave       |           |           | 59262
 (5 rows)
 */
-
 ,INS_ADDRESS AS (
   -- Insert addresses using generated data
   INSERT
@@ -1967,18 +1966,31 @@ WITH PARAMS AS (
         ,mailing_code
     FROM GEN_ADDRESS
   RETURNING *
-) 
--- SELECT * FROM INS_ADDRESS;
+)
+-- SELECT *, row_number() OVER() AS ix FROM INS_ADDRESS;
 /*
- relid | version | description | terms | extra |            created            |           modified            | address_type_relid | country_relid | region_relid |    city     |      address       | address_2 | address_3 | mailing_code 
--------+---------+-------------+-------+-------+-------------------------------+-------------------------------+--------------------+---------------+--------------+-------------+--------------------+-----------+-----------+--------------
-   132 |       1 |             |       |       | 2024-11-13 13:18:00.316919+00 | 2024-11-13 13:18:00.316919+00 |                 75 |             1 |              | Oranjestad  | Spinozastraat 22   | Door 5    |           | 
-   133 |       1 |             |       |       | 2024-11-13 13:18:00.316919+00 | 2024-11-13 13:18:00.316919+00 |                 75 |             2 |           14 | Summerside  | 49235 Water St     | Door 5    | Stop 6    | C2T 1E8
-   134 |       1 |             |       |       | 2024-11-13 13:18:00.316919+00 | 2024-11-13 13:18:00.316919+00 |                    |             3 |              | Poon Saan   | 64 San Chye Loh    |           |           | 6798
-   135 |       1 |             |       |       | 2024-11-13 13:18:00.316919+00 | 2024-11-13 13:18:00.316919+00 |                    |             3 |              | Silver City | 70 Sea View Dr     |           |           | 6798
-   136 |       1 |             |       |       | 2024-11-13 13:18:00.316919+00 | 2024-11-13 13:18:00.316919+00 |                 76 |             4 |           54 | Tulsa       | 77908 S Zenith ave | Door 5    | Stop 6    | 73161
+ relid | version | description | terms | extra |            created            |           modified            | address_type_relid | country_relid | region_relid |    city    |     address     | address_2 | address_3 | mailing_code | ix 
+-------+---------+-------------+-------+-------+-------------------------------+-------------------------------+--------------------+---------------+--------------+------------+-----------------+-----------+-----------+--------------+----
+   112 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                 76 |             1 |              | Oranjestad | Spinozastraat 8 | Door 5    |           |              |  1
+   113 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             2 |           10 | Hay River  | 42382 Poplar Rd |           |           | X3E 7X2      |  2
+   114 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             2 |           10 | Hay River  | 3838 Poplar Rd  |           |           | X4I 2U8      |  3
+   115 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             3 |              | Poon Saan  | 98 San Chye Loh |           |           | 6798         |  4
+   116 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             4 |           67 | Milwaukee  | 28416 Brady St  |           |           | 54977        |  5
 (5 rows)
 */
+
+, INS_CUSTOMER_PERSON AS (
+  -- Insert person customers using generated data and relids of inserted addresses
+  INSERT
+    INTO tables.customer_person(
+            address_relid
+           ,first_name
+           ,middle_name
+           ,last_name
+         )
+  SELECT 
+    FROM 
+)
 
 -- Insert person customers with a reference to their addresses
 -- Order the addresses by their relids, joining the nth customer to the nth address

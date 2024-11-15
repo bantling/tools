@@ -51,14 +51,24 @@ DECLARE
 BEGIN
   CASE TG_OP
     WHEN 'INSERT' THEN
-      NEW.version  = 1;
+      -- Always atart at version 1 (ignore passed value)
+      NEW.version = 1;
+      
+      -- Always start with same created and modified dates = now (ignore passed values)
       NEW.created  = V_CT;
       NEW.modified = V_CT;
   
     WHEN 'UPDATE' THEN
-      NEW.version  = OLD.version + 1;
+      -- The new and old versions have to match, otherwise some change has occurred since it was loaded
+      IF NEW.version != OLD.version THEN
+        RAISE EXCEPTION 'The version of id % has changed since the record was loaded', code.RELID_TO_ID(NEW.relid);
+      END IF;
+      
+      -- Always advance version by 1
+      NEW.version = OLD.version + 1;
+      
+      -- Always set modified date to current time (ignore passed value)
       NEW.modified = V_CT;
-        
     ELSE NULL;
   END CASE;
   
