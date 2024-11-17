@@ -1943,6 +1943,163 @@ WITH PARAMS AS (
                     |             4 |           44 | Billings         | 61354 Clark Ave       |           |           | 59262
 (5 rows)
 */
+
+-- hard-coded table of customer person first names
+,CUSTOMER_PERSON_FIRST_NAME_TABLE AS (
+   SELECT *
+     FROM (VALUES
+             ('Anna')
+            ,('Alfred')
+            ,('Britney')
+            ,('Bob')
+            ,('Christie')
+            ,('Caleb')
+            ,('Denise')
+            ,('Denny')
+            ,('Elen')
+            ,('Edward')
+            ,('Fatima')
+            ,('Fred')
+            ,('Gale')
+            ,('Glen')
+            ,('Haley')
+            ,('Howard')
+            ,('Isabel')
+            ,('Indiana')
+            ,('Jenny')
+            ,('James')
+            ,('Kristen')
+            ,('Karl')
+            ,('Lisa')
+            ,('Leonard')
+            ,('Mona')
+            ,('Michael')
+            ,('Nancy')
+            ,('Norman')
+            ,('Oprah')
+            ,('Olivia')
+            ,('Patsy')
+            ,('Patrick')
+            ,('Queenie')
+            ,('Quentin')
+            ,('Roberta')
+            ,('Ramsey')
+            ,('Selena')
+            ,('Silas')
+            ,('Tina')
+            ,('Tim')
+            ,('Ursula')
+            ,('Umar')
+            ,('Victoria')
+            ,('Victor')
+            ,('Wendy')
+            ,('William')
+            ,('Xena')
+            ,('Xavier')
+            ,('Yolanda')
+            ,('Yakov')
+            ,('Zoey')
+            ,('Zachary')
+          ) AS s(first_name)
+)
+-- SELECT * FROM CUSTOMER_PERSON_FIRST_NAME_TABLE; 
+
+-- hard-coded table of customer person last names
+,CUSTOMER_PERSON_LAST_NAME_TABLE AS (
+   SELECT *
+     FROM (VALUES
+             ('Adair')
+            ,('Adams')
+            ,('Adley')
+            ,('Anderson')
+            ,('Ashley')
+            ,('Bardot')
+            ,('Beckett')
+            ,('Carter')
+            ,('Cassidy')
+            ,('Collymore')
+            ,('Crassus')
+            ,('Cromwell')
+            ,('Curran')
+            ,('Daughtler')
+            ,('Dawson')
+            ,('Ellis')
+            ,('Elsher')
+            ,('Finnegan')
+            ,('Ford')
+            ,('Gasper')
+            ,('Gatlin')
+            ,('Gonzales')
+            ,('Gray')
+            ,('Hansley')
+            ,('Hayes')
+            ,('Hendrix')
+            ,('Hope')
+            ,('Huxley')
+            ,('Jenkins')
+            ,('Keller')
+            ,('Langley')
+            ,('Ledger')
+            ,('Levine')
+            ,('Lennon')
+            ,('Lopez')
+            ,('Madison')
+            ,('Marley')
+            ,('McKenna')
+            ,('Monroe')
+            ,('Pierce')
+            ,('Poverly')
+            ,('Raven')
+            ,('Solace')
+            ,('St. James')
+            ,('Stoll')
+            ,('Thatcher')
+            ,('Verlice')
+            ,('West')
+            ,('Wilson')
+            ,('Zimmerman')
+          ) AS s(last_name)
+)
+-- SELECT * FROM CUSTOMER_PERSON_LAST_NAME_TABLE;
+
+,CUSTOMER_PERSON_FIRST_NAME_INDEXES AS (
+ SELECT first_name
+       ,ROW_NUMBER() OVER(ORDER BY first_name) AS ix
+   FROM CUSTOMER_PERSON_FIRST_NAME_TABLE
+)
+-- SELECT * FROM CUSTOMER_PERSON_FIRST_NAME_INDEXES;
+/*
+ first_name | ix 
+------------+----
+ Alfred     |  1
+ Anna       |  2
+ Bob        |  3
+ ...
+ Yolanda    | 50
+ Zachary    | 51
+ Zoey       | 52
+(52 rows)
+*/
+
+,CUSTOMER_PERSON_LAST_NAME_INDEXES AS (
+ SELECT last_name
+       ,ROW_NUMBER() OVER(ORDER BY last_name) AS ix
+   FROM CUSTOMER_PERSON_LAST_NAME_TABLE
+)
+-- SELECT * FROM CUSTOMER_PERSON_LAST_NAME_INDEXES;
+/*
+ last_name | ix 
+-----------+----
+ Adair     |  1
+ Adams     |  2
+ Adley     |  3
+ ...
+ West      | 48
+ Wilson    | 49
+ Zimmerman | 50
+(50 rows)
+*/
+
 ,INS_ADDRESS AS (
   -- Insert addresses using generated data
   INSERT
@@ -1965,7 +2122,7 @@ WITH PARAMS AS (
         ,address_3
         ,mailing_code
     FROM GEN_ADDRESS
-  RETURNING *
+  RETURNING relid
 )
 -- SELECT *, row_number() OVER() AS ix FROM INS_ADDRESS;
 /*

@@ -14,6 +14,7 @@ WITH COUNTRY_DATA AS (
          )
 )
 -- SELECT * FROM COUNTRY_DATA;
+
 INSERT INTO tables.country(
    description
   ,terms
