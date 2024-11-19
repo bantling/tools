@@ -148,7 +148,7 @@ WITH PARAMS AS (
 
 -- Translate  address type, country, and region indexes into relids
 -- - address types are optional: only business addresses have them
--- - regions are optional: not all couintries have them
+-- - regions are optional: not all countries have them
 ,TR_ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS AS (
   SELECT  atri.relid AS address_type_relid
         ,  cri.relid AS country_relid
@@ -1840,8 +1840,11 @@ WITH PARAMS AS (
 (5 rows)
 */
 
-,ADD_ADDRESS_MAILING_CODE AS (
-  SELECT d.*
+,ADD_CITY_ADDRESS_MAILING_CODE AS (
+  SELECT d.address_type_relid
+        ,d.country_relid
+        ,d.region_relid
+        ,d.st_city_mcp ->> 'cn' AS city
         ,CASE c.code_2
          WHEN 'AW' THEN -- Aruba: street civic (max 2 digits)
               format(
@@ -1909,15 +1912,15 @@ WITH PARAMS AS (
     JOIN tables.region r
       ON r.relid = d.region_relid
 )
--- SELECT * FROM ADD_ADDRESS_MAILING_CODE;
+-- SELECT * FROM ADD_CITY_ADDRESS_MAILING_CODE;
 /*
- address_type_relid | country_relid | region_relid |                       st_city_mcp                        |        address        | mailing_code 
---------------------+---------------+--------------+----------------------------------------------------------+-----------------------+--------------
-                    |             1 |              | {"cn": "Santa Cruz", "st": "San Fuego"}                  | San Fuego 78          | 
-                    |             2 |           12 | {"cn": "Rankin Inlet", "st": "TikTaq Ave", "mcp": "X"}   | 26344 TikTaq Ave      | X2H 5L3
-                    |             2 |           17 | {"cn": "Dawson City", "st": "4th Ave", "mcp": "Y"}       | 30554 4th Ave         | Y1V 8X8
-                    |             3 |              | {"cn": "Poon Saan", "st": "San Chye Loh"}                | 23 San Chye Loh       | 6798
-                 73 |             4 |           34 | {"cn": "Wichita", "st": "S Hydraulic Ave", "mcp": "678"} | 35314 S Hydraulic Ave | 67824
+ address_type_relid | country_relid | region_relid |    city     |        address         | mailing_code 
+--------------------+---------------+--------------+-------------+------------------------+--------------
+                    |             1 |              | Oranjestad  | Spinozastraat 73       | 
+                 75 |             2 |           12 | Iqaluit     | 85899 Mivvik St        | X7Y 1H4
+                    |             2 |            9 | St John's   | 21235 George St        | A7L 4L3
+                    |             3 |              | Drumsite    | 34 Lam Lok Loh         | 6798
+                 76 |             4 |           43 | Kansas City | 71754 Independence Ave | 65578-5174
 (5 rows)
 */
 
@@ -1925,28 +1928,84 @@ WITH PARAMS AS (
   SELECT d.address_type_relid
         ,d.country_relid
         ,d.region_relid
-        ,d.st_city_mcp ->> 'cn'                                                              AS city
-        ,d.address                                                                           AS address
+        ,d.city
+        ,d.address
         ,CASE WHEN  d.address_type_relid IS NOT NULL  THEN 'Door 5' END                      AS address_2
         ,CASE WHEN (d.address_type_relid IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
         ,d.mailing_code
-    FROM ADD_ADDRESS_MAILING_CODE d
+        ,ROW_NUMBER() OVER() AS ix
+    FROM ADD_CITY_ADDRESS_MAILING_CODE d
 )
 -- SELECT * FROM GEN_ADDRESS;
 /*
- address_type_relid | country_relid | region_relid |       city       |        address        | address_2 | address_3 | mailing_code 
---------------------+---------------+--------------+------------------+-----------------------+-----------+-----------+--------------
-                    |             1 |              | Noord            | Caya Frans Figaroa 35 |           |           | 
-                 76 |             1 |              | San Nicolas      | Sero Colorado 43      | Door 5    | Stop 6    | 
-                    |             2 |            7 | Brandon          | 95297 Rosser Ave      |           |           | R3I 8V5
-                 74 |             3 |              | Flying Fish Cove | 87 Jln Pantai         | Door 5    |           | 6798
-                    |             4 |           44 | Billings         | 61354 Clark Ave       |           |           | 59262
+ address_type_relid | country_relid | region_relid |    city     |       address        | address_2 | address_3 | mailing_code | ix 
+--------------------+---------------+--------------+-------------+----------------------+-----------+-----------+--------------+----
+                    |             1 |              | Santa Cruz  | San Fuego 37         |           |           |              |  1
+                 75 |             1 |              | San Nicolas | Sero Colorado 53     | Door 5    |           |              |  2
+                    |             2 |            9 | Paradise    | 91789 Everest St     |           |           | A7B 5W8      |  3
+                 74 |             3 |              | Drumsite    | 97 Lam Lok Loh       | Door 5    | Stop 6    | 6798         |  4
+                    |             4 |           46 | Las Vegas   | 92538 Las Vegas Blvd |           |           | 89733        |  5
 (5 rows)
 */
+
+,INS_ADDRESS AS (
+  -- Insert addresses using generated data
+  INSERT
+    INTO tables.address(
+            address_type_relid
+           ,country_relid
+           ,region_relid
+           ,city
+           ,address
+           ,address_2
+           ,address_3
+           ,mailing_code
+         )
+  SELECT address_type_relid
+        ,country_relid
+        ,region_relid
+        ,city
+        ,address
+        ,address_2
+        ,address_3
+        ,mailing_code
+    FROM GEN_ADDRESS
+  RETURNING relid
+)
+-- SELECT * FROM INS_ADDRESS;
+/*
+ relid | version | description | terms | extra |            created            |           modified            | address_type_relid | country_relid | region_relid |    city    |     address     | address_2 | address_3 | mailing_code 
+-------+---------+-------------+-------+-------+-------------------------------+-------------------------------+--------------------+---------------+--------------+------------+-----------------+-----------+-----------+--------------
+   112 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                 76 |             1 |              | Oranjestad | Spinozastraat 8 | Door 5    |           |              
+   113 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             2 |           10 | Hay River  | 42382 Poplar Rd |           |           | X3E 7X2      
+   114 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             2 |           10 | Hay River  | 3838 Poplar Rd  |           |           | X4I 2U8      
+   115 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             3 |              | Poon Saan  | 98 San Chye Loh |           |           | 6798         
+   116 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             4 |           67 | Milwaukee  | 28416 Brady St  |           |           | 54977        
+(5 rows)
+*/
+
+,ADD_INS_ADDRESS_IX AS (
+   SELECT *
+         ,ROW_NUMBER() OVER() AS ix
+     FROM INS_ADDRESS
+)
+SELECT * FROM ADD_INS_ADDRESS_IX;
+/*
+ relid | ix 
+-------+----
+    87 |  1
+    88 |  2
+    89 |  3
+    90 |  4
+    91 |  5
+(5 rows)
+*/
+-- SELECT * FROM ADD_INS_ADDRESS_IX;
 
 -- hard-coded table of customer person first names
 ,CUSTOMER_PERSON_FIRST_NAME_TABLE AS (
    SELECT *
+         ,ROW_NUMBER() OVER() AS ix
      FROM (VALUES
              ('Anna')
             ,('Alfred')
@@ -2002,11 +2061,24 @@ WITH PARAMS AS (
             ,('Zachary')
           ) AS s(first_name)
 )
--- SELECT * FROM CUSTOMER_PERSON_FIRST_NAME_TABLE; 
+-- SELECT * FROM CUSTOMER_PERSON_FIRST_NAME_TABLE;
+/* first_name | ix 
+------------+----
+ Anna       |  1
+ Alfred     |  2
+ Britney    |  3
+ Bob        |  4
+ ... Yolanda    | 49
+ Yakov      | 50
+ Zoey       | 51
+ Zachary    | 52
+(52 rows)
+*/
 
 -- hard-coded table of customer person last names
 ,CUSTOMER_PERSON_LAST_NAME_TABLE AS (
    SELECT *
+         ,ROW_NUMBER() OVER() AS ix
      FROM (VALUES
              ('Adair')
             ,('Adams')
@@ -2061,78 +2133,82 @@ WITH PARAMS AS (
           ) AS s(last_name)
 )
 -- SELECT * FROM CUSTOMER_PERSON_LAST_NAME_TABLE;
-
-,CUSTOMER_PERSON_FIRST_NAME_INDEXES AS (
- SELECT first_name
-       ,ROW_NUMBER() OVER(ORDER BY first_name) AS ix
-   FROM CUSTOMER_PERSON_FIRST_NAME_TABLE
-)
--- SELECT * FROM CUSTOMER_PERSON_FIRST_NAME_INDEXES;
-/*
- first_name | ix 
-------------+----
- Alfred     |  1
- Anna       |  2
- Bob        |  3
- ...
- Yolanda    | 50
- Zachary    | 51
- Zoey       | 52
-(52 rows)
-*/
-
-,CUSTOMER_PERSON_LAST_NAME_INDEXES AS (
- SELECT last_name
-       ,ROW_NUMBER() OVER(ORDER BY last_name) AS ix
-   FROM CUSTOMER_PERSON_LAST_NAME_TABLE
-)
--- SELECT * FROM CUSTOMER_PERSON_LAST_NAME_INDEXES;
 /*
  last_name | ix 
 -----------+----
  Adair     |  1
  Adams     |  2
  Adley     |  3
+ Anderson  |  4
  ...
+ Verlice   | 47
  West      | 48
  Wilson    | 49
  Zimmerman | 50
 (50 rows)
 */
 
-,INS_ADDRESS AS (
-  -- Insert addresses using generated data
-  INSERT
-    INTO tables.address(
-            address_type_relid
-           ,country_relid
-           ,region_relid
-           ,city
-           ,address
-           ,address_2
-           ,address_3
-           ,mailing_code
-         )
-  SELECT address_type_relid
-        ,country_relid
-        ,region_relid
-        ,city
-        ,address
-        ,address_2
-        ,address_3
-        ,mailing_code
-    FROM GEN_ADDRESS
-  RETURNING relid
+,CUSTOMER_BUSINESS_NAME_TABLE AS (
+   SELECT *
+         ,ROW_NUMBER() OVER() AS ix
+     FROM (VALUES
+             ('9 Yards Media')
+            ,('Aceable, Inc.')
+            ,('Aims Community College')
+            ,('Bent Out of Shape Jewelry')
+            ,('Compass Mortgage')
+            ,('Everything But Anchovies')
+            ,('Exela Movers')
+            ,('Ibotta, Inc.')
+            ,('Intrepid Travel')
+            ,('Kaboom Fireworks')
+            ,('Light As a Feather')
+            ,('Like You Mean It Productions')
+            ,('Marathon Physical Therapy')
+            ,('More Than Words')
+            ,('Percepta Security')
+            ,('Semicolon Bookstore')
+            ,('Soft As a Grape')
+            ,('To Each Their Own, LLC')
+            ,('Top It Off')
+            ,('Twisters Gymnastics Academy')
+            ,('Wanderu')
+            ,('What You Will Yoga')
+            ,('When Pigs Fly')            
+          ) AS s(business_name)
 )
--- SELECT *, row_number() OVER() AS ix FROM INS_ADDRESS;
+-- SELECT * FROM CUSTOMER_BUSINESS_NAME_TABLE;
 /*
- relid | version | description | terms | extra |            created            |           modified            | address_type_relid | country_relid | region_relid |    city    |     address     | address_2 | address_3 | mailing_code | ix 
--------+---------+-------------+-------+-------+-------------------------------+-------------------------------+--------------------+---------------+--------------+------------+-----------------+-----------+-----------+--------------+----
-   112 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                 76 |             1 |              | Oranjestad | Spinozastraat 8 | Door 5    |           |              |  1
-   113 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             2 |           10 | Hay River  | 42382 Poplar Rd |           |           | X3E 7X2      |  2
-   114 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             2 |           10 | Hay River  | 3838 Poplar Rd  |           |           | X4I 2U8      |  3
-   115 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             3 |              | Poon Saan  | 98 San Chye Loh |           |           | 6798         |  4
-   116 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             4 |           67 | Milwaukee  | 28416 Brady St  |           |           | 54977        |  5
+        business_name         | ix 
+------------------------------+----
+ 9 Yards Media                |  1
+ Aceable, Inc.                |  2
+ Aims Community College       |  3
+ ...
+ Wanderu                      | 21
+ What You Will Yoga           | 22
+ When Pigs Fly                | 23
+(23 rows)
+*/
+
+-- Add first name and last name if there is no business type
+,GEN_CUSTOMER_NAME_INDEXES AS (
+  SELECT (random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_FIRST_NAME_TABLE) + 1)::INT AS fn_ix
+        ,(random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_FIRST_NAME_TABLE) + 1)::INT AS mn_ix
+        ,(random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_LAST_NAME_TABLE ) + 1)::INT AS ln_ix
+        ,(random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_BUSINESS_NAME_TABLE    ) + 1)::INT AS bn_ix
+        ,row_number AS ix
+    FROM GEN_ROWS
+)
+SELECT * FROM GEN_CUSTOMER_NAME_INDEXES;
+/*
+ fn_ix | mn_ix | ln_ix | bn_ix | ix 
+-------+-------+-------+-------+----
+    23 |    17 |     3 |    13 |  1
+    19 |    27 |    37 |    12 |  2
+    44 |    27 |     2 |    11 |  3
+    26 |    31 |    38 |    21 |  4
+    14 |     3 |    15 |    22 |  5
 (5 rows)
 */
 
@@ -2145,76 +2221,18 @@ WITH PARAMS AS (
            ,middle_name
            ,last_name
          )
-  SELECT 
-    FROM 
+  SELECT
+    FROM ADD_INS_ADDRESS_IX aiai
+    JOIN ADD_INS_ADDRESS_IX
+    JOIN GEN_CUSTOMER_NAME_INDEXES gcni
+      ON gcni.ix = aiai.ix
+    JOIN CUSTOMER_PERSON_FIRST_NAME_TABLE cpfnt
+      ON cpfnt.ix = gcni.fn_ix
+    JOIN CUSTOMER_PERSON_FIRST_NAME_TABLE cpmnt
+      ON cpmnt.ix = gcni.mn_ix
+    JOIN CUSTOMER_PERSON_LAST_NAME_TABLE  cplnt
+      ON cplnt.ix = gcni.ln_ix
+   WHERE aiai.address_type_relid IS NULL
 )
 
--- Insert person customers with a reference to their addresses
--- Order the addresses by their relids, joining the nth customer to the nth address
--- The relids won't match:
--- - the business relids will be from 1 to N
--- - the addresss relids will not necessarily be consecutive, as they are intermixed with person addresses
-INSERT
- INTO tables.customer_person(
-         address_relid
-        ,id
-        ,version
-        ,created
-        ,changed
-        ,first_name
-        ,middle_name
-        ,last_name
-      )
-SELECT t.relid
-      ,gen_random_uuid()
-      ,1
-      ,current_timestamp
-      ,current_timestamp
-      ,'John'
-      ,'James'
-      ,'Doe'
-  FROM tables.address t
- WHERE t.type_relid IS NULL
- ORDER
-    BY t.relid;
-
--- Insert business customers, one per businness address
-INSERT
-  INTO tables.customer_business(
-           id
-          ,version
-          ,created
-          ,changed
-          ,name
-       )
-SELECT gen_random_uuid()
-      ,1
-      ,current_timestamp
-      ,current_timestamp
-      ,'Biz'
-  FROM tables.address t
- WHERE t.type_relid IS NOT NULL;
-
--- Insert join entries from business customers to their addresses
--- Order the businesses and their addresses by their relids, joining the nth business to the nth address
--- The relids won't match:
--- - the business relids will be from 1 to N
--- - the addresss relids will not necessarily be consecutive, as they are intermixed with person addresses
--- So join the addresses to the businesses by generating row numbers
-INSERT
-  INTO tables.customer_business_address_jt(
-           business_relid
-          ,address_relid
-       )
-WITH BUSINESS_ADDRESS AS (
-  SELECT relid
-        ,row_number() OVER() AS rownum
-    FROM tables.address
-   WHERE (SELECT COUNT(*) FROM tables.address) = 0
-     AND type_relid IS NOT NULL
-)
-SELECT cb.relid
-      ,a.relid
-  FROM tables.customer_business cb
-  JOIN BUSINESS_ADDRESS a
-    ON a.rownum = cb.relid;
+-- truncate table tables.address cascade;
