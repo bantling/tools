@@ -1,9 +1,10 @@
 -- Seed addresses
 
 -- Parameters for seeding
+-- Don't do anything if there are already addresses in the system
 WITH PARAMS AS (
-  SELECT 5 AS num_rows
-   WHERE (SELECT COUNT(*) FROM tables.address) = 0
+   SELECT 5 AS num_rows
+    WHERE (SELECT COUNT(*) FROM tables.address) = 0
 )
 -- SELECT * FROM PARAMS;
 /*
@@ -15,22 +16,71 @@ WITH PARAMS AS (
 
 -- Multiply the one params row by the num_rows value
 ,GEN_ROWS AS (
- SELECT p.*
-       ,ROW_NUMBER() OVER()
-   FROM PARAMS p
-       ,generate_series(1, num_rows) r
+    SELECT '{}'::JSONB input_data
+      FROM PARAMS p
+          ,generate_series(1, num_rows) r
 )
 -- SELECT * FROM GEN_ROWS;
 /*
- num_rows | row_number 
-----------+------------
-        5 |          1
-        5 |          2
-        5 |          3
-        5 |          4
-        5 |          5
+ input_data 
+------------
+ {}
+ {}
+ {}
+ {}
+ {}
 (5 rows)
 */
+
+-- Choose 70% personal addresses and 30% business addresses
+,ADD_PERSONAL_OR_BUSINESS AS (
+   SELECT *
+         ,random() <= 0.70 AS is_personal
+     FROM GEN_ROWS
+)
+-- SELECT * FROM ADD_PERSONAL_OR_BUSINESS;
+/*
+ input_data | is_personal 
+------------+-------------
+ {}         | t
+ {}         | f
+ {}         | t
+ {}         | t
+ {}         | f
+(5 rows)
+*/
+
+-- Generate an array of all address type relids (we don't care what they are called)
+,ADD_ADDRESS_TYPE_IDS AS (
+    SELECT *
+          ,(SELECT jsonb_agg(relid) atids FROM tables.address_type atj) address_type_ids
+      FROM ADD_PERSONAL_OR_BUSINESS
+)
+-- SELECT * FROM ADD_ADDRESS_TYPE_IDS;
+/*
+ input_data | is_personal | address_type_ids 
+------------+-------------+------------------
+ {}         | f           | [74, 75, 76]
+ {}         | f           | [74, 75, 76]
+ {}         | t           | [74, 75, 76]
+ {}         | t           | [74, 75, 76]
+ {}         | t           | [74, 75, 76]
+(5 rows)
+*/
+
+-- Add address types
+,CHOOSE_ADDRESS_TYPES AS (
+    SELECT input_data || jsonb_build_object(
+              code.IIF(
+                 is_personal
+                ,NULL
+                ,address_type_ids -> (random() * (jsonb_array_length(address_type_ids) - 1))::INT
+              )
+           )
+      FROM AT_PERSONAL_OR_BUSINESS
+          ,ADDRESS_TYPE_IDS
+)
+SELECT * FROM ADDRESS_TYPES;
 
 -- Generate the list of ordered address type relids with 1-based indexes
 ,ADDRESS_TYPE_RELID_INDEXES AS (
@@ -1970,17 +2020,17 @@ WITH PARAMS AS (
         ,address_3
         ,mailing_code
     FROM GEN_ADDRESS
-  RETURNING relid
+  RETURNING relid, address_type_relid
 )
 -- SELECT * FROM INS_ADDRESS;
 /*
- relid | version | description | terms | extra |            created            |           modified            | address_type_relid | country_relid | region_relid |    city    |     address     | address_2 | address_3 | mailing_code 
--------+---------+-------------+-------+-------+-------------------------------+-------------------------------+--------------------+---------------+--------------+------------+-----------------+-----------+-----------+--------------
-   112 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                 76 |             1 |              | Oranjestad | Spinozastraat 8 | Door 5    |           |              
-   113 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             2 |           10 | Hay River  | 42382 Poplar Rd |           |           | X3E 7X2      
-   114 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             2 |           10 | Hay River  | 3838 Poplar Rd  |           |           | X4I 2U8      
-   115 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             3 |              | Poon Saan  | 98 San Chye Loh |           |           | 6798         
-   116 |       1 |             |       |       | 2024-11-15 13:04:08.278525+00 | 2024-11-15 13:04:08.278525+00 |                    |             4 |           67 | Milwaukee  | 28416 Brady St  |           |           | 54977        
+ relid | address_type_relid 
+-------+--------------------
+    89 |                 75
+    90 |                   
+    91 |                   
+    92 |                 75
+    93 |                 75
 (5 rows)
 */
 
@@ -1989,18 +2039,17 @@ WITH PARAMS AS (
          ,ROW_NUMBER() OVER() AS ix
      FROM INS_ADDRESS
 )
-SELECT * FROM ADD_INS_ADDRESS_IX;
+-- SELECT * FROM ADD_INS_ADDRESS_IX;
 /*
- relid | ix 
--------+----
-    87 |  1
-    88 |  2
-    89 |  3
-    90 |  4
-    91 |  5
+ relid | address_type_relid | ix 
+-------+--------------------+----
+    94 |                    |  1
+    95 |                 74 |  2
+    96 |                 76 |  3
+    97 |                    |  4
+    98 |                 76 |  5
 (5 rows)
 */
--- SELECT * FROM ADD_INS_ADDRESS_IX;
 
 -- hard-coded table of customer person first names
 ,CUSTOMER_PERSON_FIRST_NAME_TABLE AS (
@@ -2148,6 +2197,61 @@ SELECT * FROM ADD_INS_ADDRESS_IX;
 (50 rows)
 */
 
+-- Add first name and last name if there is no business type
+,GEN_CUSTOMER_PERSON_NAME_INDEXES AS (
+  SELECT (random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_FIRST_NAME_TABLE) + 1)::INT AS fn_ix
+        ,(random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_FIRST_NAME_TABLE) + 1)::INT AS mn_ix
+        ,(random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_LAST_NAME_TABLE ) + 1)::INT AS ln_ix
+        ,row_number AS ix
+    FROM GEN_ROWS
+)
+-- SELECT * FROM GEN_CUSTOMER_PERSON_NAME_INDEXES;
+/*
+ fn_ix | mn_ix | ln_ix | ix 
+-------+-------+-------+----
+    14 |    47 |    11 |  1
+    31 |    19 |    22 |  2
+     7 |    38 |    27 |  3
+    30 |    44 |    26 |  4
+    38 |    20 |    37 |  5
+(5 rows)
+*/
+
+-- Insert person customers using generated data and relids of inserted addresses
+,INS_CUSTOMER_PERSON AS (
+  INSERT
+    INTO tables.customer_person(
+            address_relid
+           ,first_name
+           ,middle_name
+           ,last_name
+         )
+  SELECT aiai.relid
+        ,cpfnt.first_name
+        ,code.IIF(random() < 0.8, cpmnt.first_name, '')
+        ,cplnt.last_name
+    FROM ADD_INS_ADDRESS_IX aiai
+    JOIN GEN_CUSTOMER_PERSON_NAME_INDEXES gcpni
+      ON gcpni.ix = aiai.ix
+    JOIN CUSTOMER_PERSON_FIRST_NAME_TABLE cpfnt
+      ON cpfnt.ix = gcpni.fn_ix
+    JOIN CUSTOMER_PERSON_FIRST_NAME_TABLE cpmnt
+      ON cpmnt.ix = gcpni.mn_ix
+    JOIN CUSTOMER_PERSON_LAST_NAME_TABLE  cplnt
+      ON cplnt.ix = gcpni.ln_ix
+   WHERE aiai.address_type_relid IS NULL
+  RETURNING relid
+)
+-- SELECT * FROM INS_CUSTOMER_PERSON;
+/*
+ relid 
+-------
+   104
+   105
+   106
+(3 rows)
+*/
+
 ,CUSTOMER_BUSINESS_NAME_TABLE AS (
    SELECT *
          ,ROW_NUMBER() OVER() AS ix
@@ -2192,47 +2296,67 @@ SELECT * FROM ADD_INS_ADDRESS_IX;
 */
 
 -- Add first name and last name if there is no business type
-,GEN_CUSTOMER_NAME_INDEXES AS (
-  SELECT (random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_FIRST_NAME_TABLE) + 1)::INT AS fn_ix
-        ,(random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_FIRST_NAME_TABLE) + 1)::INT AS mn_ix
-        ,(random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_LAST_NAME_TABLE ) + 1)::INT AS ln_ix
-        ,(random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_BUSINESS_NAME_TABLE    ) + 1)::INT AS bn_ix
+,GEN_CUSTOMER_BUSINESS_NAME_INDEXES AS (
+  SELECT (random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_BUSINESS_NAME_TABLE    ) + 1)::INT AS bn_ix
         ,row_number AS ix
     FROM GEN_ROWS
 )
-SELECT * FROM GEN_CUSTOMER_NAME_INDEXES;
+-- SELECT * FROM GEN_CUSTOMER_BUSINESS_NAME_INDEXES;
 /*
- fn_ix | mn_ix | ln_ix | bn_ix | ix 
--------+-------+-------+-------+----
-    23 |    17 |     3 |    13 |  1
-    19 |    27 |    37 |    12 |  2
-    44 |    27 |     2 |    11 |  3
-    26 |    31 |    38 |    21 |  4
-    14 |     3 |    15 |    22 |  5
+ bn_ix | ix 
+-------+----
+    20 |  1
+    19 |  2
+     7 |  3
+     6 |  4
+    14 |  5
 (5 rows)
 */
 
-, INS_CUSTOMER_PERSON AS (
-  -- Insert person customers using generated data and relids of inserted addresses
+-- Insert business customers using generated data and relids of inserted addresses
+,INS_CUSTOMER_BUSINESS AS (
   INSERT
-    INTO tables.customer_person(
-            address_relid
-           ,first_name
-           ,middle_name
-           ,last_name
+    INTO tables.customer_business(
+            name
          )
-  SELECT
+  SELECT cbnt.business_name
     FROM ADD_INS_ADDRESS_IX aiai
-    JOIN ADD_INS_ADDRESS_IX
-    JOIN GEN_CUSTOMER_NAME_INDEXES gcni
-      ON gcni.ix = aiai.ix
-    JOIN CUSTOMER_PERSON_FIRST_NAME_TABLE cpfnt
-      ON cpfnt.ix = gcni.fn_ix
-    JOIN CUSTOMER_PERSON_FIRST_NAME_TABLE cpmnt
-      ON cpmnt.ix = gcni.mn_ix
-    JOIN CUSTOMER_PERSON_LAST_NAME_TABLE  cplnt
-      ON cplnt.ix = gcni.ln_ix
-   WHERE aiai.address_type_relid IS NULL
+    JOIN GEN_CUSTOMER_BUSINESS_NAME_INDEXES gcbni
+      ON gcbni.ix = aiai.ix
+    JOIN CUSTOMER_BUSINESS_NAME_TABLE cbnt
+      ON cbnt.ix = gcbni.bn_ix
+   WHERE aiai.address_type_relid IS NOT NULL
+  RETURNING relid
+)
+-- SELECT * FROM INS_CUSTOMER_BUSINESS;
+/*
+ relid 
+-------
+   124
+   125
+   126
+(3 rows)
+*/
+
+,ADD_CUSTOMER_BUSINESS_IX AS (
+   SELECT *
+         ,ROW_NUMBER() OVER() AS ix
+     FROM INS_CUSTOMER_BUSINESS
 )
 
--- truncate table tables.address cascade;
+-- Insert business customer address join entry
+-- To line up the inserted relids with ADD_INS_ADDRESS_IX indexes:
+-- Add
+,INS_CUSTOMER_BUSINESS_ADDRESS_JOIN AS (
+  INSERT
+    INTO tables.customer_business_address_jt(
+            business_relid
+           ,address_relid
+         )
+  SELECT icb.relid
+    FROM ADD_INS_ADDRESS_IX aiai
+    JOIN INS_CUSTOMER_BUSINESS icb
+      ON icb.
+)
+
+truncate table tables.address cascade;

@@ -1,5 +1,6 @@
 -- Helper functions that could be used in table definitions, views, or code
 
+---------------------------------------------------------------------------------------------------
 -- TEST(TEXT, BOOLEAN): test that a condition succeeded for cases where no exception is raised
 --   P_MSG : string exception message if the test failed (cannot be null or empty)
 --   P_TEST: true if test succeeded, null or false if it failed
@@ -249,7 +250,12 @@ BEGIN
   END IF;
 END;
 $$ LANGUAGE plpgsql;
+---------------------------------------------------------------------------------------------------
 
+
+
+
+---------------------------------------------------------------------------------------------------
 -- IIF: A polymorphic function some other vendors have that Postgres lacks
 --   P_EXPR     : A boolean expression
 --   P_TRUE_VAL : value to return if P_EXPR is true
@@ -285,7 +291,12 @@ SELECT DISTINCT *
              ,(FALSE, 'a'::TEXT , 'b' , 'b' )
            ) AS t (expr, tval, fval, res)
   ) t;
+---------------------------------------------------------------------------------------------------
 
+
+
+
+---------------------------------------------------------------------------------------------------
 -- NEMPTY_WS: a version of CONCAT_WS that treats empty strings like nulls, and coalesces consecutive empty/nulls
 --   P_SEP : The separator string
 --   P_STRS: The strings to place a separator between
@@ -318,7 +329,45 @@ SELECT DISTINCT code.TEST(msg, code.NEMPTY_WS('-', VARIADIC args) IS NOT DISTINC
          ,('NEMPTY_WS must return a-b-c'  , ARRAY[NULL, NULL, 'a' , '' , '', 'b', '', NULL, 'c']        , 'a-b-c'  )
          ,('NEMPTY_WS must return a-b-c-d', ARRAY['a' , 'b' , 'c' , 'd'                        ]        , 'a-b-c-d')
        ) AS t (msg, args, res);
+---------------------------------------------------------------------------------------------------
 
+
+
+
+---------------------------------------------------------------------------------------------------
+-- JSONB_ARRAY_RANDOM returns a random element of a jsonb array
+---------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION code.JSONB_ARRAY_RANDOM(P_ARRAY JSONB) RETURNS JSONB AS
+$$
+BEGIN
+  IF NOT jsonb_typeof(P_ARRAY) = 'array' THEN
+    RAISE EXCEPTION 'P_ARRAY must be a jsonb array, not a jsonb %', jsonb_typeof(P_ARRAY);
+  END IF;
+
+  RETURN P_ARRAY -> (random() * (jsonb_array_length(P_ARRAY) - 1))::INT;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Test JSONB_ARRAY_RANDOM
+SELECT DISTINCT * FROM (
+  SELECT code.TEST('P_ARRAY must be a jsonb array, not a jsonb number', code.JSONB_ARRAY_RANDOM('[1]'::JSONB) IS NOT NULL)
+   UNION ALL
+  SELECT code.TEST(format('JSONB_ARRAY_RANDOM(%s) must return a value between %s and %s', a, l, h), code.JSONB_ARRAY_RANDOM(a)::INT BETWEEN l AND h)
+    FROM (VALUES
+           (jsonb_build_array(1), 1, 1),
+           (jsonb_build_array(1), 1, 1),
+           
+           (jsonb_build_array(2, 3), 2, 3),
+           (jsonb_build_array(2, 3), 2, 3),
+           
+           (jsonb_build_array(4, 5, 6, 7), 4, 7),
+           (jsonb_build_array(4, 5, 6, 7), 4, 7),
+           (jsonb_build_array(4, 5, 6, 7), 4, 7),
+           (jsonb_build_array(4, 5, 6, 7), 4, 7)
+         ) AS t(a, l, h)
+) t;
+
+---------------------------------------------------------------------------------------------------
 -- TO_8601 converts a TIMESTAMP into an ISO 8601 string of the form
 -- YYYY-MM-DDTHH:MM:SS.sssZ
 -- 123456789012345678901234
@@ -335,7 +384,12 @@ SELECT DISTINCT code.TEST(msg, code.IIF(ARRAY_LENGTH(ARG, 1) = 0, code.TO_8601()
          ,('TO_8601(NULL) must return NOW'               , ARRAY[NULL]::TIMESTAMP[]                          , TO_CHAR(NOW() AT TIME ZONE 'UTC'                   , 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
          ,('TO_8601(NOW - 1 DAY) must return NOW - 1 DAY', ARRAY[NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY'], TO_CHAR(NOW() AT TIME ZONE 'UTC' - INTERVAL '1 DAY', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
        ) AS t(msg, arg, res);
+---------------------------------------------------------------------------------------------------- 
 
+
+
+
+---------------------------------------------------------------------------------------------------
 -- RELID_TO_ID converts a BIGINT to a base 62 string with a maximum of 11 chars
 -- Maximum signed BIGINT value is 9_223_372_036_854_775_807 -> AzL8n0Y58m7
 --                                                             12345678901
@@ -394,7 +448,12 @@ SELECT DISTINCT * FROM (
                                                        -- = 10 * 839299365868340224 + 61             * 13537086546263552 + 21 *        218340105584896 + 8 * 3521614606208 + 49             * 56800235584 + 0 * 916132832 + 34        * 14776336 + 5 * 238328 + 8 * 3844 + 48             * 62 + 7    
         ) AS t(r, i)
 ) t;
+---------------------------------------------------------------------------------------------------
 
+
+
+
+---------------------------------------------------------------------------------------------------
 -- ID_TO_RELID converts a base 62 string with a maximum of 11 chars to a BIGINT
 -- Maximum ID is AzL8n0Y58m7 -> signed BIGINT value is 9_223_372_036_854_775_807 
 --               12345678901
@@ -480,3 +539,4 @@ SELECT DISTINCT * FROM (
            ,('AzL8n0Y58m7', 9_223_372_036_854_775_807)    
         ) AS t(i, r)
 ) t;
+---------------------------------------------------------------------------------------------------
