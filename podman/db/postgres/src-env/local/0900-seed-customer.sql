@@ -35,7 +35,7 @@ WITH PARAMS AS (
 -- Choose 70% personal addresses and 30% business addresses
 ,ADD_PERSONAL_OR_BUSINESS AS (
    SELECT *
-         ,random() <= 0.70 AS is_personal
+         ,random() <= 0.60 AS is_personal
      FROM GEN_ROWS
 )
 -- SELECT * FROM ADD_PERSONAL_OR_BUSINESS;
@@ -71,31 +71,25 @@ WITH PARAMS AS (
 -- Add address types
 ,CHOOSE_ADDRESS_TYPES AS (
     SELECT input_data || jsonb_build_object(
-              code.IIF(
+              'address_type_relid'
+             ,code.IIF(
                  is_personal
                 ,NULL
-                ,address_type_ids -> (random() * (jsonb_array_length(address_type_ids) - 1))::INT
+                ,code.JSONB_ARRAY_RANDOM(address_type_ids)::BIGINT
               )
-           )
-      FROM AT_PERSONAL_OR_BUSINESS
-          ,ADDRESS_TYPE_IDS
+           ) AS input_data
+      FROM ADD_ADDRESS_TYPE_IDS
 )
-SELECT * FROM ADDRESS_TYPES;
-
--- Generate the list of ordered address type relids with 1-based indexes
-,ADDRESS_TYPE_RELID_INDEXES AS (
- SELECT relid
-       ,ROW_NUMBER() OVER(ORDER BY ord) AS ix
-   FROM tables.address_type
-)
--- SELECT * FROM ADDRESS_TYPE_RELID_INDEXES;
+-- SELECT * FROM CHOOSE_ADDRESS_TYPES;
 /*
- relid | ix 
--------+----
-    73 |  1
-    74 |  2
-    75 |  3
-(3 rows)
+          input_data          
+------------------------------
+ {"address_type_relid": null}
+ {"address_type_relid": 75}
+ {"address_type_relid": null}
+ {"address_type_relid": 75}
+ {"address_type_relid": null}
+(5 rows)
 */
 
 -- Generate the list of ordered country relids with 1-based indexes

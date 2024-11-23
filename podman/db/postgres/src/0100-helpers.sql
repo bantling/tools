@@ -350,12 +350,16 @@ $$ LANGUAGE plpgsql;
 
 -- Test JSONB_ARRAY_RANDOM
 SELECT DISTINCT * FROM (
-  SELECT code.TEST('P_ARRAY must be a jsonb array, not a jsonb number', code.JSONB_ARRAY_RANDOM('[1]'::JSONB) IS NOT NULL)
+  SELECT code.TEST('P_ARRAY must be a jsonb array, not a jsonb number', 'SELECT code.JSONB_ARRAY_RANDOM(''1''::JSONB)')
+   UNION ALL
+  SELECT code.TEST('P_ARRAY is null', code.JSONB_ARRAY_RANDOM(NULL) IS NULL)
+   UNION ALL
+  SELECT code.TEST('P_ARRAY is empty', code.JSONB_ARRAY_RANDOM(jsonb_build_array()) IS NULL)
    UNION ALL
   SELECT code.TEST(format('JSONB_ARRAY_RANDOM(%s) must return a value between %s and %s', a, l, h), code.JSONB_ARRAY_RANDOM(a)::INT BETWEEN l AND h)
     FROM (VALUES
            (jsonb_build_array(1), 1, 1),
-           (jsonb_build_array(1), 1, 1),
+           (jsonb_build_array(2), 2, 2),
            
            (jsonb_build_array(2, 3), 2, 3),
            (jsonb_build_array(2, 3), 2, 3),
