@@ -346,7 +346,7 @@ BEGIN
 
   RETURN P_ARRAY -> (random() * (jsonb_array_length(P_ARRAY) - 1))::INT;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql VOLATILE LEAKPROOF STRICT;
 
 -- Test JSONB_ARRAY_RANDOM
 SELECT DISTINCT * FROM (

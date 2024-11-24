@@ -33,12 +33,12 @@ WITH PARAMS AS (
 */
 
 -- Choose 70% personal addresses and 30% business addresses
-,ADD_PERSONAL_OR_BUSINESS AS (
+,ADD_IS_PERSONAL AS (
    SELECT *
          ,random() <= 0.60 AS is_personal
      FROM GEN_ROWS
 )
--- SELECT * FROM ADD_PERSONAL_OR_BUSINESS;
+-- SELECT * FROM ADD_IS_PERSONAL;
 /*
  input_data | is_personal 
 ------------+-------------
@@ -50,11 +50,11 @@ WITH PARAMS AS (
 (5 rows)
 */
 
--- Generate an array of all address type relids (we don't care what they are called)
+-- Generate an array of all address type relids
 ,ADD_ADDRESS_TYPE_IDS AS (
     SELECT *
-          ,(SELECT jsonb_agg(relid) atids FROM tables.address_type atj) address_type_ids
-      FROM ADD_PERSONAL_OR_BUSINESS
+          ,(SELECT jsonb_agg(relid) FROM tables.address_type) address_type_ids
+      FROM ADD_IS_PERSONAL
 )
 -- SELECT * FROM ADD_ADDRESS_TYPE_IDS;
 /*
@@ -68,161 +68,101 @@ WITH PARAMS AS (
 (5 rows)
 */
 
--- Add address types
-,CHOOSE_ADDRESS_TYPES AS (
+-- CHoose an address type (null if is_personal is true, non-null if is_personal is false)
+,CHOOSE_ADDRESS_TYPE AS (
     SELECT input_data || jsonb_build_object(
               'address_type_relid'
-             ,code.IIF(
-                 is_personal
-                ,NULL
-                ,code.JSONB_ARRAY_RANDOM(address_type_ids)::BIGINT
-              )
+             ,code.IIF(is_personal, NULL, code.JSONB_ARRAY_RANDOM(address_type_ids))::BIGINT
            ) AS input_data
       FROM ADD_ADDRESS_TYPE_IDS
 )
--- SELECT * FROM CHOOSE_ADDRESS_TYPES;
+SELECT * FROM CHOOSE_ADDRESS_TYPE;
 /*
-          input_data          
 ------------------------------
  {"address_type_relid": null}
  {"address_type_relid": 75}
- {"address_type_relid": null}
  {"address_type_relid": 75}
+ {"address_type_relid": 74}
  {"address_type_relid": null}
 (5 rows)
 */
 
--- Generate the list of ordered country relids with 1-based indexes
-,COUNTRY_RELID_INDEXES AS (
- SELECT relid
-       ,ROW_NUMBER() OVER(ORDER BY name) AS ix
-   FROM tables.country
+-- Generate an array of all country relids 
+,ADD_COUNTRY_IDS AS (
+    SELECT *
+          ,(SELECT jsonb_agg(relid) FROM tables.COUNTRY) country_ids
+      FROM CHOOSE_ADDRESS_TYPE
 )
--- SELECT * FROM COUNTRY_RELID_INDEXES;
+-- SELECT * FROM ADD_COUNTRY_IDS;
 /*
- relid | ix 
--------+----
-     1 |  1
-     2 |  2
-     3 |  3
-     4 |  4
-(4 rows)
-*/
-
--- Generate the list of ordered region relids with 1-based indexes for each country
-,REGION_RELID_INDEXES_BY_COUNTRY AS (
- SELECT country_relid
-       ,relid
-       ,ROW_NUMBER() OVER(PARTITION BY country_relid ORDER BY ord) AS ix
-   FROM tables.region
-)
--- SELECT * FROM REGION_RELID_INDEXES_BY_COUNTRY;
-/*
- country_relid | relid | ix 
----------------+-------+----
-             2 |     5 |  1
-             2 |     6 |  2
-             2 |     7 |  3
-...
-             4 |    18 |  1
-             4 |    19 |  2
-             4 |    20 |  3
-...
-(68 rows)
-*/
-
--- Generate random address type indexes
--- NULL indexes indicate a personal address, non-null indicates a business address
-,GEN_ADDRESS_TYPE_INDEXES AS (
- SELECT code.IIF(random() >= 0.5, (random() * (SELECT COUNT(*) - 1 FROM ADDRESS_TYPE_RELID_INDEXES) + 1)::INT, NULL) AS ix
-       ,row_number
-   FROM GEN_ROWS
-)
--- SELECT * FROM GEN_ADDRESS_TYPE_INDEXES;
-/*
- ix | row_number 
-----+------------
-    |          1
-  3 |          2
-    |          3
-    |          4
-  1 |          5
+ input_data | is_personal | address_type_id | country_ids  
+------------+-------------+-----------------+--------------
+ {}         | t           |                 | [1, 2, 3, 4]
+ {}         | t           |                 | [1, 2, 3, 4]
+ {}         | f           |              74 | [1, 2, 3, 4]
+ {}         | f           |              74 | [1, 2, 3, 4]
+ {}         | f           |              75 | [1, 2, 3, 4]
 (5 rows)
 */
 
--- Generate random country indexes
-,GEN_COUNTRY_INDEXES AS (
- SELECT (random() * (SELECT COUNT(*) - 1 FROM COUNTRY_RELID_INDEXES) + 1)::INT AS ix
-       ,row_number
-   FROM GEN_ROWS
+,CHOOSE_COUNTRY AS (
+    SELECT input_data
+          ,is_personal
+          ,address_type_id
+          ,code.JSONB_ARRAY_RANDOM(country_ids)::BIGINT country_id
+      FROM ADD_COUNTRY_IDS
 )
--- SELECT * FROM GEN_COUNTRY_INDEXES;
+-- SELECT * FROM CHOOSE_COUNTRY;
 /*
- ix | row_number 
-----+------------
-  3 |          1
-  2 |          2
-  4 |          3
-  2 |          4
-  3 |          5
+ input_data | is_personal | address_type_id | country_id 
+------------+-------------+-----------------+------------
+ {}         | f           |              75 |          2
+ {}         | f           |              75 |          3
+ {}         | t           |                 |          1
+ {}         | f           |              76 |          3
+ {}         | t           |                 |          3
 (5 rows)
 */
 
--- Generate random region indexes (null for coutries with no regions)
-,GEN_REGION_INDEXES AS (
- SELECT code.IIF(c.has_regions, (random() * (SELECT COUNT(*) - 1 FROM REGION_RELID_INDEXES_BY_COUNTRY WHERE country_relid = c.relid) + 1)::INT, NULL) ix
-       ,gci.row_number
-   FROM GEN_COUNTRY_INDEXES gci
-   JOIN COUNTRY_RELID_INDEXES cri
-     ON cri.ix = gci.ix
-   JOIN tables.country c
-     ON c.relid = cri.relid
+-- Generate an array of all regoion relids for the chosen country (empty array if no regions)
+,ADD_REGION_IDS AS (
+    SELECT *
+          ,(SELECT jsonb_agg(relid) FROM tables.REGION WHERE country_relid = country_id) region_ids
+      FROM CHOOSE_COUNTRY
 )
--- SELECT * FROM GEN_REGION_INDEXES;
+-- SELECT * FROM ADD_REGION_IDS;
 /*
- ix | row_number 
-----+------------
-    |          4
-  7 |          3
-    |          1
- 14 |          5
- 49 |          2
+ input_data | is_personal | address_type_id | country_id |                   region_ids                    
+------------+-------------+-----------------+------------+-------------------------------------------------
+ {}         | t           |                 |          2 | [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+ {}         | t           |                 |          2 | [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+ {}         | f           |              76 |          3 | 
+ {}         | t           |                 |          3 | 
+ {}         | f           |              75 |          2 | [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
 (5 rows)
 */
 
--- Translate  address type, country, and region indexes into relids
--- - address types are optional: only business addresses have them
--- - regions are optional: not all countries have them
-,TR_ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS AS (
-  SELECT  atri.relid AS address_type_relid
-        ,  cri.relid AS country_relid
-        ,rribc.relid AS region_relid
-    FROM GEN_ADDRESS_TYPE_INDEXES gati
-    LEFT
-    JOIN ADDRESS_TYPE_RELID_INDEXES atri
-      ON atri.ix = gati.ix
-    JOIN GEN_COUNTRY_INDEXES gci
-      ON gci.row_number = gati.row_number
-    JOIN COUNTRY_RELID_INDEXES cri
-      ON cri.ix = gci.ix
-    JOIN GEN_REGION_INDEXES gri
-      ON gri.row_number = gati.row_number
-    LEFT
-    JOIN REGION_RELID_INDEXES_BY_COUNTRY rribc
-      ON rribc.country_relid = cri.relid
-     AND rribc.ix = gri.ix
+,CHOOSE_REGION AS (
+    SELECT input_data
+          ,is_personal
+          ,address_type_id
+          ,country_id
+          ,code.JSONB_ARRAY_RANDOM(region_ids)::BIGINT region_id
+      FROM ADD_REGION_IDS
 )
--- SELECT * FROM TR_ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS;
+-- SELECT * FROM CHOOSE_REGION;
 /*
- address_type_relid | country_relid | region_relid 
---------------------+---------------+--------------
-                 75 |             3 |             
-                    |             3 |             
-                    |             1 |             
-                    |             4 |           58
-                    |             2 |            9
+ input_data | is_personal | address_type_id | country_id | region_id 
+------------+-------------+-----------------+------------+-----------
+ {}         | t           |                 |          2 |         9
+ {}         | f           |              75 |          4 |        46
+ {}         | f           |              75 |          3 |          
+ {}         | t           |                 |          2 |        15
+ {}         | t           |                 |          2 |        16
 (5 rows)
 */
+
+------------------
 
 -- Generate {st: street, cn: city, mcp: mailing code prefix (optional)} object for chosen country/region
 -- 74 |             4 |           71 | 
