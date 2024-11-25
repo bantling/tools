@@ -7,11 +7,18 @@ ARG APP_EXEC_PASS
 # Dir for environment source files
 ARG SRC_ENV_DIR=
 
+# Number of customers to generate
+ARG DB_NUM_CUSTOMERS_GEN
+
 # Copy all sql scripts
 COPY src/* /docker-entrypoint-initdb.d
 
 # Copy environment specific files, if any
 #SRC_ENV_DIR COPY ${SRC_ENV_DIR}/* /docker-entrypoint-initdb.d
+
+# Modify environment specific files to set variables
+RUN [ -f /docker-entrypoint-initdb.d/0900-seed-customer.sql ] && \
+    sed -i 's,${NUM_ROWS},'${DB_NUM_CUSTOMERS_GEN}',g' /docker-entrypoint-initdb.d/0900-seed-customer.sql
 
 # Replace every occurrence of ${APP_EXEC_PASS} in copied sql scripts with value of build arg APP_EXEC_PASS
 # Note that ${APP_EXEC_PASS} cannot be in quotes, or it will be passed as the literal sequence ${APP_EXEC_PASS}

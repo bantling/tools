@@ -1,174 +1,101 @@
 -- Seed addresses
 
 -- Parameters for seeding
+-- ${NUM_ROWS} is set as follows:
+-- - Makefile has hard-code default of 5
+-- - It can be overriden on cli to generate 5,000 rows by invoking "make DB_NUM_CUSTOMERS_GEN=5000 ..."
+-- - The Makefile provides this value to Containerfile.in as the build arg DB_NUM_CUSTOMERS_GEN
+-- - The Containerfile.in replaces ${NUM_ROWS} in this script with the value of the build arg DB_NUM_CUSTOMERS_GEN 
 -- Don't do anything if there are already addresses in the system
-WITH PARAMS AS (
-   SELECT 5 AS num_rows
+WITH INPUT_DATA AS (
+   --SELECT generate_series(1, ${NUM_ROWS})
+   SELECT generate_series(1, 5)
     WHERE (SELECT COUNT(*) FROM tables.address) = 0
 )
--- SELECT * FROM PARAMS;
+-- SELECT * FROM INPUT_DATA;
 /*
- num_rows 
-----------
-        5 
-(1 row)
-*/
-
--- Multiply the one params row by the num_rows value
-,GEN_ROWS AS (
-    SELECT '{}'::JSONB input_data
-      FROM PARAMS p
-          ,generate_series(1, num_rows) r
-)
--- SELECT * FROM GEN_ROWS;
-/*
- input_data 
-------------
- {}
- {}
- {}
- {}
- {}
+ generate_series 
+-----------------
+               1
+               2
+               3
+               4
+               5
 (5 rows)
 */
 
 -- Choose 70% personal addresses and 30% business addresses
-,ADD_IS_PERSONAL AS (
-   SELECT *
-         ,random() <= 0.60 AS is_personal
-     FROM GEN_ROWS
+,IS_PERSONAL AS (
+   SELECT random() <= 0.60 AS is_personal
+     FROM INPUT_DATA
 )
--- SELECT * FROM ADD_IS_PERSONAL;
+-- SELECT * FROM IS_PERSONAL;
 /*
- input_data | is_personal 
-------------+-------------
- {}         | t
- {}         | f
- {}         | t
- {}         | t
- {}         | f
+ is_personal 
+-------------
+ f
+ f
+ t
+ t
+ t
 (5 rows)
 */
 
--- Generate an array of all address type relids
-,ADD_ADDRESS_TYPE_IDS AS (
+,ADD_ADDRESS_TYPE_ID AS (
     SELECT *
-          ,(SELECT jsonb_agg(relid) FROM tables.address_type) address_type_ids
-      FROM ADD_IS_PERSONAL
+          ,code.IIF(is_personal, NULL, code.JSONB_ARRAY_RANDOM((SELECT jsonb_agg(relid) FROM tables.address_type))::BIGINT) address_type_id
+      FROM IS_PERSONAL
 )
--- SELECT * FROM ADD_ADDRESS_TYPE_IDS;
+-- SELECT * FROM ADD_ADDRESS_TYPE_ID;
 /*
- input_data | is_personal | address_type_ids 
-------------+-------------+------------------
- {}         | f           | [74, 75, 76]
- {}         | f           | [74, 75, 76]
- {}         | t           | [74, 75, 76]
- {}         | t           | [74, 75, 76]
- {}         | t           | [74, 75, 76]
+ is_personal | address_type_id 
+-------------+-----------------
+ t           |              76
+ t           |              75
+ f           |              75
+ t           |              74
+ f           |              76
 (5 rows)
 */
 
--- CHoose an address type (null if is_personal is true, non-null if is_personal is false)
-,CHOOSE_ADDRESS_TYPE AS (
-    SELECT input_data || jsonb_build_object(
-              'address_type_relid'
-             ,code.IIF(is_personal, NULL, code.JSONB_ARRAY_RANDOM(address_type_ids))::BIGINT
-           ) AS input_data
-      FROM ADD_ADDRESS_TYPE_IDS
-)
-SELECT * FROM CHOOSE_ADDRESS_TYPE;
-/*
-------------------------------
- {"address_type_relid": null}
- {"address_type_relid": 75}
- {"address_type_relid": 75}
- {"address_type_relid": 74}
- {"address_type_relid": null}
-(5 rows)
-*/
-
--- Generate an array of all country relids 
-,ADD_COUNTRY_IDS AS (
+,ADD_COUNTRY_ID AS (
     SELECT *
-          ,(SELECT jsonb_agg(relid) FROM tables.COUNTRY) country_ids
-      FROM CHOOSE_ADDRESS_TYPE
+          ,code.JSONB_ARRAY_RANDOM((SELECT jsonb_agg(relid) FROM tables.COUNTRY))::BIGINT country_id
+      FROM ADD_ADDRESS_TYPE_ID
 )
--- SELECT * FROM ADD_COUNTRY_IDS;
+-- SELECT * FROM ADD_COUNTRY_ID;
 /*
- input_data | is_personal | address_type_id | country_ids  
-------------+-------------+-----------------+--------------
- {}         | t           |                 | [1, 2, 3, 4]
- {}         | t           |                 | [1, 2, 3, 4]
- {}         | f           |              74 | [1, 2, 3, 4]
- {}         | f           |              74 | [1, 2, 3, 4]
- {}         | f           |              75 | [1, 2, 3, 4]
-(5 rows)
-*/
-
-,CHOOSE_COUNTRY AS (
-    SELECT input_data
-          ,is_personal
-          ,address_type_id
-          ,code.JSONB_ARRAY_RANDOM(country_ids)::BIGINT country_id
-      FROM ADD_COUNTRY_IDS
-)
--- SELECT * FROM CHOOSE_COUNTRY;
-/*
- input_data | is_personal | address_type_id | country_id 
-------------+-------------+-----------------+------------
- {}         | f           |              75 |          2
- {}         | f           |              75 |          3
- {}         | t           |                 |          1
- {}         | f           |              76 |          3
- {}         | t           |                 |          3
+ is_personal | address_type_id | country_id 
+-------------+-----------------+------------
+ t           |              75 |          2
+ t           |              74 |          2
+ f           |              75 |          2
+ t           |              74 |          1
+ t           |              76 |          1
 (5 rows)
 */
 
 -- Generate an array of all regoion relids for the chosen country (empty array if no regions)
-,ADD_REGION_IDS AS (
+,ADD_REGION_ID AS (
     SELECT *
-          ,(SELECT jsonb_agg(relid) FROM tables.REGION WHERE country_relid = country_id) region_ids
-      FROM CHOOSE_COUNTRY
+          ,code.JSONB_ARRAY_RANDOM((SELECT jsonb_agg(relid) FROM tables.REGION WHERE country_relid = country_id))::BIGINT region_id
+      FROM ADD_COUNTRY_ID
 )
--- SELECT * FROM ADD_REGION_IDS;
+-- SELECT * FROM ADD_REGION_ID;
 /*
- input_data | is_personal | address_type_id | country_id |                   region_ids                    
-------------+-------------+-----------------+------------+-------------------------------------------------
- {}         | t           |                 |          2 | [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
- {}         | t           |                 |          2 | [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
- {}         | f           |              76 |          3 | 
- {}         | t           |                 |          3 | 
- {}         | f           |              75 |          2 | [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+ is_personal | address_type_id | country_id | region_id 
+-------------+-----------------+------------+-----------
+ f           |              74 |          2 | 13
+ f           |              76 |          4 | 40
+ t           |              75 |          1 | 
+ t           |              75 |          3 | 
+ t           |              75 |          4 | 42
 (5 rows)
 */
 
-,CHOOSE_REGION AS (
-    SELECT input_data
-          ,is_personal
-          ,address_type_id
-          ,country_id
-          ,code.JSONB_ARRAY_RANDOM(region_ids)::BIGINT region_id
-      FROM ADD_REGION_IDS
-)
--- SELECT * FROM CHOOSE_REGION;
-/*
- input_data | is_personal | address_type_id | country_id | region_id 
-------------+-------------+-----------------+------------+-----------
- {}         | t           |                 |          2 |         9
- {}         | f           |              75 |          4 |        46
- {}         | f           |              75 |          3 |          
- {}         | t           |                 |          2 |        15
- {}         | t           |                 |          2 |        16
-(5 rows)
-*/
-
-------------------
-
--- Generate {st: street, cn: city, mcp: mailing code prefix (optional)} object for chosen country/region
--- 74 |             4 |           71 | 
--- 75 |             4 |           71 | 
+-- Add {st: street, cn: city name, mcp: mailing code prefix (optional)} object for chosen country/region 
 ,ADD_CITY_STREET_MCP AS (
-  SELECT d.*
+  SELECT ari.*
         ,CASE c.code_2
          WHEN 'AW' THEN -- Aruba
            -- select distinct v from (select (
@@ -1805,30 +1732,27 @@ SELECT * FROM CHOOSE_ADDRESS_TYPE;
                -- ) v, generate_series(1, 1000) n) t order by 1;
             END
           END st_city_mcp
-    FROM TR_ADDRESS_TYPE_COUNTRY_REGION_INDEXES_TO_RELIDS d
+    FROM ADD_REGION_ID ari
     JOIN tables.country c
-      ON c.relid = d.country_relid
+      ON c.relid = ari.country_id
     LEFT
     JOIN tables.region r
-      ON r.relid = d.region_relid
+      ON r.relid = ari.region_id
 )
 -- SELECT * FROM ADD_CITY_STREET_MCP;
 /*
- address_type_relid | country_relid | region_relid |                      st_city_mcp                       
---------------------+---------------+--------------+--------------------------------------------------------
-                 74 |             2 |           12 | {"cn": "Iqaluit", "st": "Mivvik St", "mcp": "X"}
-                 75 |             4 |           27 | {"cn": "Jacksonville", "st": "Laura St", "mcp": "320"}
-                    |             3 |              | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}
-                    |             3 |              | {"cn": "Poon Saan", "st": "San Chye Loh"}
-                    |             1 |              | {"cn": "Oranjestad", "st": "Spinozastraat"}
+ is_personal | address_type_id | country_id | region_id |                     st_city_mcp                      
+-------------+-----------------+------------+-----------+------------------------------------------------------
+ f           |              75 |          1 |           | {"cn": "Paradera", "st": "Bloemond"}
+ t           |              76 |          3 |           | {"cn": "Poon Saan", "st": "San Chye Loh"}
+ t           |              74 |          3 |           | {"cn": "Silver City", "st": "Sea View Dr"}
+ f           |              74 |          3 |           | {"cn": "Poon Saan", "st": "San Chye Loh"}
+ f           |              75 |          4 |        24 | {"cn": "Bridgeport", "st": "Helen St", "mcp": "064"}
 (5 rows)
 */
 
-,ADD_CITY_ADDRESS_MAILING_CODE AS (
-  SELECT d.address_type_relid
-        ,d.country_relid
-        ,d.region_relid
-        ,d.st_city_mcp ->> 'cn' AS city
+,ADD_ADDRESS_MAILING_CODE AS (
+  SELECT acsm.*
         ,CASE c.code_2
          WHEN 'AW' THEN -- Aruba: street civic (max 2 digits)
               format(
@@ -1889,48 +1813,50 @@ SELECT * FROM CHOOSE_ADDRESS_TYPE;
                   END
               )
           END mailing_code
-    FROM ADD_CITY_STREET_MCP d
+    FROM ADD_CITY_STREET_MCP acsm
     JOIN tables.country c
-      ON c.relid = d.country_relid
+      ON c.relid = acsm.country_id
     LEFT
     JOIN tables.region r
-      ON r.relid = d.region_relid
+      ON r.relid = acsm.region_id
 )
--- SELECT * FROM ADD_CITY_ADDRESS_MAILING_CODE;
+-- SELECT * FROM ADD_ADDRESS_MAILING_CODE;
 /*
- address_type_relid | country_relid | region_relid |    city     |        address         | mailing_code 
---------------------+---------------+--------------+-------------+------------------------+--------------
-                    |             1 |              | Oranjestad  | Spinozastraat 73       | 
-                 75 |             2 |           12 | Iqaluit     | 85899 Mivvik St        | X7Y 1H4
-                    |             2 |            9 | St John's   | 21235 George St        | A7L 4L3
-                    |             3 |              | Drumsite    | 34 Lam Lok Loh         | 6798
-                 76 |             4 |           43 | Kansas City | 71754 Independence Ave | 65578-5174
+ is_personal | address_type_id | country_id | region_id |                        st_city_mcp                         |       address        | mailing_code 
+-------------+-----------------+------------+-----------+------------------------------------------------------------+----------------------+--------------
+ f           |              75 |          1 |           | {"cn": "San Nicolas", "st": "Sero Colorado"}               | Sero Colorado 50     | 
+ f           |              74 |          2 |        13 | {"cn": "Toronto", "st": "Yonge St", "mcp": "M"}            | 91626 Yonge St       | M8V 0P8
+ t           |              76 |          3 |           | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}             | 87 Jln Pantai        | 6798
+ f           |              74 |          3 |           | {"cn": "Drumsite", "st": "Lam Lok Loh"}                    | 42 Lam Lok Loh       | 6798
+ f           |              75 |          4 |        66 | {"cn": "Huntington", "st": "Buffington Ave", "mcp": "251"} | 80944 Buffington Ave | 25134
 (5 rows)
 */
 
+-- Input a complete address
 ,GEN_ADDRESS AS (
-  SELECT d.address_type_relid
-        ,d.country_relid
-        ,d.region_relid
-        ,d.city
-        ,d.address
-        ,CASE WHEN  d.address_type_relid IS NOT NULL  THEN 'Door 5' END                      AS address_2
-        ,CASE WHEN (d.address_type_relid IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
-        ,d.mailing_code
-        ,ROW_NUMBER() OVER() AS ix
-    FROM ADD_CITY_ADDRESS_MAILING_CODE d
+  SELECT aamc.address_type_id
+        ,aamc.country_id
+        ,aamc.region_id
+        ,aamc.st_city_mcp ->> 'city' as city
+        ,aamc.address
+        ,CASE WHEN  aamc.address_type_id IS NOT NULL  THEN 'Door 5' END                      AS address_2
+        ,CASE WHEN (aamc.address_type_id IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
+        ,aamc.mailing_code
+    FROM ADD_ADDRESS_MAILING_CODE aamc
 )
 -- SELECT * FROM GEN_ADDRESS;
 /*
- address_type_relid | country_relid | region_relid |    city     |       address        | address_2 | address_3 | mailing_code | ix 
---------------------+---------------+--------------+-------------+----------------------+-----------+-----------+--------------+----
-                    |             1 |              | Santa Cruz  | San Fuego 37         |           |           |              |  1
-                 75 |             1 |              | San Nicolas | Sero Colorado 53     | Door 5    |           |              |  2
-                    |             2 |            9 | Paradise    | 91789 Everest St     |           |           | A7B 5W8      |  3
-                 74 |             3 |              | Drumsite    | 97 Lam Lok Loh       | Door 5    | Stop 6    | 6798         |  4
-                    |             4 |           46 | Las Vegas   | 92538 Las Vegas Blvd |           |           | 89733        |  5
+ address_type_id | country_id | region_id | city |        address        | address_2 | address_3 | mailing_code 
+-----------------+------------+-----------+------+-----------------------+-----------+-----------+--------------
+                 |          1 |           |      | Sero Colorado 9       |           |           | 
+              76 |          2 |         8 |      | 97107 King St         | Door 5    |           | E6A 6A8
+                 |          3 |           |      | 83 San Chye Loh       |           |           | 6798
+                 |          3 |           |      | 87 Jln Pantai         |           |           | 6798
+              76 |          4 |        59 |      | 82669 Ladyslipper Cir | Door 5    | Stop 6    | 57376-0163
 (5 rows)
 */
+
+-------------------
 
 ,INS_ADDRESS AS (
   -- Insert addresses using generated data

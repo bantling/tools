@@ -37,6 +37,9 @@ DB_NAME           := pg_app
 POSTGRES_PASSWORD := postgres
 APP_EXEC_PASS     := pg_app_pass
 
+# Number of seed rows to generate for customers
+DB_NUM_CUSTOMERS_GEN := 5
+
 #### Targets
 
 # Default target
