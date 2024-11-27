@@ -298,8 +298,8 @@ SELECT DISTINCT *
 
 ---------------------------------------------------------------------------------------------------
 -- NEMPTY_WS: a version of CONCAT_WS that treats empty strings like nulls, and coalesces consecutive empty/nulls
---   P_SEP : The separator string
---   P_STRS: The strings to place a separator between
+-- P_SEP    : The separator string
+-- P_STRS   : The strings to place a separator between
 --
 -- Returns each non-null non-empty string in P_STRS, separated by P_SEP
 -- Unlike CONCAT_WS, the nulls and empty strings are removed first, eliminating consecutive separators 
@@ -335,20 +335,93 @@ SELECT DISTINCT code.TEST(msg, code.NEMPTY_WS('-', VARIADIC args) IS NOT DISTINC
 
 
 ---------------------------------------------------------------------------------------------------
--- JSONB_ARRAY_RANDOM returns a random element of a jsonb array
+-- JSONB_ARRAY_RANDOM returns a random subset of elements of a jsonb array
+-- P_ARRAY     : The array to return random elements of
+-- P_SUBSET_MIN: The minimum number of elements to return (NULL means a single element)
+-- P_SUBSET_MAX: The maximum number of elements to return (NULL means the number of elements in the array)
+--
+-- The default (P_SUBSET_MIN IS NULL) is to select a single random element and return it as is
+-- 
+-- If P_SUBSET_MIN is > 0, then a jsonb array is returned, containing a random subset of elements,
+-- where the subset size is any size from P_SUBSET_MIN up to P_SUBSET_MAX inclusive
+
+-- P_ARRAY      must be an array
+-- P_SUBSET_MIN cannot be 0
+-- P_SUBSET_MAX cannot be 0
+-- If P_SUBSET_MAX is NULL or > array length, then P_SUBSET_MAX = array length 
+-- If P_SUBSET_MAX < P_SUBSET_MIN, then P_SUBSET_MAX = P_SUBSET_MIN
 ---------------------------------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION code.JSONB_ARRAY_RANDOM(P_ARRAY JSONB) RETURNS JSONB AS
+CREATE OR REPLACE FUNCTION code.JSONB_ARRAY_RANDOM(P_ARRAY JSONB, P_SUBSET_MIN INT = NULL, P_SUBSET_MAX INT = NULL) RETURNS JSONB AS
 $$
+DECLARE
+  V_MAX_COUNT       INT;
+  
+  V_LEN             INT;
+  V_ARRAY_REMAINING JSONB;
+  V_ARRAY_RES       JSONB;
+  V_COUNT           INT;
+  V_IDX             INT;
+  V_ELEM            JSONB;
 BEGIN
   IF NOT jsonb_typeof(P_ARRAY) = 'array' THEN
     RAISE EXCEPTION 'P_ARRAY must be a jsonb array, not a jsonb %', jsonb_typeof(P_ARRAY);
   END IF;
-
-  RETURN P_ARRAY -> (random() * (jsonb_array_length(P_ARRAY) - 1))::INT;
+  
+  IF P_SUBSET_MIN = 0 THEN
+    RAISE EXCEPTION 'P_SUBSET_MIN cannot be 0';
+  END IF;
+  
+  IF P_SUBSET_MAX = 0 THEN
+    RAISE EXCEPTION 'P_SUBSET_MAX cannot be 0';
+  END IF;
+  
+  IF P_SUBSET_MAX < P_SUBSET_MIN THEN
+    P_SUBSET_MAX := P_SUBSET_MIN;
+  END IF;
+  
+  -- Get max count and array length
+  V_MAX_COUNT := P_SUBSET_MAX;
+  V_LEN := jsonb_array_length(P_ARRAY);
+  
+  ---- Simple case of returning a single random element as is ----
+  
+  IF P_SUBSET_MIN IS NULL THEN
+    RETURN P_ARRAY -> (random() * (V_LEN - 1))::INT;
+  END IF;
+  
+  ---- Complex case of returning a subset of one or more elements as  an array ----
+ 
+  -- Ensure that if V_MAX is NULL or > array length, it is set to the array length
+  IF (V_MAX_COUNT IS NULL) OR (V_MAX_COUNT > V_LEN) THEN
+    V_MAX_COUNT := V_LEN;
+  END IF;
+   
+  -- V_ARRAY_REMAINING contains array elements that have not been chosen yet
+  V_ARRAY_REMAINING := P_ARRAY;
+  
+  -- V_ARRAY_RES is the array we're going to return with the random chosen elements in it
+  V_ARRAY_RES = '[]'::jsonb;
+  
+  -- Loop through the closed range [0, random upper index >= 0]
+  FOR V_COUNT IN 0 .. (random() * (V_MAX_COUNT - 1))::INT LOOP
+    -- Select a random element index
+    V_IDX := (random() * (VLEN - 1))::INT;
+    
+    -- Add the selected index from the remaining elements to the result
+    V_ARRAY_RES := V_ARRAY_RES || (V_ARRAY_REMAINING -> V_IDX);
+    
+    -- Remove the selected index from the remaining elements
+    V_ARRAY_REMAINING := V_ARRAY_REMAINING - V_IDX;
+     
+    -- Adjust the length
+    V_LEN := V_LEN - 1;
+  END LOOP;
+  
+  RETURN V_ARRAY_RES;
 END;
-$$ LANGUAGE plpgsql VOLATILE LEAKPROOF STRICT;
+$$ LANGUAGE plpgsql VOLATILE;
 
--- Test JSONB_ARRAY_RANDOM
+-- Test JSONB_ARRAY_RANDOM simple case of one random element
 SELECT DISTINCT * FROM (
   SELECT code.TEST('P_ARRAY must be a jsonb array, not a jsonb number', 'SELECT code.JSONB_ARRAY_RANDOM(''1''::JSONB)')
    UNION ALL
@@ -370,6 +443,16 @@ SELECT DISTINCT * FROM (
            (jsonb_build_array(4, 5, 6, 7), 4, 7)
          ) AS t(a, l, h)
 ) t;
+
+-- Test JSONB_ARRAY_RANDOM complex case of a random subset of elements
+SELECT DISTINCT * FROM (
+  SELECT code.TEST('P_SUBSET_MIN cannot be 0', 'SELECT code.JSONB_ARRAY_RANDOM(NULL, 0)')
+   UNION ALL
+  SELECT code.TEST('P_SUBSET_MAX cannot be 0', 'SELECT code.JSONB_ARRAY_RANDOM(NULL, 1, 0)')
+) t;
+
+
+
 
 ---------------------------------------------------------------------------------------------------
 -- TO_8601 converts a TIMESTAMP into an ISO 8601 string of the form
