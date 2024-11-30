@@ -79,7 +79,7 @@ podman-machine-start:
 
 # Ensure all oci container building operations are performed, so we have all the containers we need to run the app
 .PHONY: oci
-oci: oci-clean oci-pull oci-build oci-run
+oci: podman oci-clean oci-pull oci-build oci-run
 
 # Clean oci artifacts: remove all containers related to the image, and the image itself
 # The only thing not removed is the base image needed to build the code
@@ -121,6 +121,7 @@ oci-build: .Containerfile
 	podman build \
 	  --build-arg "PG_IMAGE_REF=$(PG_IMAGE_REF)" \
 	  --build-arg "APP_EXEC_PASS=$(APP_EXEC_PASS)" \
+	  --build-arg "DB_NUM_CUSTOMERS_GEN=$(DB_NUM_CUSTOMERS_GEN)" \
 	  $(SRC_ENV_ARG) \
 	  -f $< \
 	  -t $(DEPLOY_IMAGE_REF) \

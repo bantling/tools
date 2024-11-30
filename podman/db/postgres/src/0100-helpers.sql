@@ -358,7 +358,7 @@ DECLARE
   
   V_LEN             INT;
   V_ARRAY_REMAINING JSONB;
-  V_ARRAY_RES       JSONB;
+  V_RES             JSONB;
   V_COUNT           INT;
   V_IDX             INT;
   V_ELEM            JSONB;
@@ -367,29 +367,35 @@ BEGIN
     RAISE EXCEPTION 'P_ARRAY must be a jsonb array, not a jsonb %', jsonb_typeof(P_ARRAY);
   END IF;
   
-  IF P_SUBSET_MIN = 0 THEN
-    RAISE EXCEPTION 'P_SUBSET_MIN cannot be 0';
+  IF P_SUBSET_MIN < 1 THEN
+    RAISE EXCEPTION 'P_SUBSET_MIN cannot be < 1';
   END IF;
   
-  IF P_SUBSET_MAX = 0 THEN
-    RAISE EXCEPTION 'P_SUBSET_MAX cannot be 0';
+  IF P_SUBSET_MAX < 1 THEN
+    RAISE EXCEPTION 'P_SUBSET_MAX cannot be < 1';
   END IF;
   
-  IF P_SUBSET_MAX < P_SUBSET_MIN THEN
-    P_SUBSET_MAX := P_SUBSET_MIN;
-  END IF;
-  
-  -- Get max count and array length
-  V_MAX_COUNT := P_SUBSET_MAX;
   V_LEN := jsonb_array_length(P_ARRAY);
   
   ---- Simple case of returning a single random element as is ----
   
   IF P_SUBSET_MIN IS NULL THEN
-    RETURN P_ARRAY -> (random() * (V_LEN - 1))::INT;
+    V_IDX := (random() * (V_LEN - 1))::INT;
+    V_RES := P_ARRAY -> V_IDX;
+    -- RAISE NOTICE 'RANDOM ELEMENT = %, %, %, %', V_LEN, V_IDX, jsonb_typeof(V_RES), V_RES;
+    RETURN V_RES;
   END IF;
   
   ---- Complex case of returning a subset of one or more elements as  an array ----
+  
+  P_SUBSET_MAX := CASE
+      WHEN P_SUBSET_MAX IS NULL        THEN V_LEN
+      WHEN P_SUBSET_MAX < P_SUBSET_MIN THEN P_SUBSET_MIN
+      ELSE P_SUBSET_MAX
+  END CASE;
+  
+  -- Get max count and array length
+  V_MAX_COUNT := P_SUBSET_MAX;
  
   -- Ensure that if V_MAX is NULL or > array length, it is set to the array length
   IF (V_MAX_COUNT IS NULL) OR (V_MAX_COUNT > V_LEN) THEN
@@ -399,16 +405,16 @@ BEGIN
   -- V_ARRAY_REMAINING contains array elements that have not been chosen yet
   V_ARRAY_REMAINING := P_ARRAY;
   
-  -- V_ARRAY_RES is the array we're going to return with the random chosen elements in it
-  V_ARRAY_RES = '[]'::jsonb;
+  -- V_RES is the array we're going to return with the random chosen elements in it
+  V_RES = '[]'::jsonb;
   
-  -- Loop through the closed range [0, random upper index >= 0]
-  FOR V_COUNT IN 0 .. (random() * (V_MAX_COUNT - 1))::INT LOOP
+  -- Loop through the closed range [0, random upper index >= P_SUBSET_MIN and <= V_MAX_COUNT]
+  FOR V_COUNT IN 1 .. (P_SUBSET_MIN + (random() * (V_MAX_COUNT - P_SUBSET_MIN))::INT) LOOP
     -- Select a random element index
-    V_IDX := (random() * (VLEN - 1))::INT;
+    V_IDX := (random() * (V_LEN - 1))::INT;
     
     -- Add the selected index from the remaining elements to the result
-    V_ARRAY_RES := V_ARRAY_RES || (V_ARRAY_REMAINING -> V_IDX);
+    V_RES := V_RES || (V_ARRAY_REMAINING -> V_IDX);
     
     -- Remove the selected index from the remaining elements
     V_ARRAY_REMAINING := V_ARRAY_REMAINING - V_IDX;
@@ -417,11 +423,13 @@ BEGIN
     V_LEN := V_LEN - 1;
   END LOOP;
   
-  RETURN V_ARRAY_RES;
+  RETURN V_RES;
 END;
 $$ LANGUAGE plpgsql VOLATILE;
 
 -- Test JSONB_ARRAY_RANDOM simple case of one random element
+-- SELECT code.JSONB_ARRAY_RANDOM('[1]'::JSONB) from generate_series(1, 10);
+-- SELECT code.JSONB_ARRAY_RANDOM('[2,4,6,8]'::JSONB) from generate_series(1, 10);
 SELECT DISTINCT * FROM (
   SELECT code.TEST('P_ARRAY must be a jsonb array, not a jsonb number', 'SELECT code.JSONB_ARRAY_RANDOM(''1''::JSONB)')
    UNION ALL
@@ -446,9 +454,21 @@ SELECT DISTINCT * FROM (
 
 -- Test JSONB_ARRAY_RANDOM complex case of a random subset of elements
 SELECT DISTINCT * FROM (
-  SELECT code.TEST('P_SUBSET_MIN cannot be 0', 'SELECT code.JSONB_ARRAY_RANDOM(NULL, 0)')
+  SELECT code.TEST('P_SUBSET_MIN cannot be < 1', 'SELECT code.JSONB_ARRAY_RANDOM(NULL, 0)')
    UNION ALL
-  SELECT code.TEST('P_SUBSET_MAX cannot be 0', 'SELECT code.JSONB_ARRAY_RANDOM(NULL, 1, 0)')
+  SELECT code.TEST('P_SUBSET_MAX cannot be < 1', 'SELECT code.JSONB_ARRAY_RANDOM(NULL, 1, 0)')
+   UNION ALL
+  SELECT code.TEST('Random 1 element', jsonb_array_length(code.JSONB_ARRAY_RANDOM('[2,4,6,8]',1,1)) = 1)
+    FROM generate_series(1, 100)
+   UNION ALL
+  SELECT code.TEST('Random 1 element', (code.JSONB_ARRAY_RANDOM('[2,4,6,8]',1,1) -> 0)::INT IN (2,4,6,8))
+   FROM generate_series(1, 100)
+   UNION ALL
+  SELECT code.TEST('Random 3 elements', jsonb_array_length(code.JSONB_ARRAY_RANDOM('[2,4,6,8]',1,3)) BETWEEN 1 AND 3)
+    FROM generate_series(1, 100)
+   UNION ALL
+  SELECT code.TEST('Random all elements', jsonb_array_length(code.JSONB_ARRAY_RANDOM('[2,4,6,8]',1)) BETWEEN 1 AND 4)
+    FROM generate_series(1, 100)
 ) t;
 
 

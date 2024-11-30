@@ -5,11 +5,17 @@
 -- - Makefile has hard-code default of 5
 -- - It can be overriden on cli to generate 5,000 rows by invoking "make DB_NUM_CUSTOMERS_GEN=5000 ..."
 -- - The Makefile provides this value to Containerfile.in as the build arg DB_NUM_CUSTOMERS_GEN
--- - The Containerfile.in replaces ${NUM_ROWS} in this script with the value of the build arg DB_NUM_CUSTOMERS_GEN 
--- Don't do anything if there are already addresses in the system
-WITH INPUT_DATA AS (
-   --SELECT generate_series(1, ${NUM_ROWS})
-   SELECT generate_series(1, 5)
+-- - The Containerfile.in replaces ${NUM_ROWS} in this script with the value of the build arg DB_NUM_CUSTOMERS_GEN
+WITH PARAMS AS (
+  -- SELECT ${NUM_ROWS} AS NUM_ROWS
+  SELECT 5 AS NUM_ROWS
+)
+ 
+-- Generate NUM_ROWS rows using generate_series
+-- Generate 0 rows if there are already addresses in the system
+,INPUT_DATA AS (
+   SELECT generate_series(1, NUM_ROWS)
+     FROM PARAMS
     WHERE (SELECT COUNT(*) FROM tables.address) = 0
 )
 -- SELECT * FROM INPUT_DATA;
@@ -24,7 +30,7 @@ WITH INPUT_DATA AS (
 (5 rows)
 */
 
--- Choose 70% personal addresses and 30% business addresses
+-- Choose 60% personal addresses and 40% business addresses
 ,IS_PERSONAL AS (
    SELECT random() <= 0.60 AS is_personal
      FROM INPUT_DATA
@@ -41,9 +47,15 @@ WITH INPUT_DATA AS (
 (5 rows)
 */
 
+-- For personal addresses, choose a null array of address type ids
+-- For busines  addresses, choose a random subset of 1 .. n from all address type ids
 ,ADD_ADDRESS_TYPE_ID AS (
     SELECT *
-          ,code.IIF(is_personal, NULL, code.JSONB_ARRAY_RANDOM((SELECT jsonb_agg(relid) FROM tables.address_type))::BIGINT) address_type_id
+          ,code.IIF(
+              is_personal
+             ,NULL
+             ,code.JSONB_ARRAY_RANDOM((SELECT jsonb_agg(relid) FROM tables.address_type), 1)
+           ) address_type_id
       FROM IS_PERSONAL
 )
 -- SELECT * FROM ADD_ADDRESS_TYPE_ID;
