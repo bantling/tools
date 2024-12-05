@@ -1872,27 +1872,30 @@ WITH PARAMS AS (
 
 -- Generate complete addresses
 ,GEN_ADDRESS AS (
-  SELECT t.address_type_id
-        ,aamc.country_id
-        ,aamc.region_id
-        ,aamc.city
-        ,aamc.address
-        ,CASE WHEN  t.address_type_id IS NOT NULL  THEN 'Door 5' END                      AS address_2
-        ,CASE WHEN (t.address_type_id IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
-        ,aamc.mailing_code
-    FROM ADD_ADDRESS_MAILING_CODE aamc
-        ,jsonb_array_elements(code.IIF(jsonb_array_length(aamc.address_type_ids) as t(address_type_id)
+  SELECT acmc.ix
+        ,t.address_type_id #>> '{}' AS address_type_id
+        ,acmc.country_id
+        ,acmc.region_id
+        ,acmc.city
+        ,acmc.address
+        ,CASE WHEN  t.address_type_id #>> '{}' IS NOT NULL                       THEN 'Door 5' END AS address_2
+        ,CASE WHEN (t.address_type_id #>> '{}' IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
+        ,acmc.mailing_code
+    FROM ADD_CIVIC_MAILING_CODE acmc
+        ,jsonb_array_elements(COALESCE(acmc.address_type_ids, '[null]'::jsonb)) as t(address_type_id)
+   ORDER BY 1
 )
-SELECT * FROM GEN_ADDRESS;
+-- SELECT * FROM GEN_ADDRESS;
 /*
- address_type_id | country_id | region_id | city |        address        | address_2 | address_3 | mailing_code 
------------------+------------+-----------+------+-----------------------+-----------+-----------+--------------
-                 |          1 |           |      | Sero Colorado 9       |           |           | 
-              76 |          2 |         8 |      | 97107 King St         | Door 5    |           | E6A 6A8
-                 |          3 |           |      | 83 San Chye Loh       |           |           | 6798
-                 |          3 |           |      | 87 Jln Pantai         |           |           | 6798
-              76 |          4 |        59 |      | 82669 Ladyslipper Cir | Door 5    | Stop 6    | 57376-0163
-(5 rows)
+ ix | address_type_id | country_id | region_id |     city      |       address       | address_2 | address_3 | mailing_code
+----+-----------------+------------+-----------+---------------+---------------------+-----------+-----------+--------------
+  1 |                 |          1 |           | "San Nicolas" | Sero Colorado 78    |           |           |
+  2 | 75              |          4 |        22 | "San Diego"   | 74384 San Diego Ave | Door 5    | Stop 6    | 94352
+  2 | 74              |          4 |        22 | "San Diego"   | 74384 San Diego Ave | Door 5    | Stop 6    | 94352
+  3 |                 |          3 |           | "Poon Saan"   | 12 San Chye Loh     |           |           | 6798
+  4 |                 |          3 |           | "Silver City" | 67 Sea View Dr      |           |           | 6798
+  5 | 74              |          2 |         6 | "Vancouver"   | 43783 Robson St     | Door 5    |           | V4C 4V7
+(6 rows)
 */
 
 -------------------
