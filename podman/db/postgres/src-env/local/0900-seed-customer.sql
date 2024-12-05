@@ -14,41 +14,44 @@ WITH PARAMS AS (
 -- Generate NUM_ROWS rows using generate_series
 -- Generate 0 rows if there are already addresses in the system
 ,INPUT_DATA AS (
-   SELECT generate_series(1, NUM_ROWS)
+   SELECT generate_series(1, NUM_ROWS) AS ix
      FROM PARAMS
     WHERE (SELECT COUNT(*) FROM tables.address) = 0
+    ORDER BY 1
 )
 -- SELECT * FROM INPUT_DATA;
 /*
- generate_series 
------------------
-               1
-               2
-               3
-               4
-               5
+ ix
+----
+  1
+  2
+  3
+  4
+  5
 (5 rows)
 */
 
 -- Choose 60% personal addresses and 40% business addresses
 ,IS_PERSONAL AS (
-   SELECT random() <= 0.60 AS is_personal
+   SELECT *
+          ,random() <= 0.60 AS is_personal
      FROM INPUT_DATA
+    ORDER BY 1
 )
 -- SELECT * FROM IS_PERSONAL;
 /*
- is_personal 
--------------
- f
- f
- t
- t
- t
+ ix | is_personal
+----+-------------
+  1 | t
+  2 | t
+  3 | f
+  4 | t
+  5 | t
 (5 rows)
 */
 
 -- For personal addresses, choose a null array of address type ids
--- For business addresses, choose a random subset of 1 .. n from all address type ids
+-- For business addresses, choose a random subset of 1 .. n from all n address type ids
 ,ADD_ADDRESS_TYPE_IDS AS (
     SELECT *
           ,code.IIF(
@@ -57,54 +60,59 @@ WITH PARAMS AS (
              ,code.JSONB_ARRAY_RANDOM((SELECT jsonb_agg(relid) FROM tables.address_type), 1)
            ) address_type_ids
       FROM IS_PERSONAL
+     ORDER BY 1
 )
 -- SELECT * FROM ADD_ADDRESS_TYPE_IDS;
 /*
- is_personal | address_type_ids 
--------------+------------------
- t           | 
- f           | [75, 76]
- t           | 
- f           | [76, 75, 74]
- t           | 
+ ix | is_personal | address_type_ids
+----+-------------+------------------
+  1 | t           |
+  2 | f           | [75]
+  3 | t           |
+  4 | t           |
+  5 | t           |
 (5 rows)
 */
 
+-- Add a random country id from all available
 ,ADD_COUNTRY_ID AS (
     SELECT *
           ,code.JSONB_ARRAY_RANDOM((SELECT jsonb_agg(relid) FROM tables.COUNTRY))::BIGINT country_id
       FROM ADD_ADDRESS_TYPE_IDS
+     ORDER BY 1
 )
 -- SELECT * FROM ADD_COUNTRY_ID;
 /*
- is_personal | address_type_id | country_id 
--------------+-----------------+------------
- t           |              75 |          2
- t           |              74 |          2
- f           |              75 |          2
- t           |              74 |          1
- t           |              76 |          1
+ ix | is_personal | address_type_ids | country_id
+----+-------------+------------------+------------
+  1 | t           |                  |          4
+  2 | t           |                  |          2
+  3 | f           | [75]             |          2
+  4 | t           |                  |          1
+  5 | t           |                  |          3
 (5 rows)
 */
 
--- Generate an array of all region relids for the chosen country (empty array if no regions)
+-- Generate a random region id of all regions for the chosen country (null if country has no regions)
 ,ADD_REGION_ID AS (
     SELECT *
           ,code.JSONB_ARRAY_RANDOM((SELECT jsonb_agg(relid) FROM tables.REGION WHERE country_relid = country_id))::BIGINT region_id
       FROM ADD_COUNTRY_ID
+     ORDER BY 1
 )
 -- SELECT * FROM ADD_REGION_ID;
 /*
- is_personal | address_type_id | country_id | region_id 
--------------+-----------------+------------+-----------
- f           |              74 |          2 | 13
- f           |              76 |          4 | 40
- t           |              75 |          1 | 
- t           |              75 |          3 | 
- t           |              75 |          4 | 42
+ ix | is_personal | address_type_ids | country_id | region_id
+----+-------------+------------------+------------+-----------
+  1 | f           | [75, 76]         |          4 |        21
+  2 | t           |                  |          2 |        13
+  3 | t           |                  |          2 |         6
+  4 | f           | [74]             |          3 |
+  5 | t           |                  |          1 |
 (5 rows)
 */
 
+-- Add country and region codes
 ,ADD_COUNTRY_REGION_CODES AS (
     SELECT ari.*
           ,c.code_2 AS country_code
@@ -115,16 +123,17 @@ WITH PARAMS AS (
       LEFT
       JOIN tables.region r
         ON r.relid = ari.region_id
+     ORDER BY 1
 )
 -- SELECT * FROM ADD_COUNTRY_REGION_CODES;
 /*
- is_personal | address_type_ids | country_id | region_id | country_code | region_code
--------------+------------------+------------+-----------+--------------+-------------
- f           | [76, 75, 74]     |          1 |           | AW           |
- t           |                  |          2 |        14 | CA           | PE
- t           |                  |          3 |           | CX           |
- t           |                  |          4 |        46 | US           | NV
- f           | [75, 74]         |          4 |        21 | US           | AR
+ ix | is_personal | address_type_ids | country_id | region_id | country_code | region_code
+----+-------------+------------------+------------+-----------+--------------+-------------
+  1 | f           | [75, 76, 74]     |          3 |           | CX           |
+  2 | t           |                  |          4 |        46 | US           | NV
+  3 | t           |                  |          3 |           | CX           |
+  4 | f           | [76]             |          2 |        15 | CA           | QC
+  5 | t           |                  |          1 |           | AW           |
 (5 rows)
 */
 
@@ -1768,22 +1777,24 @@ WITH PARAMS AS (
             END
           END st_city_mcp
     FROM ADD_COUNTRY_REGION_CODES acrc
+   ORDER BY 1
 )
 -- SELECT * FROM ADD_CITY_STREET_MCP;
 /*
- is_personal | address_type_ids | country_id | region_id | country_code | region_code |                       st_city_mcp
--------------+------------------+------------+-----------+--------------+-------------+----------------------------------------------------------
- f           | [76]             |          1 |           | AW           |             | {"cn": "Noord", "st": "Caya Frans Figaroa"}
- t           |                  |          2 |        14 | CA           | PE          | {"cn": "Charlottetown", "st": "Richmond St", "mcp": "C"}
- f           | [75, 76]         |          2 |         5 | CA           | AB          | {"cn": "Edmonton", "st": "Whyte Ave", "mcp": "T"}
- f           | [76, 74, 75]     |          3 |           | CX           |             | {"cn": "Silver City", "st": "Sea View Dr"}
- t           |                  |          3 |           | CX           |             | {"cn": "Silver City", "st": "Sea View Dr"}
+ ix | is_personal | address_type_ids | country_id | region_id | country_code | region_code |                             st_city_mcp
+----+-------------+------------------+------------+-----------+--------------+-------------+---------------------------------------------------------------------
+  1 | t           |                  |          2 |        16 | CA           | SK          | {"cn": "Regina", "st": "Winnipeg St", "mcp": "S"}
+  2 | t           |                  |          4 |        62 | US           | UT          | {"cn": "Salt Lake City", "st": "Poplar Grove Vlvd S", "mcp": "846"}
+  3 | t           |                  |          3 |           | CX           |             | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}
+  4 | f           | [75]             |          3 |           | CX           |             | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}
+  5 | f           | [75, 74, 76]     |          1 |           | AW           |             | {"cn": "San Nicolas", "st": "Sero Colorado"}
 (5 rows)
-
 */
 
-,ADD_ADDRESS_MAILING_CODE AS (
+-- Add a civic number and mailing code random suffix
+,ADD_CIVIC_MAILING_CODE AS (
   SELECT acsm.*
+        ,acsm.st_city_mcp -> 'cn' AS city
         ,CASE country_code
          WHEN 'AW' THEN -- Aruba: street civic (max 2 digits)
               format(
@@ -1845,32 +1856,34 @@ WITH PARAMS AS (
               )
           END mailing_code
     FROM ADD_CITY_STREET_MCP acsm
+   ORDER BY 1
 )
--- SELECT * FROM ADD_ADDRESS_MAILING_CODE;
+-- SELECT * FROM ADD_CIVIC_MAILING_CODE;
 /*
- is_personal | address_type_ids | country_id | region_id | country_code | region_code |                       st_city_mcp                       |      address       | mailing_code
--------------+------------------+------------+-----------+--------------+-------------+---------------------------------------------------------+--------------------+--------------
- f           | [74, 75]         |          2 |        16 | CA           | SK          | {"cn": "Saskatoon", "st": "Broadway Ave", "mcp": "S"}   | 14327 Broadway Ave | S7R 3Y5
- t           |                  |          2 |         8 | CA           | NB          | {"cn": "Fredericton", "st": "Dundonald St", "mcp": "E"} | 18684 Dundonald St | E2V 8D1
- t           |                  |          3 |           | CX           |             | {"cn": "Silver City", "st": "Sea View Dr"}              | 21 Sea View Dr     | 6798
- t           |                  |          3 |           | CX           |             | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}          | 73 Jln Pantai      | 6798
- f           | [75, 74, 76]     |          3 |           | CX           |             | {"cn": "Silver City", "st": "Sea View Dr"}              | 8 Sea View Dr      | 6798
+ ix | is_personal | address_type_ids | country_id | region_id | country_code | region_code |                      st_city_mcp                       |     city      |     address     | mailing_code
+----+-------------+------------------+------------+-----------+--------------+-------------+--------------------------------------------------------+---------------+-----------------+--------------
+  1 | t           |                  |          1 |           | AW           |             | {"cn": "Santa Cruz", "st": "San Fuego"}                | "Santa Cruz"  | San Fuego 97    |
+  2 | t           |                  |          2 |        10 | CA           | NT          | {"cn": "Hay River", "st": "Poplar Rd", "mcp": "X"}     | "Hay River"   | 74886 Poplar Rd | X6Z 4Q5
+  3 | t           |                  |          3 |           | CX           |             | {"cn": "Drumsite", "st": "Lam Lok Loh"}                | "Drumsite"    | 52 Lam Lok Loh  | 6798
+  4 | t           |                  |          2 |        12 | CA           | NU          | {"cn": "Iqaluit", "st": "Mivvik St", "mcp": "X"}       | "Iqaluit"     | 8486 Mivvik St  | X1L 6Q4
+  5 | f           | [75, 74]         |          4 |        27 | US           | FL          | {"cn": "Tallahassee", "st": "Monroe St", "mcp": "335"} | "Tallahassee" | 27415 Monroe St | 33552
 (5 rows)
 */
 
--- Generate a complete address
+-- Generate complete addresses
 ,GEN_ADDRESS AS (
-  SELECT aamc.address_type_id
+  SELECT t.address_type_id
         ,aamc.country_id
         ,aamc.region_id
-        ,aamc.st_city_mcp ->> 'city' as city
+        ,aamc.city
         ,aamc.address
-        ,CASE WHEN  aamc.address_type_id IS NOT NULL  THEN 'Door 5' END                      AS address_2
-        ,CASE WHEN (aamc.address_type_id IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
+        ,CASE WHEN  t.address_type_id IS NOT NULL  THEN 'Door 5' END                      AS address_2
+        ,CASE WHEN (t.address_type_id IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
         ,aamc.mailing_code
     FROM ADD_ADDRESS_MAILING_CODE aamc
+        ,jsonb_array_elements(code.IIF(jsonb_array_length(aamc.address_type_ids) as t(address_type_id)
 )
--- SELECT * FROM GEN_ADDRESS;
+SELECT * FROM GEN_ADDRESS;
 /*
  address_type_id | country_id | region_id | city |        address        | address_2 | address_3 | mailing_code 
 -----------------+------------+-----------+------+-----------------------+-----------+-----------+--------------
