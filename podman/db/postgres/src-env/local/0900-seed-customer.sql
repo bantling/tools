@@ -1985,22 +1985,22 @@ WITH PARAMS AS (
 -- The generated address relids are sequential
 -- Add a sequential rn column
 ,ADD_INS_ADDRESS_RN AS (
-   SELECT ROW_NUMBER() OVER() AS rn
+   SELECT ROW_NUMBER() OVER(ORDER BY relid) AS rn
          ,*
      FROM INS_ADDRESS
+    ORDER BY rn
 )
 -- SELECT * FROM ADD_INS_ADDRESS_RN;
 /*
  rn | relid | address_type_relid
 ----+-------+--------------------
-  1 |    93 |                 75
-  2 |    94 |                 76
-  3 |    95 |
-  4 |    96 |                 76
-  5 |    97 |                 74
-  6 |    98 |
-  7 |    99 |
-(7 rows)
+  1 |    87 |
+  2 |    88 |                 75
+  3 |    89 |                 74
+  4 |    90 |                 75
+  5 |    91 |
+  6 |    92 |
+(6 rows)
 */
 
 -- Join the GEN_ADDRESS rn column to the ADD_INS_ADDRESS_RN rn column
@@ -2013,19 +2013,21 @@ WITH PARAMS AS (
 )
 -- SELECT * FROM JOIN_GEN_ADDRESS_INS_ADDRESS;
 /*
- ix | rn | address_type_relid | country_relid | region_relid |        city        |        address         | address_2 | address_3 | mailing_code | address_relid
-----+----+--------------------+---------------+--------------+--------------------+------------------------+-----------+-----------+--------------+---------------
-  1 |  1 |                 74 |             3 |              | "Flying Fish Cove" | 88 Jln Pantai          | Door 5    | Stop 6    | 6798         |           100
-  1 |  2 |                 75 |             4 |           35 | "Frankfort"        | 42877 Holmes St        | Door 5    |           | 41543        |           101
-  2 |  3 |                    |             4 |           36 | "New Orleans"      | 43884 Bourbon St       |           |           | 71362        |           102
-  3 |  4 |                    |             2 |            8 | "Fredericton"      | 16916 Dundonald St     |           |           | E6J 9U6      |           103
-  4 |  5 |                    |             4 |           43 | "Kansas City"      | 23735 Independence Ave |           |           | 63859        |           104
-  5 |  6 |                 76 |             1 |              | "Paradera"         | Bloemond 59            | Door 5    | Stop 6    |              |           105
-  5 |  7 |                 75 |             1 |              | "San Nicolas"      | Sero Colorado 23       | Door 5    |           |              |           106
-(7 rows)
+ ix | rn | address_type_relid | country_relid | region_relid |     city      |         address          | address_2 | address_3 | mailing_code | address_relid
+----+----+--------------------+---------------+--------------+---------------+--------------------------+-----------+-----------+--------------+---------------
+  1 |  1 |                 75 |             3 |              | "Poon Saan"   | 2 San Chye Loh           | Door 5    |           | 6798         |            93
+  1 |  2 |                 74 |             3 |              | "Silver City" | 21 Sea View Dr           | Door 5    |           | 6798         |            94
+  1 |  3 |                 76 |             1 |              | "San Nicolas" | Sero Colorado 93         | Door 5    |           |              |            95
+  2 |  4 |                    |             4 |           65 | "Olympia"     | 2317 Union Ave SE        |           |           | 98644        |            96
+  3 |  5 |                 74 |             2 |           13 | "Toronto"     | 47526 Yonge St           | Door 5    |           | P4V 8E8      |            97
+  3 |  6 |                 75 |             2 |           15 | "Quebec City" | 17987 Petit-Champlain St | Door 5    | Stop 6    | G5V 4U2      |            98
+  4 |  7 |                    |             2 |           11 | "Halifax"     | 11356 Spring Garden Rd   |           |           | B9T 4U2      |            99
+  5 |  8 |                 76 |             2 |            5 | "Calgary"     | 19101 17th Ave SW        | Door 5    |           | T1P 3X3      |           100
+  5 |  9 |                 75 |             2 |            6 | "Victoria"    | 72467 Government St      | Door 5    | Stop 6    | V3R 6T6      |           101
+(9 rows)
 */
 
--- hard-coded table of customer person first names
+-- Hard-coded table of customer person first names
 ,CUSTOMER_PERSON_FIRST_NAME_TABLE AS (
    SELECT *
          ,ROW_NUMBER() OVER() AS ix
