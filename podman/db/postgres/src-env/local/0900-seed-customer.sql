@@ -12,43 +12,60 @@ WITH PARAMS AS (
 )
 
 -- truncate table tables.address cascade;
- 
+
 -- Generate NUM_ROWS rows using generate_series
 -- Generate 0 rows if there are already addresses in the system
-,INPUT_DATA AS (
-   SELECT generate_series(1, NUM_ROWS) AS ix
+,GEN_ROWS AS (
+   SELECT generate_series(1, NUM_ROWS)
      FROM PARAMS
     WHERE (SELECT COUNT(*) FROM tables.address) = 0
-    ORDER BY ix
 )
--- SELECT * FROM INPUT_DATA;
+-- SELECT * FROM GEN_ROWS;
 /*
- ix
-----
-  1
-  2
-  3
-  4
-  5
+ generate_series
+-----------------
+               1
+               2
+               3
+               4
+               5
 (5 rows)
 */
 
 -- Choose 60% personal addresses and 40% business addresses
 ,IS_PERSONAL AS (
-   SELECT *
-          ,random() <= 0.60 AS is_personal
-     FROM INPUT_DATA
-    ORDER BY ix
+   SELECT random() <= 0.60 AS is_personal
+     FROM GEN_ROWS
 )
 -- SELECT * FROM IS_PERSONAL;
 /*
- ix | is_personal
-----+-------------
-  1 | t
-  2 | t
-  3 | f
-  4 | t
-  5 | t
+ is_personal
+-------------
+ t
+ t
+ f
+ t
+ t
+(5 rows)
+*/
+
+-- Add a row number partitioned by is_personal
+-- We need to have separate 1 .. n row numbers for personal and bussiness addresses
+,ADD_PARTITIONED_CUSTOMER_NUM AS (
+   SELECT is_personal
+         ,row_number() over(partition by is_personal) cn
+     FROM IS_PERSONAL
+    ORDER BY is_personal, cn
+)
+-- SELECT * FROM ADD_PARTITIONED_CUSTOMER_NUM;
+/*
+ is_personal | cn
+-------------+----
+ f           |  1
+ f           |  2
+ t           |  1
+ t           |  2
+ t           |  3
 (5 rows)
 */
 
@@ -61,45 +78,44 @@ WITH PARAMS AS (
              ,NULL
              ,code.JSONB_ARRAY_RANDOM((SELECT jsonb_agg(relid) FROM tables.address_type), 1)
            ) address_type_relids
-      FROM IS_PERSONAL
-     ORDER BY ix
+      FROM ADD_PARTITIONED_CUSTOMER_NUM
+     ORDER BY is_personal, cn
 )
 -- SELECT * FROM ADD_ADDRESS_TYPE_IDS;
 /*
- ix | is_personal | address_type_relids
-----+-------------+---------------------
-  1 | f           | [74, 75]
-  2 | f           | [75]
-  3 | t           |
-  4 | t           |
-  5 | f           | [74]
+ is_personal | cn | address_type_relids
+-------------+----+---------------------
+ f           |  1 | [75, 76, 74]
+ f           |  2 | [76, 74]
+ f           |  3 | [76]
+ t           |  1 |
+ t           |  2 |
 (5 rows)
 */
 
 -- Expand address type ids into seperate rows
 -- ,jsonb_array_elements(COALESCE(acmc.address_type_ids, '[null]'::jsonb)) as t(address_type_id)
 ,EXPAND_ADDRESS_TYPE_IDS AS (
-    SELECT aati.ix
-          ,row_number() over() AS rn
-          ,aati.is_personal
+    SELECT aati.is_personal
+          ,aati.cn
+          ,row_number() over(partition by is_personal order by cn, address_type_relid) an
           ,(t.address_type_relid #>> '{}')::BIGINT address_type_relid
       FROM ADD_ADDRESS_TYPE_IDS aati
           ,jsonb_array_elements(COALESCE(aati.address_type_relids, '[null]'::jsonb)) as t(address_type_relid)
-     ORDER BY rn
+     ORDER BY is_personal, an
 )
 -- SELECT * FROM EXPAND_ADDRESS_TYPE_IDS;
 /*
- ix | rn | is_personal | address_type_relid
-----+----+-------------+--------------------
-  1 |  1 | f           |                 74
-  1 |  2 | f           |                 76
-  1 |  3 | f           |                 75
-  2 |  4 | f           |                 75
-  2 |  5 | f           |                 76
-  3 |  6 | t           |
-  4 |  7 | t           |
-  5 |  8 | t           |
-(8 rows)
+ is_personal | cn | an | address_type_relid
+-------------+----+----+--------------------
+ f           |  1 |  1 |                 75
+ f           |  1 |  2 |                 76
+ f           |  2 |  3 |                 75
+ f           |  2 |  4 |                 76
+ t           |  1 |  1 |
+ t           |  2 |  2 |
+ t           |  3 |  3 |
+(7 rows)
 */
 
 -- Add a random country id from all available
@@ -107,19 +123,21 @@ WITH PARAMS AS (
     SELECT *
           ,code.JSONB_ARRAY_RANDOM((SELECT jsonb_agg(relid) FROM tables.COUNTRY))::BIGINT country_relid
       FROM EXPAND_ADDRESS_TYPE_IDS
-     ORDER BY rn
+     ORDER BY is_personal, an
 )
 -- SELECT * FROM ADD_COUNTRY_ID;
 /*
- ix | rn | is_personal | address_type_relid | country_relid
-----+----+-------------+--------------------+---------------
-  1 |  1 | f           |                 76 |             2
-  1 |  2 | f           |                 74 |             1
-  2 |  3 | t           |                    |             2
-  3 |  4 | t           |                    |             1
-  4 |  5 | t           |                    |             3
-  5 |  6 | t           |                    |             3
-(6 rows)
+ is_personal | cn | an | address_type_relid | country_relid
+-------------+----+----+--------------------+---------------
+ f           |  1 |  1 |                 75 |             1
+ f           |  1 |  2 |                 76 |             2
+ f           |  2 |  3 |                 75 |             3
+ f           |  2 |  4 |                 76 |             4
+ f           |  3 |  5 |                 75 |             3
+ f           |  3 |  6 |                 76 |             3
+ t           |  1 |  1 |                    |             4
+ t           |  2 |  2 |                    |             2
+(8 rows)
 */
 
 -- Generate a random region id of all regions for the chosen country (null if country has no regions)
@@ -127,20 +145,24 @@ WITH PARAMS AS (
     SELECT *
           ,code.JSONB_ARRAY_RANDOM((SELECT jsonb_agg(relid) FROM tables.REGION r WHERE r.country_relid = aci.country_relid))::BIGINT region_relid
       FROM ADD_COUNTRY_ID aci
-     ORDER BY rn
+     ORDER BY is_personal, an
 )
 -- SELECT * FROM ADD_REGION_ID;
 /*
- ix | rn | is_personal | address_type_relid | country_relid | region_relid
-----+----+-------------+--------------------+---------------+--------------
-  1 |  1 | t           |                    |             3 |
-  2 |  2 | t           |                    |             4 |           37
-  3 |  3 | t           |                    |             4 |           63
-  4 |  4 | t           |                    |             4 |           67
-  5 |  5 | f           |                 75 |             2 |           14
-  5 |  6 | f           |                 74 |             3 |
-  5 |  7 | f           |                 76 |             2 |            6
-(7 rows)
+ is_personal | cn | an | address_type_relid | country_relid | region_relid
+-------------+----+----+--------------------+---------------+--------------
+ f           |  1 |  1 |                 74 |             2 |            6
+ f           |  1 |  2 |                 75 |             2 |            9
+ f           |  2 |  3 |                 74 |             1 |
+ f           |  2 |  4 |                 75 |             1 |
+ f           |  2 |  5 |                 76 |             1 |
+ f           |  3 |  6 |                 74 |             4 |           55
+ f           |  3 |  7 |                 75 |             1 |
+ f           |  3 |  8 |                 76 |             3 |
+ f           |  4 |  9 |                 74 |             3 |
+ f           |  4 | 10 |                 75 |             3 |
+ t           |  1 |  1 |                    |             4 |           37
+(11 rows)
 */
 
 -- Add country and region codes
@@ -154,22 +176,21 @@ WITH PARAMS AS (
       LEFT
       JOIN tables.region r
         ON r.relid = ari.region_relid
-     ORDER BY rn
+     ORDER BY is_personal, an
 )
 -- SELECT * FROM ADD_COUNTRY_REGION_CODES;
 /*
- ix | rn | is_personal | address_type_relid | country_relid | region_relid | country_code | region_code
-----+----+-------------+--------------------+---------------+--------------+--------------+-------------
-  1 |  1 | t           |                    |             4 |           73 | US           | VI
-  2 |  2 | t           |                    |             3 |              | CX           |
-  3 |  3 | f           |                 75 |             4 |           48 | US           | NJ
-  3 |  4 | f           |                 74 |             3 |              | CX           |
-  4 |  5 | f           |                 74 |             3 |              | CX           |
-  4 |  6 | f           |                 75 |             1 |              | AW           |
-  4 |  7 | f           |                 76 |             2 |           14 | CA           | PE
-  5 |  8 | f           |                 75 |             1 |              | AW           |
-  5 |  9 | f           |                 74 |             3 |              | CX           |
-(9 rows)
+ is_personal | cn | an | address_type_relid | country_relid | region_relid | country_code | region_code
+-------------+----+----+--------------------+---------------+--------------+--------------+-------------
+ f           |  1 |  1 |                 74 |             4 |           67 | US           | WI
+ f           |  1 |  2 |                 76 |             3 |              | CX           |
+ f           |  2 |  3 |                 74 |             2 |           14 | CA           | PE
+ f           |  2 |  4 |                 75 |             1 |              | AW           |
+ f           |  2 |  5 |                 76 |             2 |            7 | CA           | MB
+ t           |  1 |  1 |                    |             1 |              | AW           |
+ t           |  2 |  2 |                    |             2 |            7 | CA           | MB
+ t           |  3 |  3 |                    |             3 |              | CX           |
+(8 rows)
 */
 
 -- Add {st: street, cn: city name, mcp: mailing code prefix (optional)} object for chosen country/region 
@@ -1812,19 +1833,19 @@ WITH PARAMS AS (
             END
           END st_city_mcp
     FROM ADD_COUNTRY_REGION_CODES acrc
-   ORDER BY rn
+   ORDER BY is_personal, an
 )
 -- SELECT * FROM ADD_CITY_STREET_MCP;
 /*
- ix | rn | is_personal | address_type_relid | country_relid | region_relid | country_code | region_code |                        st_city_mcp
-----+----+-------------+--------------------+---------------+--------------+--------------+-------------+-----------------------------------------------------------
-  1 |  1 | t           |                    |             2 |           10 | CA           | NT          | {"cn": "Yellowknife", "st": "Ragged Ass Rd", "mcp": "X"}
-  2 |  2 | f           |                 74 |             4 |           63 | US           | VT          | {"cn": "Montpelier", "st": "Towne Hill Rd", "mcp": "059"}
-  2 |  3 | f           |                 76 |             2 |           12 | CA           | NU          | {"cn": "Rankin Inlet", "st": "TikTaq Ave", "mcp": "X"}
-  3 |  4 | t           |                    |             4 |           33 | US           | IA          | {"cn": "Des Moines", "st": "Court Ave", "mcp": "511"}
-  4 |  5 | f           |                 74 |             2 |           10 | CA           | NT          | {"cn": "Yellowknife", "st": "Ragged Ass Rd", "mcp": "X"}
-  4 |  6 | f           |                 75 |             1 |              | AW           |             | {"cn": "Paradera", "st": "Bloemond"}
-  5 |  7 | t           |                    |             4 |           66 | US           | WV          | {"cn": "Charleston", "st": "Quarrier St", "mcp": "262"}
+ is_personal | cn | an | address_type_relid | country_relid | region_relid | country_code | region_code |                         st_city_mcp
+-------------+----+----+--------------------+---------------+--------------+--------------+-------------+-------------------------------------------------------------
+ f           |  1 |  1 |                 76 |             2 |           11 | CA           | NS          | {"cn": "Sydney", "st": "Dorchester St", "mcp": "B"}
+ f           |  2 |  2 |                 74 |             4 |           71 | US           | MP          | {"cn": "Marpi", "st": "Ayuyu Dr", "mcp": "969"}
+ f           |  2 |  3 |                 75 |             2 |           13 | CA           | ON          | {"cn": "Ottawa", "st": "Wellington St", "mcp": "L"}
+ f           |  2 |  4 |                 76 |             2 |            8 | CA           | NB          | {"cn": "Moncton", "st": "King St", "mcp": "E"}
+ t           |  1 |  1 |                    |             2 |           12 | CA           | NU          | {"cn": "Iqaluit", "st": "Mivvik St", "mcp": "X"}
+ t           |  2 |  2 |                    |             2 |           15 | CA           | QC          | {"cn": "Montreal", "st": "Sainte-Catherine St", "mcp": "H"}
+ t           |  3 |  3 |                    |             2 |           16 | CA           | SK          | {"cn": "Saskatoon", "st": "Broadway Ave", "mcp": "S"}
 (7 rows)
 */
 
@@ -1893,52 +1914,53 @@ WITH PARAMS AS (
               )
           END mailing_code
     FROM ADD_CITY_STREET_MCP acsm
-   ORDER BY rn
+   ORDER BY is_personal, an
 )
 -- SELECT * FROM ADD_CIVIC_MAILING_CODE;
 /*
- ix | rn | is_personal | address_type_relid | country_relid | region_relid | country_code | region_code |                     st_city_mcp                      |        city        |      address       | mailing_code
-----+----+-------------+--------------------+---------------+--------------+--------------+-------------+------------------------------------------------------+--------------------+--------------------+--------------
-  1 |  1 | f           |                 76 |             1 |              | AW           |             | {"cn": "Paradera", "st": "Bloemond"}                 | "Paradera"         | Bloemond 70        |
-  1 |  2 | f           |                 75 |             1 |              | AW           |             | {"cn": "Paradera", "st": "Bloemond"}                 | "Paradera"         | Bloemond 84        |
-  2 |  3 | f           |                 76 |             3 |              | CX           |             | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}       | "Flying Fish Cove" | 44 Jln Pantai      | 6798
-  2 |  4 | f           |                 74 |             3 |              | CX           |             | {"cn": "Silver City", "st": "Sea View Dr"}           | "Silver City"      | 99 Sea View Dr     | 6798
-  2 |  5 | f           |                 75 |             1 |              | AW           |             | {"cn": "San Nicolas", "st": "Sero Colorado"}         | "San Nicolas"      | Sero Colorado 71   |
-  3 |  6 | f           |                 75 |             2 |            8 | CA           | NB          | {"cn": "Moncton", "st": "King St", "mcp": "E"}       | "Moncton"          | 90887 King St      | E5J 3X9
-  4 |  7 | f           |                 74 |             3 |              | CX           |             | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}       | "Flying Fish Cove" | 85 Jln Pantai      | 6798
-  5 |  8 | f           |                 76 |             4 |           59 | US           | SD          | {"cn": "Pierre", "st": "N Taylor Ave", "mcp": "576"} | "Pierre"           | 43961 N Taylor Ave | 57625
-  5 |  9 | f           |                 75 |             3 |              | CX           |             | {"cn": "Drumsite", "st": "Lam Lok Loh"}              | "Drumsite"         | 22 Lam Lok Loh     | 6798
-(9 rows)
+ is_personal | cn | an | address_type_relid | country_relid | region_relid | country_code | region_code |                        st_city_mcp                        |        city        |         address         | mailing_code
+-------------+----+----+--------------------+---------------+--------------+--------------+-------------+-----------------------------------------------------------+--------------------+-------------------------+--------------
+ f           |  1 |  1 |                 74 |             3 |              | CX           |             | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}            | "Flying Fish Cove" | 20 Jln Pantai           | 6798
+ f           |  1 |  2 |                 75 |             3 |              | CX           |             | {"cn": "Poon Saan", "st": "San Chye Loh"}                 | "Poon Saan"        | 92 San Chye Loh         | 6798
+ f           |  1 |  3 |                 76 |             4 |           19 | US           | AK          | {"cn": "Juneau", "st": "South Franklin St", "mcp": "996"} | "Juneau"           | 12613 South Franklin St | 99642-6304
+ f           |  2 |  4 |                 74 |             3 |              | CX           |             | {"cn": "Silver City", "st": "Sea View Dr"}                | "Silver City"      | 73 Sea View Dr          | 6798
+ f           |  2 |  5 |                 76 |             3 |              | CX           |             | {"cn": "Flying Fish Cove", "st": "Jln Pantai"}            | "Flying Fish Cove" | 40 Jln Pantai           | 6798
+ t           |  1 |  1 |                    |             3 |              | CX           |             | {"cn": "Poon Saan", "st": "San Chye Loh"}                 | "Poon Saan"        | 57 San Chye Loh         | 6798
+ t           |  2 |  2 |                    |             1 |              | AW           |             | {"cn": "San Nicolas", "st": "Sero Colorado"}              | "San Nicolas"      | Sero Colorado 3         |
+ t           |  3 |  3 |                    |             2 |            5 | CA           | AB          | {"cn": "Calgary", "st": "17th Ave SW", "mcp": "T"}        | "Calgary"          | 97272 17th Ave SW       | T4P 3D1
+(8 rows)
 */
 
 -- Generate complete addresses
 ,GEN_ADDRESS AS (
-  SELECT ix
-        ,rn
+  SELECT is_personal
+        ,cn
+        ,an
         ,address_type_relid
         ,country_relid
         ,region_relid
         ,city
         ,address
-        ,CASE WHEN  address_type_relid IS NOT NULL                       THEN 'Door 5' END AS address_2
-        ,CASE WHEN (address_type_relid IS NOT NULL) AND (random() < 0.5) THEN 'Stop 6' END AS address_3
+        ,code.IIF(is_personal, NULL::TEXT, 'Door 5') AS address_2
+        ,code.IIF(is_personal, NULL::TEXT, 'Stop 6') AS address_3
         ,mailing_code
     FROM ADD_CIVIC_MAILING_CODE
-   ORDER BY rn
+   ORDER BY is_personal, an
 )
 -- SELECT * FROM GEN_ADDRESS;
 /*
- ix | rn | address_type_relid | country_relid | region_relid |        city        |       address       | address_2 | address_3 | mailing_code
-----+----+--------------------+---------------+--------------+--------------------+---------------------+-----------+-----------+--------------
-  1 |  1 |                    |             2 |           14 | "Summerside"       | 31076 Water St      |           |           | C0B 1X7
-  2 |  2 |                    |             3 |              | "Flying Fish Cove" | 91 Jln Pantai       |           |           | 6798
-  3 |  3 |                 76 |             1 |              | "Paradera"         | Bloemond 70         | Door 5    |           |
-  4 |  4 |                 74 |             3 |              | "Poon Saan"        | 67 San Chye Loh     | Door 5    |           | 6798
-  4 |  5 |                 76 |             1 |              | "Paradera"         | Bloemond 34         | Door 5    |           |
-  4 |  6 |                 75 |             4 |           22 | "San Diego"        | 77018 San Diego Ave | Door 5    |           | 93433
-  5 |  7 |                 76 |             2 |           12 | "Rankin Inlet"     | 14069 TikTaq Ave    | Door 5    | Stop 6    | X9J 9C7
-  5 |  8 |                 75 |             2 |           13 | "Toronto"          | 44552 Yonge St      | Door 5    |           | N6I 3J2
-(8 rows)
+ is_personal | cn | an | address_type_relid | country_relid | region_relid |        city        |       address       | address_2 | address_3 | mailing_code
+-------------+----+----+--------------------+---------------+--------------+--------------------+---------------------+-----------+-----------+--------------
+ f           |  1 |  1 |                 74 |             2 |            9 | "St John's"        | 79849 George St     | Door 5    | Stop 6    | A4Q 5L2
+ f           |  1 |  2 |                 76 |             3 |              | "Flying Fish Cove" | 9 Jln Pantai        | Door 5    | Stop 6    | 6798
+ f           |  2 |  3 |                 74 |             1 |              | "San Nicolas"      | Sero Colorado 81    | Door 5    | Stop 6    |
+ f           |  2 |  4 |                 75 |             3 |              | "Flying Fish Cove" | 44 Jln Pantai       | Door 5    | Stop 6    | 6798
+ f           |  3 |  5 |                 74 |             2 |           11 | "Sydney"           | 22712 Dorchester St | Door 5    | Stop 6    | B2O 6B8
+ f           |  3 |  6 |                 76 |             4 |           71 | "Saipan"           | 59573 Tapochao Rd   | Door 5    | Stop 6    | 96930
+ f           |  4 |  7 |                 74 |             3 |              | "Silver City"      | 39 Sea View Dr      | Door 5    | Stop 6    | 6798
+ f           |  4 |  8 |                 75 |             3 |              | "Silver City"      | 19 Sea View Dr      | Door 5    | Stop 6    | 6798
+ t           |  1 |  1 |                    |             3 |              | "Poon Saan"        | 86 San Chye Loh     |           |           | 6798
+(9 rows)
 */
 
 -- Insert addresses, returning the generated relid and address_type_relid
@@ -1964,73 +1986,74 @@ WITH PARAMS AS (
         ,address_3
         ,mailing_code
     FROM GEN_ADDRESS
+   ORDER BY is_personal, an
   RETURNING relid, address_type_relid
 )
 -- SELECT * FROM INS_ADDRESS;
 /*
  relid | address_type_relid 
 -------+--------------------
-    84 |
-    85 |                 74
-    86 |                 75
-    87 |                 76
-    88 |
-    89 |                 74
-    90 |                 75
-    91 |                 76
-    92 |
-(9 rows)
-*/
-
--- The generated address relids are sequential
--- Add a sequential rn column
-,ADD_INS_ADDRESS_RN AS (
-   SELECT ROW_NUMBER() OVER(ORDER BY relid) AS rn
-         ,*
-     FROM INS_ADDRESS
-    ORDER BY rn
-)
--- SELECT * FROM ADD_INS_ADDRESS_RN;
-/*
- rn | relid | address_type_relid
-----+-------+--------------------
-  1 |    87 |
-  2 |    88 |                 75
-  3 |    89 |                 74
-  4 |    90 |                 75
-  5 |    91 |
-  6 |    92 |
+   187 |                 74
+   188 |                 76
+   189 |
+   190 |
+   191 |
+   192 |
 (6 rows)
 */
 
--- Join the GEN_ADDRESS rn column to the ADD_INS_ADDRESS_RN rn column
+-- The generated address relids are sequential
+-- Add a sequential an column partitioned on is_personal
+,ADD_INS_ADDRESS_AN AS (
+   SELECT address_type_relid IS NULL AS is_personal
+         ,row_number() over(partition by address_type_relid IS NULL order by relid) an
+         ,*
+     FROM INS_ADDRESS
+    ORDER BY is_personal, an
+)
+-- SELECT * FROM ADD_INS_ADDRESS_AN;
+/*
+ is_personal | an | relid | address_type_relid
+-------------+----+-------+--------------------
+ f           |  1 |   227 |                 74
+ f           |  2 |   228 |                 76
+ f           |  3 |   229 |                 75
+ f           |  4 |   230 |                 74
+ f           |  5 |   231 |                 76
+ t           |  1 |   232 |
+ t           |  2 |   233 |
+(7 rows)
+*/
+
+-- Join the GEN_ADDRESS an column to the ADD_INS_ADDRESS_AN an column
 ,JOIN_GEN_ADDRESS_INS_ADDRESS AS (
    SELECT ga.*
-         ,aiar.relid as address_relid
+         ,aiaa.relid as address_relid
      FROM GEN_ADDRESS ga
-     JOIN ADD_INS_ADDRESS_RN aiar
-       ON ga.rn = aiar.rn
+     JOIN ADD_INS_ADDRESS_AN aiaa
+       ON ga.is_personal = aiaa.is_personal
+      AND ga.an = aiaa.an
+    ORDER BY is_personal, an
 )
 -- SELECT * FROM JOIN_GEN_ADDRESS_INS_ADDRESS;
 /*
- ix | rn | address_type_relid | country_relid | region_relid |     city      |         address          | address_2 | address_3 | mailing_code | address_relid
-----+----+--------------------+---------------+--------------+---------------+--------------------------+-----------+-----------+--------------+---------------
-  1 |  1 |                 75 |             3 |              | "Poon Saan"   | 2 San Chye Loh           | Door 5    |           | 6798         |            93
-  1 |  2 |                 74 |             3 |              | "Silver City" | 21 Sea View Dr           | Door 5    |           | 6798         |            94
-  1 |  3 |                 76 |             1 |              | "San Nicolas" | Sero Colorado 93         | Door 5    |           |              |            95
-  2 |  4 |                    |             4 |           65 | "Olympia"     | 2317 Union Ave SE        |           |           | 98644        |            96
-  3 |  5 |                 74 |             2 |           13 | "Toronto"     | 47526 Yonge St           | Door 5    |           | P4V 8E8      |            97
-  3 |  6 |                 75 |             2 |           15 | "Quebec City" | 17987 Petit-Champlain St | Door 5    | Stop 6    | G5V 4U2      |            98
-  4 |  7 |                    |             2 |           11 | "Halifax"     | 11356 Spring Garden Rd   |           |           | B9T 4U2      |            99
-  5 |  8 |                 76 |             2 |            5 | "Calgary"     | 19101 17th Ave SW        | Door 5    |           | T1P 3X3      |           100
-  5 |  9 |                 75 |             2 |            6 | "Victoria"    | 72467 Government St      | Door 5    | Stop 6    | V3R 6T6      |           101
-(9 rows)
+ is_personal | cn | an | address_type_relid | country_relid | region_relid |        city        |      address      | address_2 | address_3 | mailing_code | address_relid
+-------------+----+----+--------------------+---------------+--------------+--------------------+-------------------+-----------+-----------+--------------+---------------
+ f           |  1 |  1 |                 74 |             3 |              | "Flying Fish Cove" | 24 Jln Pantai     | Door 5    | Stop 6    | 6798         |           247
+ f           |  1 |  2 |                 75 |             3 |              | "Flying Fish Cove" | 57 Jln Pantai     | Door 5    | Stop 6    | 6798         |           248
+ f           |  1 |  3 |                 76 |             1 |              | "Oranjestad"       | Spinozastraat 61  | Door 5    | Stop 6    |              |           249
+ f           |  2 |  4 |                 75 |             1 |              | "San Nicolas"      | Sero Colorado 33  | Door 5    | Stop 6    |              |           250
+ f           |  2 |  5 |                 76 |             4 |           51 | "Marpi"            | 83141 Ayuyu Dr    | Door 5    | Stop 6    | 27463        |           251
+ t           |  1 |  1 |                    |             1 |              | "Oranjestad"       | Spinozastraat 26  |           |           |              |           252
+ t           |  2 |  2 |                    |             2 |           14 | "Charlottetown"    | 24564 Richmond St |           |           | C4I 6V4      |           253
+ t           |  3 |  3 |                    |             3 |              | "Poon Saan"        | 6 San Chye Loh    |           |           | 6798         |           254
+(8 rows)
 */
 
 -- Hard-coded table of customer person first names
 ,CUSTOMER_PERSON_FIRST_NAME_TABLE AS (
-   SELECT *
-         ,ROW_NUMBER() OVER() AS ix
+   SELECT ROW_NUMBER() OVER() AS ix
+         ,*
      FROM (VALUES
              ('Anna')
             ,('Alfred')
@@ -2087,23 +2110,23 @@ WITH PARAMS AS (
           ) AS s(first_name)
 )
 -- SELECT * FROM CUSTOMER_PERSON_FIRST_NAME_TABLE;
-/* first_name | ix 
-------------+----
- Anna       |  1
- Alfred     |  2
- Britney    |  3
- Bob        |  4
- ... Yolanda    | 49
- Yakov      | 50
- Zoey       | 51
- Zachary    | 52
+/*
+ ix | first_name
+----+------------
+  1 | Anna
+  2 | Alfred
+  3 | Britney
+ ...
+ 50 | Yakov
+ 51 | Zoey
+ 52 | Zachary
 (52 rows)
 */
 
--- hard-coded table of customer person last names
+-- Hard-coded table of customer person last names
 ,CUSTOMER_PERSON_LAST_NAME_TABLE AS (
-   SELECT *
-         ,ROW_NUMBER() OVER() AS ix
+   SELECT ROW_NUMBER() OVER() AS ix
+         ,*
      FROM (VALUES
              ('Adair')
             ,('Adams')
@@ -2159,78 +2182,21 @@ WITH PARAMS AS (
 )
 -- SELECT * FROM CUSTOMER_PERSON_LAST_NAME_TABLE;
 /*
- last_name | ix 
------------+----
- Adair     |  1
- Adams     |  2
- Adley     |  3
- Anderson  |  4
+ ix | last_name
+----+-----------
+  1 | Adair
+  2 | Adams
+  3 | Adley
  ...
- Verlice   | 47
- West      | 48
- Wilson    | 49
- Zimmerman | 50
+ 49 | Wilson
+ 50 | Zimmerman
 (50 rows)
 */
 
--- Add first name and last name if there is no business type
-,GEN_CUSTOMER_PERSON_NAME_INDEXES AS (
-  SELECT (random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_FIRST_NAME_TABLE) + 1)::INT AS fn_ix
-        ,(random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_FIRST_NAME_TABLE) + 1)::INT AS mn_ix
-        ,(random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_LAST_NAME_TABLE ) + 1)::INT AS ln_ix
-        ,row_number AS ix
-    FROM GEN_ROWS
-)
--- SELECT * FROM GEN_CUSTOMER_PERSON_NAME_INDEXES;
-/*
- fn_ix | mn_ix | ln_ix | ix 
--------+-------+-------+----
-    14 |    47 |    11 |  1
-    31 |    19 |    22 |  2
-     7 |    38 |    27 |  3
-    30 |    44 |    26 |  4
-    38 |    20 |    37 |  5
-(5 rows)
-*/
-
--- Insert person customers using generated data and relids of inserted addresses
-,INS_CUSTOMER_PERSON AS (
-  INSERT
-    INTO tables.customer_person(
-            address_relid
-           ,first_name
-           ,middle_name
-           ,last_name
-         )
-  SELECT aiai.relid
-        ,cpfnt.first_name
-        ,code.IIF(random() < 0.8, cpmnt.first_name, '')
-        ,cplnt.last_name
-    FROM ADD_INS_ADDRESS_IX aiai
-    JOIN GEN_CUSTOMER_PERSON_NAME_INDEXES gcpni
-      ON gcpni.ix = aiai.ix
-    JOIN CUSTOMER_PERSON_FIRST_NAME_TABLE cpfnt
-      ON cpfnt.ix = gcpni.fn_ix
-    JOIN CUSTOMER_PERSON_FIRST_NAME_TABLE cpmnt
-      ON cpmnt.ix = gcpni.mn_ix
-    JOIN CUSTOMER_PERSON_LAST_NAME_TABLE  cplnt
-      ON cplnt.ix = gcpni.ln_ix
-   WHERE aiai.address_type_relid IS NULL
-  RETURNING relid
-)
--- SELECT * FROM INS_CUSTOMER_PERSON;
-/*
- relid 
--------
-   104
-   105
-   106
-(3 rows)
-*/
-
+-- Hard-coded table of business names
 ,CUSTOMER_BUSINESS_NAME_TABLE AS (
-   SELECT *
-         ,ROW_NUMBER() OVER() AS ix
+   SELECT ROW_NUMBER() OVER() AS ix
+         ,*
      FROM (VALUES
              ('9 Yards Media')
             ,('Aceable, Inc.')
@@ -2254,22 +2220,117 @@ WITH PARAMS AS (
             ,('Twisters Gymnastics Academy')
             ,('Wanderu')
             ,('What You Will Yoga')
-            ,('When Pigs Fly')            
+            ,('When Pigs Fly')
           ) AS s(business_name)
 )
 -- SELECT * FROM CUSTOMER_BUSINESS_NAME_TABLE;
 /*
-        business_name         | ix 
-------------------------------+----
- 9 Yards Media                |  1
- Aceable, Inc.                |  2
- Aims Community College       |  3
+ ix |        business_name
+----+------------------------------
+  1 | 9 Yards Media
+  2 | Aceable, Inc.
+  3 | Aims Community College
  ...
- Wanderu                      | 21
- What You Will Yoga           | 22
- When Pigs Fly                | 23
+ 21 | Wanderu
+ 22 | What You Will Yoga
+ 23 | When Pigs Fly
 (23 rows)
 */
+
+-- Add first name, middle name (40% of the time), and last name if it is a personal address
+-- Add business name if it is a business address
+,ADD_CUSTOMER_PERSON_BUSINESS_NAME_INDEXES AS (
+  SELECT *
+        ,code.IIF(    is_personal                       , (random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_FIRST_NAME_TABLE) + 1)::INT, NULL) as fn_ix
+        ,code.IIF(    is_personal AND (random() <= 0.40), (random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_FIRST_NAME_TABLE) + 1)::INT, NULL) as mn_ix
+        ,code.IIF(    is_personal                       , (random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_PERSON_LAST_NAME_TABLE ) + 1)::INT, NULL) as ln_ix
+        ,code.IIF(NOT is_personal,                        (random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_BUSINESS_NAME_TABLE    ) + 1)::INT, NULL) as bn_ix
+    FROM JOIN_GEN_ADDRESS_INS_ADDRESS
+   ORDER BY is_personal, an
+)
+-- SELECT * FROM ADD_CUSTOMER_PERSON_BUSINESS_NAME_INDEXES;
+/*
+ is_personal | cn | an | address_type_relid | country_relid | region_relid |        city        |         address          | address_2 | address_3 | mailing_code | address_relid | fn_ix | mn_ix | ln_ix | bn_ix
+-------------+----+----+--------------------+---------------+--------------+--------------------+--------------------------+-----------+-----------+--------------+---------------+-------+-------+-------+-------
+ f           |  1 |  1 |                 74 |             1 |              | "Paradera"         | Bloemond 41              | Door 5    | Stop 6    |              |           263 |       |       |       |    20
+ f           |  1 |  2 |                 75 |             3 |              | "Flying Fish Cove" | 41 Jln Pantai            | Door 5    | Stop 6    | 6798         |           264 |       |       |       |    14
+ f           |  1 |  3 |                 76 |             4 |           55 | "Salem"            | 17327 Chestnut St        | Door 5    | Stop 6    | 97123        |           265 |       |       |       |    20
+ f           |  2 |  4 |                 74 |             2 |            6 | "Vancouver"        | 51319 Robson St          | Door 5    | Stop 6    | V1M 2B1      |           266 |       |       |       |    14
+ f           |  2 |  5 |                 75 |             4 |           20 | "Phoenix"          | 98775 Van Buren St       | Door 5    | Stop 6    | 85654        |           267 |       |       |       |     2
+ f           |  2 |  6 |                 76 |             3 |              | "Flying Fish Cove" | 76 Jln Pantai            | Door 5    | Stop 6    | 6798         |           268 |       |       |       |     2
+ f           |  3 |  7 |                 74 |             2 |           15 | "Quebec City"      | 71569 Petit-Champlain St | Door 5    | Stop 6    | H5I 2R9      |           269 |       |       |       |    20
+ f           |  3 |  8 |                 75 |             3 |              | "Flying Fish Cove" | 98 Jln Pantai            | Door 5    | Stop 6    | 6798         |           270 |       |       |       |    20
+ f           |  3 |  9 |                 76 |             2 |           14 | "Summerside"       | 16662 Water St           | Door 5    | Stop 6    | C3Q 0P7      |           271 |       |       |       |     8
+ t           |  1 |  1 |                    |             2 |           11 | "Sydney"           | 70879 Dorchester St      |           |           | B8K 6P1      |           272 |    31 |       |     7 |
+ t           |  2 |  2 |                    |             2 |           14 | "Summerside"       | 74705 Water St           |           |           | C8C 9D1      |           273 |    43 |    51 |    14 |
+(11 rows)
+*/
+
+-- Add person and business names
+,ADD_CUSTOMER_PERSON_BUSINESS_NAMES AS (
+   SELECT acpbni.*
+         ,cpfnt.first_name
+         ,cpmnt.first_name AS middle_name
+         ,cplnt.last_name
+         ,cbnt.business_name
+     FROM ADD_CUSTOMER_PERSON_BUSINESS_NAME_INDEXES acpbni
+     LEFT
+     JOIN CUSTOMER_PERSON_FIRST_NAME_TABLE cpfnt
+       ON cpfnt.ix = acpbni.fn_ix
+     LEFT
+     JOIN CUSTOMER_PERSON_FIRST_NAME_TABLE cpmnt
+       ON cpmnt.ix = acpbni.mn_ix
+     LEFT
+     JOIN CUSTOMER_PERSON_LAST_NAME_TABLE cplnt
+       ON cplnt.ix = acpbni.ln_ix
+     LEFT
+     JOIN CUSTOMER_BUSINESS_NAME_TABLE cbnt
+       ON cbnt.ix = acpbni.bn_ix
+)
+-- SELECT * FROM ADD_CUSTOMER_PERSON_BUSINESS_NAMES;
+/*
+ is_personal | cn | an | address_type_relid | country_relid | region_relid |        city        |      address       | address_2 | address_3 | mailing_code | address_relid | fn_ix | mn_ix | ln_ix | bn_ix | first_name | middle_name | last_name |       business_name
+-------------+----+----+--------------------+---------------+--------------+--------------------+--------------------+-----------+-----------+--------------+---------------+-------+-------+-------+-------+------------+-------------+-----------+---------------------------
+ f           |  1 |  1 |                 74 |             4 |           46 | "Carson City"      | 92558 E William St | Door 5    | Stop 6    | 89421        |           285 |       |       |       |    17 |            |             |           | Soft As a Grape
+ f           |  1 |  2 |                 76 |             3 |              | "Poon Saan"        | 52 San Chye Loh    | Door 5    | Stop 6    | 6798         |           286 |       |       |       |     4 |            |             |           | Bent Out of Shape Jewelry
+ t           |  1 |  1 |                    |             2 |            5 | "Calgary"          | 58866 17th Ave SW  |           |           | T5V 2G8      |           287 |    26 |    29 |    19 |       | Michael    | Oprah       | Ford      |
+ t           |  2 |  2 |                    |             3 |              | "Flying Fish Cove" | 62 Jln Pantai      |           |           | 6798         |           288 |    52 |    14 |    11 |       | Zachary    | Glen        | Crassus   |
+ t           |  3 |  3 |                    |             3 |              | "Poon Saan"        | 53 San Chye Loh    |           |           | 6798         |           289 |    20 |       |    40 |       | James      |             | Pierce    |
+ t           |  4 |  4 |                    |             3 |              | "Drumsite"         | 28 Lam Lok Loh     |           |           | 6798         |           290 |    22 |       |    25 |       | Karl       |             | Hayes     |
+(6 rows)
+*/
+
+-- Insert person customers using generated data and relids of already inserted addresses
+,INS_CUSTOMER_PERSON AS (
+  INSERT
+    INTO tables.customer_person(
+            address_relid
+           ,first_name
+           ,middle_name
+           ,last_name
+         )
+  SELECT address_relid
+        ,first_name
+        ,middle_name
+        ,last_name
+    FROM ADD_CUSTOMER_PERSON_BUSINESS_NAMES cpbni
+   WHERE is_personal
+   ORDER BY an
+  RETURNING relid
+)
+-- SELECT * FROM INS_CUSTOMER_PERSON;
+/*
+ relid 
+-------
+   183
+   184
+   185
+   186
+(4 rows)
+*/
+
+-- The generated customer persons are sequential
+-- Add a sequential an column
 
 -- Add first name and last name if there is no business type
 ,GEN_CUSTOMER_BUSINESS_NAME_INDEXES AS (
