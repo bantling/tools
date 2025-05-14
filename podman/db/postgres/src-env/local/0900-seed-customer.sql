@@ -2313,7 +2313,7 @@ WITH PARAMS AS (
         ,first_name
         ,middle_name
         ,last_name
-    FROM ADD_CUSTOMER_PERSON_BUSINESS_NAMES cpbni
+    FROM ADD_CUSTOMER_PERSON_BUSINESS_NAMES
    WHERE is_personal
    ORDER BY an
   RETURNING relid
@@ -2329,40 +2329,16 @@ WITH PARAMS AS (
 (4 rows)
 */
 
--- The generated customer persons are sequential
--- Add a sequential an column
-
--- Add first name and last name if there is no business type
-,GEN_CUSTOMER_BUSINESS_NAME_INDEXES AS (
-  SELECT (random() * (SELECT COUNT(*) - 1 FROM CUSTOMER_BUSINESS_NAME_TABLE    ) + 1)::INT AS bn_ix
-        ,row_number AS ix
-    FROM GEN_ROWS
-)
--- SELECT * FROM GEN_CUSTOMER_BUSINESS_NAME_INDEXES;
-/*
- bn_ix | ix 
--------+----
-    20 |  1
-    19 |  2
-     7 |  3
-     6 |  4
-    14 |  5
-(5 rows)
-*/
-
 -- Insert business customers using generated data and relids of inserted addresses
 ,INS_CUSTOMER_BUSINESS AS (
   INSERT
     INTO tables.customer_business(
             name
          )
-  SELECT cbnt.business_name
-    FROM ADD_INS_ADDRESS_IX aiai
-    JOIN GEN_CUSTOMER_BUSINESS_NAME_INDEXES gcbni
-      ON gcbni.ix = aiai.ix
-    JOIN CUSTOMER_BUSINESS_NAME_TABLE cbnt
-      ON cbnt.ix = gcbni.bn_ix
-   WHERE aiai.address_type_relid IS NOT NULL
+  SELECT business_name
+    FROM ADD_CUSTOMER_PERSON_BUSINESS_NAMES
+   WHERE NOT is_personal
+   ORDER BY an
   RETURNING relid
 )
 -- SELECT * FROM INS_CUSTOMER_BUSINESS;
@@ -2375,11 +2351,15 @@ WITH PARAMS AS (
 (3 rows)
 */
 
-,ADD_CUSTOMER_BUSINESS_IX AS (
-   SELECT *
-         ,ROW_NUMBER() OVER() AS ix
-     FROM INS_CUSTOMER_BUSINESS
+-- The generated address relids are sequential
+-- Add a sequential an column partitioned on is_personal
+,ADD_INS_BUSINESS_ADDRESS_AN AS (
+   SELECT
+     FROM INS_ADDRESS ia
+     JOIN INS_CUSTOMER_BUSINESS icb
+    ORDER BY is_personal, an
 )
+-- SELECT * FROM ADD_INS_ADDRESS_AN;
 
 -- Insert business customer address join entry
 -- To line up the inserted relids with ADD_INS_ADDRESS_IX indexes:
@@ -2390,10 +2370,9 @@ WITH PARAMS AS (
             business_relid
            ,address_relid
          )
-  SELECT icb.relid
-    FROM ADD_INS_ADDRESS_IX aiai
-    JOIN INS_CUSTOMER_BUSINESS icb
-      ON icb.
+  SELECT
+    FROM ADD_CUSTOMER_PERSON_BUSINESS_NAMES acpbn
+   WHERE NOT is_personal
 )
 
 truncate table tables.address cascade;
