@@ -63,7 +63,7 @@ trap cleanup EXIT INT
 # cd to dir of this script
 cd "`dirname "$0"`"
 
-# Need to delete olf efivars.img to ensure no left over boot order from previous runs
+# Need to delete old efivars.img to ensure no left over boot order from previous runs
 echo "Generating efivars.img..."
 rm -f efivars.img
 dd if=/dev/zero bs=1 count=0 seek=64M of=efivars.img
@@ -200,7 +200,7 @@ echo "Image root=UUID=\$root_id rw initrd=\initramfs-linux.img" > /archlinux/boo
 END
 
 # echo "Downloading QEMU EFI bios image..."
-# [ -f QEMU_EFI.img ] || curl -Lo - https://releases.linaro.org/components/kernel/uefi-linaro/15.10/release/qemu64/QEMU_EFI.img.gz | gzip -dc > QEMU_EFI.img
+[ -f QEMU_EFI.img ] || curl -Lo - https://releases.linaro.org/components/kernel/uefi-linaro/15.10/release/qemu64/QEMU_EFI.img.gz | gzip -dc > QEMU_EFI.img
 
 echo "Downloading Arch ISO image..."
 [ -f Arch.Linux.Arm--aarch64.iso ] || curl -LO https://github.com/IComplainInComments/archiso/releases/download/v2.0/Arch.Linux.Arm--aarch64.iso
@@ -217,7 +217,7 @@ qemu-system-aarch64 \\
 	-drive if=pflash,media=disk,file=QEMU_EFI.img,cache=writethrough,format=raw \\
 	-drive if=pflash,media=disk,file=efivars.img,cache=writethrough,format=raw \\
 	-device virtio-gpu-pci \\
-	-drive file=temp/archlinuxinstall.img,format=raw,if=virtio \\
+	-drive file=temp/archlinuxinstall.img,format=raw,file.locking=off,if=virtio \\
 	-drive file=Arch.Linux.Arm--aarch64.iso,format=raw,if=virtio \\
 	-device qemu-xhci \\
 	-device usb-kbd \\

@@ -6,4 +6,9 @@ cross-compile/*/make/*/build
 qemu-vms/freebsd/*amd*
 qemu-vms/*/*img*
 qemu-vms/*/*iso*
-
+qemu-vms/ArchLinux.app
+qemu-vms/efivars.img
+qemu-vms/*iso*
+qemu-vms/*qcow2*
+qemu-vms/run.sh
+qemu-vms/temp
