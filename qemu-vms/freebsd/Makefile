@@ -131,11 +131,11 @@ $(AMD64_XZ_CKSUM_CMP): $(AMD64_XZ_CKSUM) $(AMD64_XZ_CKSUM_GEN)
 	touch $@
 
 # Decompress image
-# For some reason, we need to touch the extracted file after extracting it, to ensure it has a date newer than
-# the prerequisite. Otherwise, it keeps extracting.
+# By default, xz extracts the file using the date inside the archive.
+# We need to update the extracted file to the current date to avoid always re-extracting.
 $(AMD64_MEMSTICK): $(AMD64_XZ_CKSUM_CMP)
 	echo "Extracting memstick image"
-	xz --verbose -kd $@.xz
+	xz --verbose -kfd $@.xz
 	touch $@
 
 # Make a copy of the decompressed memstick image every time it is extracted or bootstrap.sh is modified
@@ -190,8 +190,8 @@ $(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 	echo '#### Use modified memstick image to auto install into a test image'
 	echo
 	echo 'When prompt appears, run /setup.sh vtbd1'
-	echo 'The default is to have swap and call the pool zroot, you can run /setup.sh vtbd1 [ -n ] [ -p poolname ]'
-	echo "Where -n means no swap, and -p poolname provides an alternate pool name (don't use zinstall)"
+	echo 'The default is to have swap and call the pool zroot, you can run /setup.sh vtbd1 [ -n ] [ -p poolname ] [ -a ]'
+	echo "Where -n means no swap, -p poolname provides an alternate pool name (don't use zinstall), and -a means autologin"
 	echo
 	qemu-system-x86_64 \
 	  -accel "$(QEMU_ACCEL)" \
@@ -204,7 +204,7 @@ $(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 	touch $< $@
 
 
-# Test the test image boots and has no setup scripts or freebsd sets.
+# Test the test image boots.
 # Touches AMD64_MEMSTICK_INST, AMD64_MEMSTICK_CONF and target file for same reasons as above for AMD64_MEMSTICK_INST target
 $(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_IMAGE_TEST)
 	echo
@@ -248,7 +248,7 @@ retest:
 
 .PHONY: clean
 clean:
-	find . -maxdepth 1 -type f -name '*FreeBSD*' -print0 | xargs -0 rm;
+	find . -maxdepth 1 -type f -name '.amd64*' -print0 | xargs -0 rm;
 
 .PHONY: push
 push:

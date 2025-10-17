@@ -11,11 +11,11 @@ echo "Bringing up vtnet0"
 dhclient vtnet0 || :
 
 # Download bootstrap-setup.sh
-echo "Downloading bootstrap.sh"
+echo "Downloading bootstrap-setup.sh"
 echo "get bootstrap-setup.sh" | tftp 10.0.2.2
 
 # Run bootstrap-setup.sh
-echo "Executing bootstrap.sh"
+echo "Executing bootstrap-setup.sh"
 sh /bootstrap-setup.sh
 
 # Shut down

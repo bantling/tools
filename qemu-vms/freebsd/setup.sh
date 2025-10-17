@@ -50,7 +50,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-# Check if /boot/loader.conf contains lines for disk identification settings (not present by default)
+# Alter /boot/loader.conf autoboot_delay to 0
 grep -q 'autoboot_delay' /boot/loader.conf || {
   echo 'Configuring boot delay'
   sleep 1
@@ -70,21 +70,43 @@ echo 'Creating gpt partiton table'
 sleep 1
 gpart create -s gpt "$dev"
 
-## Create boot and zfs partitions
+## Create boot, efi, and zfs partitions
 echo 'Creating gpt boot and root partitions'
 sleep 1
-gpart add -t freebsd-boot -l zboot -s 512k "$dev"
-gpart add -t freebsd-zfs  -l "$poolname" "$dev"
+gpart add -t freebsd-boot -l zboot       -s 512k "$dev"
+gpart add -t efi          -l efi         -s 512m "$dev"
+gpart add -t freebsd-zfs  -l "$poolname"         "$dev"
 
-## Install boot code
+## Install mbr boot sector and partition code
 echo 'Installing gpt boot sector and gpt partition boot loader'
 sleep 1
 gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 "$dev"
 
+## Create EFI filesystem
+echo 'Creating EFI filesystem'
+sleep 1
+newfs_msdos -F 16 -L EFI "$dev"p2
+
+## Create temp EFI mountpoint
+echo 'Creating temp EFI mount point'
+sleep 1
+mkdir -p /tmp/efi
+
+## Mount EFI
+echo 'Mounting EFI filesystem'
+sleep 1
+mount -t msdosfs /dev/"$dev"p2 /tmp/efi
+
+## Install efu boot partition code
+echo 'Installing EFI boot code'
+sleep 1
+mkdir /tmp/efi/FreeBSD
+cp /boot/loader.efi /tmp/efi/FreeBSD
+
 ## Get gpt id for "$poolname" label
 echo 'Retrieving gpt root partition id'
 sleep 1
-zpool_dev="/dev/gptid/`glabel status | grep "gptid.*${dev}p2" | awk '{print $1}' | awk -F/ '{print $2}'`"
+zpool_dev="/dev/gptid/`glabel status | grep "gptid.*${dev}p3" | awk '{print $1}' | awk -F/ '{print $2}'`"
 
 ## Create temp mountpoint
 echo 'Creating temp mount point'
@@ -185,6 +207,9 @@ cp usr/share/zoneinfo/UTC etc/localtime
 echo 'Adjusting kernel time zone'
 sleep 1
 adjkerntz -a
+
+echo 'Setup complete'
+sleep 1
 
 exit
 EOF
