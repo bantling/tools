@@ -33,7 +33,7 @@ echo "get setup.sh" | tftp 10.0.2.2
 # Execute setup script
 echo 'Executing setup.sh (no swap, poolname = zinstall, autologin)'
 sleep 1
-sh /setup.sh vtbd1 -n -p zinstall -a
+sh /setup.sh ada1 -n -p zinstall -a
 
 # Auto login as root
 echo 'Autologin as root'

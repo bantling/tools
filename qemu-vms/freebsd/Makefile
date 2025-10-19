@@ -3,36 +3,15 @@
 # Build a FreeBSD x86_64 bootable image with the following basic steps:
 # - Determine latest release of FreeBSD memstick image
 # - Download latest release and hash file
-# - Use packer to automate basic install steps
-#   - Verify known hash of memstick image matches generated hash of memstick image
-#   - Create target raw formatted image
-#   - Use QEMU to launch a VM with one of mac (hvf), windows (whpx,kernel-irqchip=off), linux (kvm), or none (tcg) accelerators
-#   - Boot up and enter shell
-#   - Execute a provided shell script
-#     - Set kernel tuning params for podman network performance
-#       - /boot/loader.conf:
-#         - hw.vtnet.X.csum_disable=1
-#         - hw.vtnet.lro_disable=1
-#       - /etc/sysctl.conf:
-#         - net.link.bridge.pfil_member=0
-#         - net.link.bridge.pfil_bridge=0
-#         - net.link.bridge.pfil_onlyip=0
-#       - /etc/rc.local:
-#         - ifconfig vtnet0 -rxcsum
-#   - Set boot delay to 1 second
-#     - /boot/loader.conf:
-#       - autoboot_delay="1"
-#   - Enable gpt labels and ids to show under /dev/gpt and /dev/gptid
-#     - /boot/loader.conf:
-#       - kern.geom.label.disk_ident.enable="0"
-#       - kern.geom.label.gpt.enable="1"
-#       - kern.geom.label.gptid.enable="1"
-#   - Create boot and zfs filesystems
-#   - Set zfs ashift = 12
-#   - Use a zvol for swap
-#   - Install a base system (base, kernel)
-#   - Set hostname, timezone, and DHCP
-#   - Install podman
+# - Generate a hash file, and commpare against downloaded hash file
+# - Make a copy of memstick image
+# - MBR boot copy of memstick
+# - Modify memstick image so that it has autologin, and a bootstrap script
+# - Run bootstrap script to modify a second drive that is an installer
+# - Auto powers off once installer is setup
+# - MBR boot installer image to install into a test image
+# - User manually runs installer, and powers off
+# - EFI boot test image to verify it boots up, user can login on and poweroff
 
 # We need a target to determine the latest release version of FreeBSD
 # This is a nuisance because there may be a beta version that is newer than the current release
@@ -79,6 +58,9 @@ AMD64_MEMSTICK_BOOT := .amd64.boot.img
 AMD64_MEMSTICK_CONF := .amd64.conf
 AMD64_MEMSTICK_INST := .amd64.inst
 AMD64_MEMSTICK_TEST := .amd64.test
+AMD64_OVMF_IMAGE    := scjalliance/ovmf-builder:stable202505
+AMD64_OVMF_CODE     := .amd64.OVMF_CODE.fd
+AMD64_OVMF_VARS     := .amd64.OVMF_VARS.fd
 
 # Define other vars
 COMMA                        := ,
@@ -138,7 +120,7 @@ $(AMD64_MEMSTICK): $(AMD64_XZ_CKSUM_CMP)
 	xz --verbose -kfd $@.xz
 	touch $@
 
-# Make a copy of the decompressed memstick image every time it is extracted or bootstrap.sh is modified
+# Make an installer copy of the decompressed memstick image every time it is extracted or bootstrap.sh is modified
 $(AMD64_MEMSTICK_BOOT): $(AMD64_MEMSTICK) bootstrap.sh
 	echo "Copying memstick image for manual modification"
 	cp $< $@
@@ -167,11 +149,14 @@ $(AMD64_MEMSTICK_CONF): $(AMD64_MEMSTICK_BOOT) $(AMD64_IMAGE_INSTALL) bootstrap-
 	echo
 	qemu-system-x86_64 \
 	  -accel "$(QEMU_ACCEL)" \
-	  -boot c \
 	  -cpu qemu64 \
 	  -m 1024 \
-	  -drive file=$(AMD64_MEMSTICK_BOOT),format=raw,if=virtio \
-	  -drive file=$(AMD64_IMAGE_INSTALL),format=raw,if=virtio \
+	  -boot c\
+	  -drive file=$(AMD64_MEMSTICK_BOOT),format=raw,id=disk0,cache=writeback,if=none \
+	  -drive file=$(AMD64_IMAGE_INSTALL),format=raw,id=disk1,cache=writeback,if=none \
+	  -device ahci,id=ahci \
+	  -device ide-hd,drive=disk0,bus=ahci.0 \
+	  -device ide-hd,drive=disk1,bus=ahci.1 \
 	  -nic user,model=virtio-net-pci,tftp=.
 	touch $@
 
@@ -189,24 +174,35 @@ $(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 	echo
 	echo '#### Use modified memstick image to auto install into a test image'
 	echo
-	echo 'When prompt appears, run /setup.sh vtbd1'
-	echo 'The default is to have swap and call the pool zroot, you can run /setup.sh vtbd1 [ -n ] [ -p poolname ] [ -a ]'
+	echo 'When prompt appears, run /setup.sh ada1'
+	echo 'The default is to have swap and call the pool zroot, you can run /setup.sh ada1 [ -n ] [ -p poolname ] [ -a ]'
 	echo "Where -n means no swap, -p poolname provides an alternate pool name (don't use zinstall), and -a means autologin"
 	echo
+	echo 'When the setup completes, run poweroff to quit and test the target image under EFI'
 	qemu-system-x86_64 \
 	  -accel "$(QEMU_ACCEL)" \
-	  -boot c \
 	  -cpu qemu64 \
 	  -m 1024 \
-	  -drive file=$(AMD64_IMAGE_INSTALL),format=raw,if=virtio \
-	  -drive file=$(AMD64_IMAGE_TEST),format=raw,if=virtio \
+	  -boot c \
+	  -drive file=$(AMD64_IMAGE_INSTALL),format=raw,id=disk0,cache=writeback,if=none \
+	  -drive file=$(AMD64_IMAGE_TEST),format=raw,id=disk1,cache=writeback,if=none \
+	  -device ahci,id=ahci \
+	  -device ide-hd,drive=disk0,bus=ahci.0 \
+	  -device ide-hd,drive=disk1,bus=ahci.1 \
 	  -nic user,model=virtio-net-pci
 	touch $< $@
 
+# Download the OVMF files
+$(AMD64_OVMF_CODE) $(AMD64_OVMF_VARS):
+	# See if the podman image exists
+	[ "`podman images -n --filter "reference=$(AMD64_OVMF_IMAGE)" | wc -l`" -eq 1 ] || \
+		podman pull $(AMD64_OVMF_IMAGE)
+	# Grab the file from the image
+	podman run --rm -v $(PWD):/host --userns=keep-id $(AMD64_OVMF_IMAGE) sh -c "cp $(@:.amd64.%=/data/%) /host/$@"
 
 # Test the test image boots.
-# Touches AMD64_MEMSTICK_INST, AMD64_MEMSTICK_CONF and target file for same reasons as above for AMD64_MEMSTICK_INST target
-$(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_IMAGE_TEST)
+# Touches AMD64_MEMSTICK_INST, AMD64_MEMSTICK_CONF, and target file for same reasons as above for AMD64_MEMSTICK_INST target
+$(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_OVMF_CODE) $(AMD64_OVMF_VARS)
 	echo
 	echo '#### Boot test image, with same network config as auto install image'
 	echo
@@ -216,11 +212,13 @@ $(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_IMAGE_TEST)
 	echo
 	qemu-system-x86_64 \
 		-accel "$(QEMU_ACCEL)" \
-		-boot c \
 		-cpu qemu64 \
 		-m 1024 \
-		-drive file=$(AMD64_IMAGE_TEST),format=raw,if=none,id=disk0 \
-		-device ich9-ahci,id=ahci \
+		-boot c \
+		-drive if=pflash,media=disk,file=$(AMD64_OVMF_CODE),cache=writethrough,format=raw \
+		-drive if=pflash,media=disk,file=$(AMD64_OVMF_VARS),cache=writethrough,format=raw \
+		-drive file=$(AMD64_IMAGE_TEST),format=raw,id=disk0,if=none \
+		-device ahci,id=ahci \
 		-device ide-hd,drive=disk0,bus=ahci.0 \
 		-nic user,model=e1000,net=192.168.0.0/24,dhcpstart=192.168.0.1 \
 		-nic user,model=rtl8139,net=192.168.1.0/24,dhcpstart=192.168.1.1,tftp=.
@@ -228,27 +226,27 @@ $(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_IMAGE_TEST)
 
 .PHONY: recopy
 recopy:
-	rm $(AMD64_MEMSTICK_BOOT)
+	rm -f $(AMD64_MEMSTICK_BOOT)
 	$(MAKE)
 
 .PHONY: reconfig
 reconfig:
-	rm $(AMD64_MEMSTICK_CONF)
+	rm -f $(AMD64_MEMSTICK_CONF)
 	$(MAKE)
 
 .PHONY: reinstall
 reinstall:
-	rm $(AMD64_MEMSTICK_INST)
+	rm -f $(AMD64_MEMSTICK_INST)
 	$(MAKE)
 
 .PHONY: retest
 retest:
-	rm $(AMD64_MEMSTICK_TEST)
+	rm -f $(AMD64_MEMSTICK_TEST)
 	$(MAKE)
 
 .PHONY: clean
 clean:
-	find . -maxdepth 1 -type f -name '.amd64*' -print0 | xargs -0 rm;
+	find . -maxdepth 1 -type f \( -name amd64* -o -name '.amd64*' \) -print0 | xargs -0 rm
 
 .PHONY: push
 push:
@@ -272,6 +270,9 @@ vars:
 	echo "AMD64_MEMSTICK_CONF   = $(AMD64_MEMSTICK_CONF)"
 	echo "AMD64_MEMSTICK_INST   = $(AMD64_MEMSTICK_INST)"
 	echo "AMD64_MEMSTICK_TEST   = $(AMD64_MEMSTICK_TEST)"
+	echo "AMD64_OVMF_IMAGE      = $(AMD64_OVMF_IMAGE)"
+	echo "AMD64_OVMF_CODE       = $(AMD64_OVMF_CODE)"
+	echo "AMD64_OVMF_VARS       = $(AMD64_OVMF_VARS)"
 	echo "QEMU_ACCEL_HVF        = $(QEMU_ACCEL_HVF)"
 	echo "QEMU_ACCEL_WHPX       = $(QEMU_ACCEL_WHPX)"
 	echo "QEMU_ACCEL_KVM        = $(QEMU_ACCEL_KVM)"

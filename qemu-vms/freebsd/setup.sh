@@ -73,9 +73,9 @@ gpart create -s gpt "$dev"
 ## Create boot, efi, and zfs partitions
 echo 'Creating gpt boot and root partitions'
 sleep 1
-gpart add -t freebsd-boot -l zboot       -s 512k "$dev"
-gpart add -t efi          -l efi         -s 512m "$dev"
-gpart add -t freebsd-zfs  -l "$poolname"         "$dev"
+gpart add       -t freebsd-boot -l zboot       -s 512k "$dev"
+gpart add -a 4K -t efi          -l efi         -s 512m "$dev"
+gpart add       -t freebsd-zfs  -l "$poolname"         "$dev"
 
 ## Install mbr boot sector and partition code
 echo 'Installing gpt boot sector and gpt partition boot loader'
@@ -100,8 +100,8 @@ mount -t msdosfs /dev/"$dev"p2 /tmp/efi
 ## Install efu boot partition code
 echo 'Installing EFI boot code'
 sleep 1
-mkdir /tmp/efi/FreeBSD
-cp /boot/loader.efi /tmp/efi/FreeBSD
+mkdir -p /tmp/efi/EFI/BOOT
+cp /boot/boot1.efi /tmp/efi/EFI/BOOT/BOOTX64.EFI
 
 ## Get gpt id for "$poolname" label
 echo 'Retrieving gpt root partition id'
@@ -126,11 +126,11 @@ cd /tmp/zfs
 
 echo 'Installing kernel'
 sleep 1
-tar xvJf /usr/freebsd-dist/kernel.txz
+tar xf /usr/freebsd-dist/kernel.txz
 
 echo 'Installing base'
 sleep 1
-tar xvJf /usr/freebsd-dist/base.txz
+tar xf /usr/freebsd-dist/base.txz
 
 # Copy setup script and base and kernel sets
 echo 'Copying setup.sh'
