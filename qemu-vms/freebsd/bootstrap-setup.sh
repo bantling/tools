@@ -33,14 +33,12 @@ echo "get setup.sh" | tftp 10.0.2.2
 # Execute setup script
 echo 'Executing setup.sh (no swap, poolname = zinstall, autologin)'
 sleep 1
-sh /setup.sh ada1 -n -p zinstall -a
+sh /setup.sh -d ada1 -n -p zinstall -a
+exit
 
-# Auto login as root
+# Auto login as root crudely by invoking sh at end of rc.local
+# This won't happen on actual installed system
 echo 'Autologin as root'
 sleep 1
 echo '/bin/sh' >> /tmp/zfs/etc/rc.local
 chmod +x /tmp/zfs/etc/rc.local
-
-# Shut down
-echo 'Shutting down'
-poweroff

@@ -17,7 +17,3 @@ echo "get bootstrap-setup.sh" | tftp 10.0.2.2
 # Run bootstrap-setup.sh
 echo "Executing bootstrap-setup.sh"
 sh /bootstrap-setup.sh
-
-# Shut down
-echo 'Shutting down'
-poweroff

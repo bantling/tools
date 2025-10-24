@@ -70,6 +70,7 @@ QEMU_ACCEL_KVM               := $(shell qemu-system-x86_64 -accel help | grep kv
 QEMU_ACCEL                   := $(if $(QEMU_ACCEL_HVF),hvf,$(if $(QEMU_ACCEL_WHPX),whpx$(COMMA)kernel-irqchip=off,$(if $(QEMU_ACCEL_KVM),kvm,tcg)))
 AMD64_IMAGE_INSTALL          := amd64.install.img
 AMD64_IMAGE_TEST             := amd64.test.img
+AMD64_IMAGE_TEST2            := amd64.test2.img
 
 # Silent by default
 # Run "make VERBOSE=1 ..." to show output of each recipe invoked
@@ -126,6 +127,7 @@ $(AMD64_MEMSTICK_BOOT): $(AMD64_MEMSTICK) bootstrap.sh
 	cp $< $@
 
 # Create the install image
+.PHONY: AMD64_IMAGE_INSTALL
 $(AMD64_IMAGE_INSTALL):
 	qemu-img create -f raw $@ 8G
 
@@ -160,6 +162,7 @@ $(AMD64_MEMSTICK_CONF): $(AMD64_MEMSTICK_BOOT) $(AMD64_IMAGE_INSTALL) bootstrap-
 	  -nic user,model=virtio-net-pci,tftp=.
 	touch $@
 
+.PHONY: $(AMD64_IMAGE_TEST)
 $(AMD64_IMAGE_TEST):
 	qemu-img create -f raw $@ 8G
 
@@ -174,9 +177,9 @@ $(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 	echo
 	echo '#### Use modified memstick image to auto install into a test image'
 	echo
-	echo 'When prompt appears, run /setup.sh ada1'
-	echo 'The default is to have swap and call the pool zroot, you can run /setup.sh ada1 [ -n ] [ -p poolname ] [ -a ]'
-	echo "Where -n means no swap, -p poolname provides an alternate pool name (don't use zinstall), and -a means autologin"
+	echo 'When prompt appears, login as root (password toor) and run /setup.sh ada1'
+	echo 'The default is to have swap, a label of hd, and name the pool zroot, you can run /setup.sh -d ada1 [ -l label ] [ -n ] [ -p poolname ] [ -a ]'
+	echo "Where -l sets a different label, -n means no swap, -p poolname provides an alternate pool name (don't use zinstall), and -a means autologin"
 	echo
 	echo 'When the setup completes, run poweroff to quit and test the target image under EFI'
 	qemu-system-x86_64 \
@@ -200,9 +203,13 @@ $(AMD64_OVMF_CODE) $(AMD64_OVMF_VARS):
 	# Grab the file from the image
 	podman run --rm -v $(PWD):/host --userns=keep-id $(AMD64_OVMF_IMAGE) sh -c "cp $(@:.amd64.%=/data/%) /host/$@"
 
-# Test the test image boots.
+.PHONY: $(AMD64_IMAGE_TEST2)
+$(AMD64_IMAGE_TEST2):
+	qemu-img create -f raw $@ 8G
+
+# Test the test image boots
 # Touches AMD64_MEMSTICK_INST, AMD64_MEMSTICK_CONF, and target file for same reasons as above for AMD64_MEMSTICK_INST target
-$(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_OVMF_CODE) $(AMD64_OVMF_VARS)
+$(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_IMAGE_TEST2) $(AMD64_OVMF_CODE) $(AMD64_OVMF_VARS)
 	echo
 	echo '#### Boot test image, with same network config as auto install image'
 	echo
@@ -218,8 +225,10 @@ $(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_OVMF_CODE) $(AMD64_OVMF_V
 		-drive if=pflash,media=disk,file=$(AMD64_OVMF_CODE),cache=writethrough,format=raw \
 		-drive if=pflash,media=disk,file=$(AMD64_OVMF_VARS),cache=writethrough,format=raw \
 		-drive file=$(AMD64_IMAGE_TEST),format=raw,id=disk0,if=none \
+		-drive file=$(AMD64_IMAGE_TEST2),format=raw,id=disk1,if=none \
 		-device ahci,id=ahci \
 		-device ide-hd,drive=disk0,bus=ahci.0 \
+		-device ide-hd,drive=disk1,bus=ahci.1 \
 		-nic user,model=e1000,net=192.168.0.0/24,dhcpstart=192.168.0.1 \
 		-nic user,model=rtl8139,net=192.168.1.0/24,dhcpstart=192.168.1.1,tftp=.
 	touch $< $(AMD64_MEMSTICK_CONF) $@
@@ -246,7 +255,7 @@ retest:
 
 .PHONY: clean
 clean:
-	find . -maxdepth 1 -type f \( -name amd64* -o -name '.amd64*' \) -print0 | xargs -0 rm
+	find . -maxdepth 1 -type f \( -name 'amd64*' -o -name '.amd64*' \) -a \! \( -name '$(AMD64_RELEASE_F)' -o -name '$(AMD64_XZ_MEMSTICK)' \) -print0 | xargs -0 rm
 
 .PHONY: push
 push:
