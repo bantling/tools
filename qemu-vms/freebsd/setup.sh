@@ -38,7 +38,7 @@ Setup a bootable ZFS filesystem on the specified device:
 device=""
 labelDefault=hd
 swap=1
-poolnameDefault=zroot
+poolname=zroot
 autologin=0
 mirror=0
 

@@ -58,9 +58,16 @@ AMD64_MEMSTICK_BOOT := .amd64.boot.img
 AMD64_MEMSTICK_CONF := .amd64.conf
 AMD64_MEMSTICK_INST := .amd64.inst
 AMD64_MEMSTICK_TEST := .amd64.test
-AMD64_OVMF_IMAGE    := scjalliance/ovmf-builder:stable202505
+OVMF_REPO           := rust-osdev/ovmf-prebuilt
+OVMF_API            := https://api.github.com/repos/$(OVMF_REPO)
+OVMF_RELEASE        := $(shell curl -s $(OVMF_API)/releases | jq -r '.[].tag_name' | grep stable | head -n 1)
+OVMF_DOWNLOAD       := https://github.com/$(OVMF_REPO)/releases/download/$(OVMF_RELEASE)/$(OVMF_RELEASE)-bin.tar.xz
+OVMF_TAR_XZ         := .edk2.tar.xz
+OVMF_TAR_X64_CODE   := $(OVMF_RELEASE)-bin/x64/code.fd
+OVMF_TAR_X64_VARS   := $(OVMF_RELEASE)-bin/x64/vars.fd
 AMD64_OVMF_CODE     := .amd64.OVMF_CODE.fd
 AMD64_OVMF_VARS     := .amd64.OVMF_VARS.fd
+
 
 # Define other vars
 COMMA                        := ,
@@ -127,8 +134,8 @@ $(AMD64_MEMSTICK_BOOT): $(AMD64_MEMSTICK) bootstrap.sh
 	cp $< $@
 
 # Create the install image
-.PHONY: AMD64_IMAGE_INSTALL
 $(AMD64_IMAGE_INSTALL):
+	echo 'Creating install image $@'
 	qemu-img create -f raw $@ 8G
 
 # Modify the memstick image to install bootstrap.sh script
@@ -162,7 +169,6 @@ $(AMD64_MEMSTICK_CONF): $(AMD64_MEMSTICK_BOOT) $(AMD64_IMAGE_INSTALL) bootstrap-
 	  -nic user,model=virtio-net-pci,tftp=.
 	touch $@
 
-.PHONY: $(AMD64_IMAGE_TEST)
 $(AMD64_IMAGE_TEST):
 	qemu-img create -f raw $@ 8G
 
@@ -177,7 +183,7 @@ $(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 	echo
 	echo '#### Use modified memstick image to auto install into a test image'
 	echo
-	echo 'When prompt appears, login as root (password toor) and run /setup.sh ada1'
+	echo 'When prompt appears, login as root (password toor) and run /setup.sh -d ada1'
 	echo 'The default is to have swap, a label of hd, and name the pool zroot, you can run /setup.sh -d ada1 [ -l label ] [ -n ] [ -p poolname ] [ -a ]'
 	echo "Where -l sets a different label, -n means no swap, -p poolname provides an alternate pool name (don't use zinstall), and -a means autologin"
 	echo
@@ -195,13 +201,20 @@ $(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 	  -nic user,model=virtio-net-pci
 	touch $< $@
 
-# Download the OVMF files
-$(AMD64_OVMF_CODE) $(AMD64_OVMF_VARS):
-	# See if the podman image exists
-	[ "`podman images -n --filter "reference=$(AMD64_OVMF_IMAGE)" | wc -l`" -eq 1 ] || \
-		podman pull $(AMD64_OVMF_IMAGE)
-	# Grab the file from the image
-	podman run --rm -v $(PWD):/host --userns=keep-id $(AMD64_OVMF_IMAGE) sh -c "cp $(@:.amd64.%=/data/%) /host/$@"
+# Download the edk2 tar file
+$(OVMF_TAR_XZ):
+	echo 'Downloading $@'
+	curl -Lo $@ $(OVMF_DOWNLOAD)
+
+# Extract the AMD EFI code from edk2 tar file
+$(AMD64_OVMF_CODE): $(OVMF_TAR_XZ)
+	echo 'Extracting $(OVMF_TAR_X64_CODE) from $< into $@'
+	tar xfO $< $(OVMF_TAR_X64_CODE) > $@
+
+# Extract the AMD EFI vars from edk2 tar file
+$(AMD64_OVMF_VARS): $(OVMF_TAR_XZ)
+	echo 'Extracting $(OVMF_TAR_X64_VARS) from $< into $@'
+	tar xfO $< $(OVMF_TAR_X64_VARS) > $@
 
 .PHONY: $(AMD64_IMAGE_TEST2)
 $(AMD64_IMAGE_TEST2):
@@ -213,7 +226,7 @@ $(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_IMAGE_TEST2) $(AMD64_OVMF
 	echo
 	echo '#### Boot test image, with same network config as auto install image'
 	echo
-	echo 'When login prompt appears, login as root, no password will be required'
+	echo 'When login prompt appears, login as root, password is toor'
 	echo 'Both network cards should work, where 192.168.0.1 and 192.168.1.1 are the gateways'
 	echo "tftp can be used on 192.168.1.2"
 	echo
@@ -240,12 +253,12 @@ recopy:
 
 .PHONY: reconfig
 reconfig:
-	rm -f $(AMD64_MEMSTICK_CONF)
+	rm -f $(AMD64_MEMSTICK_CONF) $(AMD64_MEMSTICK_INST) $(AMD64_MEMSTICK_TEST)
 	$(MAKE)
 
 .PHONY: reinstall
 reinstall:
-	rm -f $(AMD64_MEMSTICK_INST)
+	rm -f $(AMD64_MEMSTICK_INST) $(AMD64_MEMSTICK_TEST)
 	$(MAKE)
 
 .PHONY: retest
@@ -282,6 +295,11 @@ vars:
 	echo "AMD64_OVMF_IMAGE      = $(AMD64_OVMF_IMAGE)"
 	echo "AMD64_OVMF_CODE       = $(AMD64_OVMF_CODE)"
 	echo "AMD64_OVMF_VARS       = $(AMD64_OVMF_VARS)"
+	echo "OVMF_REPO             = $(OVMF_REPO)"
+	echo "OVMF_API              = $(OVMF_API)"
+	echo "OVMF_RELEASE          = $(OVMF_RELEASE)"
+	echo "OVMF_URL              = $(OVMF_URL)"
+	echo "OVMF_TAR_XZ           = $(OVMF_TAR_XZ)"
 	echo "QEMU_ACCEL_HVF        = $(QEMU_ACCEL_HVF)"
 	echo "QEMU_ACCEL_WHPX       = $(QEMU_ACCEL_WHPX)"
 	echo "QEMU_ACCEL_KVM        = $(QEMU_ACCEL_KVM)"
