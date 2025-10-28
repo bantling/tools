@@ -13,6 +13,12 @@
 # - User manually runs installer, and powers off
 # - EFI boot test image to verify it boots up, user can login on and poweroff
 
+# Execute all recipe lines in one shell
+.ONESHELL:
+
+# Turn off default rules
+.SUFFIXES:
+
 # We need a target to determine the latest release version of FreeBSD
 # This is a nuisance because there may be a beta version that is newer than the current release
 # EG:
@@ -37,10 +43,10 @@ AMD64_ISO_BASE_URL := https://download.freebsd.org/releases/amd64/amd64/ISO-IMAG
 
 # Define a script to get the latest x86 RELEASE version
 define AMD64_GET_RELEASE
-for version in $$(curl -sL $(AMD64_ISO_BASE_URL) | grep '<a href="[0-9]' | sed -r 's,.*href="([^/]*)/.*,\1,' | sort -rV); do \
-	[ $$(curl -sL $(AMD64_ISO_BASE_URL)/$$version | grep 'href="FreeBSD.*RELEASE' | wc -l) -gt 0 ] || continue; \
-	echo $$version; \
-	break; \
+for version in $$(curl -sL $(AMD64_ISO_BASE_URL) | grep '<a href="[0-9]' | sed -r 's,.*href="([^/]*)/.*,\1,' | sort -rV); do
+	[ $$(curl -sL $(AMD64_ISO_BASE_URL)/$$version | grep 'href="FreeBSD.*RELEASE' | wc -l) -gt 0 ] || continue;
+	echo $$version;
+	break;
 done
 endef
 
@@ -94,6 +100,7 @@ all: generate-release $(AMD64_MEMSTICK_TEST)
 # - It contains a different version that the current one
 .PHONY: generate-release
 generate-release:
+	echo 'Checking FreeBSD release'
 	[ -f "$(AMD64_RELEASE_F)" -a "`cat "$(AMD64_RELEASE_F)" 2> /dev/null`" = "$(AMD64_RELEASE)" ] || echo "$(AMD64_RELEASE)" > "$(AMD64_RELEASE_F)"
 
 # Download latest image if we don't have it
@@ -139,7 +146,6 @@ $(AMD64_IMAGE_INSTALL):
 	qemu-img create -f raw $@ 8G
 
 # Modify the memstick image to install bootstrap.sh script
-# The target file is not created by make - it is created by bootstrap.sh as last command, but only if it succeeds
 $(AMD64_MEMSTICK_CONF): $(AMD64_MEMSTICK_BOOT) $(AMD64_IMAGE_INSTALL) bootstrap-setup.sh setup.sh
 	echo
 	echo '#### Configure copy of memstick image to auto install'
@@ -160,7 +166,7 @@ $(AMD64_MEMSTICK_CONF): $(AMD64_MEMSTICK_BOOT) $(AMD64_IMAGE_INSTALL) bootstrap-
 	  -accel "$(QEMU_ACCEL)" \
 	  -cpu qemu64 \
 	  -m 1024 \
-	  -boot c\
+	  -boot c \
 	  -drive file=$(AMD64_MEMSTICK_BOOT),format=raw,id=disk0,cache=writeback,if=none \
 	  -drive file=$(AMD64_IMAGE_INSTALL),format=raw,id=disk1,cache=writeback,if=none \
 	  -device ahci,id=ahci \
@@ -170,6 +176,7 @@ $(AMD64_MEMSTICK_CONF): $(AMD64_MEMSTICK_BOOT) $(AMD64_IMAGE_INSTALL) bootstrap-
 	touch $@
 
 $(AMD64_IMAGE_TEST):
+	echo 'Creating image $@'
 	qemu-img create -f raw $@ 8G
 
 # Install into a test image using the install image with real world devices, to manually test installing to another drive
@@ -218,6 +225,7 @@ $(AMD64_OVMF_VARS): $(OVMF_TAR_XZ)
 
 .PHONY: $(AMD64_IMAGE_TEST2)
 $(AMD64_IMAGE_TEST2):
+	echo 'Creating image $@'
 	qemu-img create -f raw $@ 8G
 
 # Test the test image boots
