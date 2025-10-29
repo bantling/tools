@@ -227,7 +227,6 @@ $(AMD64_OVMF_VARS): $(OVMF_TAR_XZ)
 	echo 'Extracting $(OVMF_TAR_X64_VARS) from $< into $@'
 	tar xfO $< $(OVMF_TAR_X64_VARS) > $@
 
-.PHONY: $(AMD64_IMAGE_TEST2)
 $(AMD64_IMAGE_TEST2):
 	echo 'Creating image $@'
 	qemu-img create -f raw $@ 8G

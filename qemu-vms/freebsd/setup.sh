@@ -3,7 +3,7 @@ set -e
 
 usage() {
   {
-  [ $# -eq 0 ] || printf "$1"
+  [ $# -eq 0 ] || echo "$1"
   echo "$0:
 -h
 -d device [ -l label ] [ -n ] [ -p poolname ] [ -a ] [ -t timezone ]
@@ -36,6 +36,9 @@ Setup a bootable ZFS filesystem on the specified device:
   } | more
   exit 1
 }
+
+# Die if current user is not root
+[ "$(id -u)" -eq 0 ] || usage "Must be logged in as root";
 
 # Use a simple loop to handle remaining optional args in any order
 device=""
@@ -361,7 +364,7 @@ else
 
   first_device="`gpart show -l | awk -v label=$first_label '
     NF == 6 {device=$4}
-    $4 ~ $label {print device;exit}
+    $4 ~ label {print device;exit}
   '`"
 
   echo "First device of $poolname = $first_device"
