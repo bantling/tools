@@ -2,19 +2,21 @@
 set -e
 
 usage() {
+  {
   [ $# -eq 0 ] || printf "$1"
   echo "$0:
 -h
--d device [ -l label ] [ -n ] [ -p poolname ] [ -a ]
+-d device [ -l label ] [ -n ] [ -p poolname ] [ -a ] [ -t timezone ]
 -m -d device -l label -p poolname
 
--h         : display help
--d device  : device to use
--l label   : use specified label instead of default hd
--n         : no swap volume
--p poolname: use specified pool name instead of default zroot
--a         : autologin as user
--m         : add additional device as a mirror
+-h          : display help
+-d device   : device to use
+-l label    : use specified label (default hd)
+-n          : no swap volume
+-p poolname : use specified pool name (default zroot)
+-a          : autologin as user named 'user'
+-t timezone : specify a timezone like America/Halifax (default UTC)
+-m          : add additional device as a mirror
 
 Notes:
 - If -h occurs anywhere, all other options are ignored
@@ -27,10 +29,11 @@ Setup a bootable ZFS filesystem on the specified device:
 - The gpt label is used by the zpool, making it easier to identify which drive failed
 - A 4G swap zvol (unless suppressed by -n)
 - Networking tuned for podman performance
-- Use UTC timezone
+- Use specified timezone
 - /etc/rc.local starts up DHCP on all non-loop network devices
 - /etc/ttys and /etc/gettytab are configured to autologin as ordinary user named user
   "
+  } | more
   exit 1
 }
 
@@ -40,6 +43,7 @@ labelDefault=hd
 swap=1
 poolname=zroot
 autologin=0
+timezone=UTC
 mirror=0
 
 while [ "$#" -gt 0 ]; do
@@ -75,6 +79,14 @@ while [ "$#" -gt 0 ]; do
       autologin=1
       ;;
 
+    -t)
+      shift
+      [ "$#" -gt 0 ] || usage "no timezone"
+      [ -f /usr/share/zoneinfo/$1 ] || usage "timezone $1 does not exist"
+
+      timezone="$1"
+      ;;
+
     -m)
       mirror=1
       ;;
@@ -95,7 +107,21 @@ if [ "$mirror" -eq 1 ]; then
 else
   [ -n "$label" ] || label="$labelDefault"
   [ -n "$poolname" ] || echo "defaulted poolname to $poolname"
-  echo "Setup pool $poolname with device $device labelled as $label"
+  echo "Setup pool:"
+  echo "- device    : $device"
+  echo "- label     : $label"
+  if [ "$swap" -eq 1 ]; then
+  echo "- swap      : yes"
+  else
+  echo "- swap      : no"
+  fi
+  echo "- pool name : $poolname"
+  if [ "$autologin" -eq 1 ]; then
+  echo "- autologin : yes"
+  else
+  echo "- autologin : no"
+  fi
+  echo "- timezone  : $timezone"
 fi
 
 read -p "Are you sure? [y/N]: " yn
@@ -117,7 +143,7 @@ if [ "$mirror" -eq 0 ]; then
   ## Unmount all partitions on the specified device
   ## Could be mounts from a previous attempt to run this script that failed
   echo 'Unmounting any mounted filesystems'
-  umount -A || :
+  umount -A 2> /dev/null || :
 
   ## Destroy any existing gpt partitions
   ## The command fails if no partitions exist
@@ -237,6 +263,8 @@ cat <<-EOF | chroot .
   sed -i ''    's,# TERM=.*,TERM=vt100,'  /home/user/.profile
   sed -i '' -r 's,(.*fortune),# \1,'      /home/user/.profile
   sed -i ''    's,PAGER=less,PAGER=more,' /home/user/.profile
+
+  touch /home/user/.hushlogin
   exit
 EOF
 
@@ -294,10 +322,15 @@ echo 'Configuring rc.conf'
 sleep 1
 sysrc zfs_enable="YES"
 sysrc hostname="freebsd"
+sysrc blanktime="0"
+sysrc saver="no"
+sysrc ntpdate_enable="YES"
+sysrc ntpd_sync_on_start="YES"
+sysrc ntpd_enable="YES"
 
-echo 'Setting timezone to UTC'
+echo 'Setting timezone to $timezone'
 sleep 1
-cp usr/share/zoneinfo/UTC etc/localtime
+cp "usr/share/zoneinfo/$timezone" etc/localtime
 
 echo 'Adjusting kernel time zone'
 sleep 1

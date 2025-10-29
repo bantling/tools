@@ -31,9 +31,9 @@ sleep 1
 echo "get setup.sh" | tftp 10.0.2.2
 
 # Execute setup script
-echo 'Executing setup.sh (no swap, poolname = zinstall, autologin)'
+echo 'Executing setup.sh'
 sleep 1
-sh /setup.sh -d ada1 -n -p zinstall -a
+echo y | sh /setup.sh -d ada1 -n -p zinstall -a
 
 echo 'Powering off'
 sleep 1

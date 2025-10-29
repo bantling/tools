@@ -191,8 +191,12 @@ $(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 	echo '#### Use modified memstick image to auto install into a test image'
 	echo
 	echo 'When prompt appears, login as root (password toor) and run /setup.sh -d ada1'
-	echo 'The default is to have swap, a label of hd, and name the pool zroot, you can run /setup.sh -d ada1 [ -l label ] [ -n ] [ -p poolname ] [ -a ]'
-	echo "Where -l sets a different label, -n means no swap, -p poolname provides an alternate pool name (don't use zinstall), and -a means autologin"
+	echo 'The default is to have swap, a label of hd, a pool named zroot, UTC timezone'
+	echo
+	echo 'you can run /setup.sh -d ada1 [ -l label ] [ -n ] [ -p poolname ] [ -a ] [-t timezone]'
+	echo "Where:"
+	echo "-l sets a different label, -n means no swap, -p poolname provides an alternate pool name (don't use zinstall),"
+	echo "-a means autologin, and -t sets a different timezone"
 	echo
 	echo 'When the setup completes, run poweroff to quit and test the target image under EFI'
 	qemu-system-x86_64 \
