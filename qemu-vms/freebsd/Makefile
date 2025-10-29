@@ -67,6 +67,7 @@ AMD64_MEMSTICK_TEST := .amd64.test
 OVMF_REPO           := rust-osdev/ovmf-prebuilt
 OVMF_API            := https://api.github.com/repos/$(OVMF_REPO)
 OVMF_RELEASE        := $(shell curl -s $(OVMF_API)/releases | jq -r '.[].tag_name' | grep stable | head -n 1)
+OVMF_RELEASE_F      := .edk2.release
 OVMF_DOWNLOAD       := https://github.com/$(OVMF_REPO)/releases/download/$(OVMF_RELEASE)/$(OVMF_RELEASE)-bin.tar.xz
 OVMF_TAR_XZ         := .edk2.tar.xz
 OVMF_TAR_X64_CODE   := $(OVMF_RELEASE)-bin/x64/code.fd
@@ -93,13 +94,13 @@ endif
 
 # Default target
 .PHONY: all
-all: generate-release $(AMD64_MEMSTICK_TEST)
+all: generate-freebsd-release $(AMD64_MEMSTICK_TEST)
 
 # Generate the release file if:
 # - It does not exist
 # - It contains a different version that the current one
-.PHONY: generate-release
-generate-release:
+.PHONY: generate-freebsd-release
+generate-freebsd-release:
 	echo 'Checking FreeBSD release'
 	[ -f "$(AMD64_RELEASE_F)" -a "`cat "$(AMD64_RELEASE_F)" 2> /dev/null`" = "$(AMD64_RELEASE)" ] || echo "$(AMD64_RELEASE)" > "$(AMD64_RELEASE_F)"
 
@@ -212,9 +213,17 @@ $(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 	  -nic user,model=virtio-net-pci
 	touch $< $@
 
+# Generate the edk2 file if:
+# -It does not exist
+# - It contains a different version than the current one
+.PHONY: generate-edk2-release
+generate-edk2-release:
+	echo 'Checking edk2 release'
+	[ -f "$(OVMF_RELEASE_F)" -a "`cat "$(OVMF_RELEASE_F)" 2> /dev/null`" = "$(OVMF_RELEASE)" ] || echo "$(OVMF_RELEASE)" > "$(OVMF_RELEASE_F)"
+
 # Download the edk2 tar file
-$(OVMF_TAR_XZ):
-	echo 'Downloading $@'
+$(OVMF_TAR_XZ): $(OVMF_RELEASE_F)
+	echo 'Downloading the $(OVMF_RELEASE) compressed archive'
 	curl -Lo $@ $(OVMF_DOWNLOAD)
 
 # Extract the AMD EFI code from edk2 tar file
@@ -227,13 +236,14 @@ $(AMD64_OVMF_VARS): $(OVMF_TAR_XZ)
 	echo 'Extracting $(OVMF_TAR_X64_VARS) from $< into $@'
 	tar xfO $< $(OVMF_TAR_X64_VARS) > $@
 
+.PHONY: $(AMD64_IMAGE_TEST2)
 $(AMD64_IMAGE_TEST2):
 	echo 'Creating image $@'
 	qemu-img create -f raw $@ 8G
 
 # Test the test image boots
 # Touches AMD64_MEMSTICK_INST, AMD64_MEMSTICK_CONF, and target file for same reasons as above for AMD64_MEMSTICK_INST target
-$(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) $(AMD64_IMAGE_TEST2) $(AMD64_OVMF_CODE) $(AMD64_OVMF_VARS)
+$(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) generate-edk2-release $(AMD64_OVMF_CODE) $(AMD64_OVMF_VARS) $(AMD64_IMAGE_TEST2)
 	echo
 	echo '#### Boot test image, with same network config as auto install image'
 	echo
@@ -306,6 +316,7 @@ vars:
 	echo "OVMF_REPO             = $(OVMF_REPO)"
 	echo "OVMF_API              = $(OVMF_API)"
 	echo "OVMF_RELEASE          = $(OVMF_RELEASE)"
+	echo "OVMF_RELEASE_F        = $(OVMF_RELEASE_F)"
 	echo "OVMF_DOWNLOAD         = $(OVMF_DOWNLOAD)"
 	echo "OVMF_TAR_XZ           = $(OVMF_TAR_XZ)"
 	echo "OVMF_TAR_X64_CODE     = $(OVMF_TAR_X64_CODE)"

@@ -148,6 +148,14 @@ if [ "$mirror" -eq 0 ]; then
   echo 'Unmounting any mounted filesystems'
   umount -A 2> /dev/null || :
 
+  ## Get a list of existing zpools on devices that need to be destroyed
+    for zpd in "`zpool import 2> /dev/null | grep gpt | awk '{print $1}'`"
+    do
+      echo "Clearing label of old zpool device $zpd"
+      zpool labelclear -f "$zpd" || :
+    done
+  }
+
   ## Destroy any existing gpt partitions
   ## The command fails if no partitions exist
   echo 'Destroying gpt partition table'
@@ -397,7 +405,24 @@ else
   sleep 1
   gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 "$device"
 
+  ## Get a list of existing zpools on devices that need to be destroyed
+  [ "`zpool import 2> /dev/null | grep ONLINE | wc -l`" -eq 0 ] || {
+    for zpd in "`zpool import 2> /dev/null | grep gpt | awk '{print $1}'`"
+    do
+      echo "Clearing label of old zpool device $zpd"
+      sleep 1
+      zpool labelclear -f "$zpd" || :
+    done
+  }
+
+  ## Remove any existing zpool labels on the target device
+  echo "Clearing any labels on $device"
+  sleep 1
+  zpool labelclear -f $device || :
+
   ## Attach second disk as clone of the first
+  echo "Attaching gpt/${poolname}-${first_label} to gpt/${poolname}-${label}"
+  sleep 1
   zpool attach $poolname "gpt/${poolname}-${first_label}" "gpt/${poolname}-${label}"
 
   ## Show zpool status
