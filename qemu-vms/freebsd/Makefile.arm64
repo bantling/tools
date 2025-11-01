@@ -39,22 +39,31 @@
 # Eventually, the 14.1 beta will be replaced by a release, and the script will use that instead if 14.0
 
 # URL to get available versions of FreeBSD
-ARM64_ISO_BASE_URL := https://download.freebsd.org/releases/VM-IMAGES
+ARM64_ISO_BASE_URL := https://download.freebsd.org/releases/arm64/aarch64/ISO-IMAGES
+
+# Define a script to get the latest x86 RELEASE version
+define ARM64_GET_RELEASE
+for version in $$(curl -sL $(ARM64_ISO_BASE_URL) | grep '<a href="[0-9]' | sed -r 's,.*href="([^/]*)/.*,\1,' | sort -rV); do
+	[ $$(curl -sL $(ARM64_ISO_BASE_URL)/$$version | grep 'href="FreeBSD.*RELEASE' | wc -l) -gt 0 ] || continue;
+	echo $$version;
+	break;
+done
+endef
 
 # Define release vars
-ARM64_RELEASE         := $(shell curl -sL $(ARM64_ISO_BASE_URL) | grep '<a href="[0-9]' | sed -r 's,.*href="([^/]*)/.*,\1,' | grep RELEASE | sort -rV | head -n 1 | awk -F- '{print $$1}')
+ARM64_RELEASE         := $(shell $(ARM64_GET_RELEASE))
 ARM64_RELEASE_F       := .arm64.release
-ARM64_XZ_URL          := $(ARM64_ISO_BASE_URL)/$(ARM64_RELEASE)-RELEASE/aarch64/Latest/FreeBSD-$(ARM64_RELEASE)-RELEASE-arm64-aarch64.raw.xz
-ARM64_RAW             := .arm64-raw.img
-ARM64_XZ_RAW          := $(ARM64_RAW).xz
-ARM64_XZ_CKSUM_URL    := $(ARM64_ISO_BASE_URL)/$(ARM64_RELEASE)-RELEASE/aarch64/Latest/CHECKSUM.SHA512
+ARM64_XZ_URL          := $(ARM64_ISO_BASE_URL)/$(ARM64_RELEASE)/FreeBSD-$(ARM64_RELEASE)-RELEASE-arm64-aarch64-memstick.img.xz
+ARM64_MEMSTICK        := .arm64-memstick.img
+ARM64_XZ_MEMSTICK     := $(ARM64_MEMSTICK).xz
+ARM64_XZ_CKSUM_URL    := $(ARM64_ISO_BASE_URL)/$(ARM64_RELEASE)/CHECKSUM.SHA512-FreeBSD-$(ARM64_RELEASE)-RELEASE-arm64-aarch64
 ARM64_XZ_CKSUM        := .arm64.sha512
 ARM64_XZ_CKSUM_GEN    := $(ARM64_XZ_CKSUM).gen
 ARM64_XZ_CKSUM_CMP    := $(ARM64_XZ_CKSUM).cmp
-ARM64_RAW_BOOT     := .arm64.boot.img
-ARM64_RAW_CONF     := .arm64.conf
-ARM64_RAW_INST     := .arm64.inst
-ARM64_RAW_TEST     := .arm64.test
+ARM64_MEMSTICK_BOOT   := .arm64.boot.img
+ARM64_MEMSTICK_CONF   := .arm64.conf
+ARM64_MEMSTICK_INST   := .arm64.inst
+ARM64_MEMSTICK_TEST   := .arm64.test
 OVMF_REPO             := rust-osdev/ovmf-prebuilt
 OVMF_API              := https://api.github.com/repos/$(OVMF_REPO)
 OVMF_RELEASE          := $(shell curl -s $(OVMF_API)/releases | jq -r '.[].tag_name' | grep stable | head -n 1)
@@ -85,7 +94,7 @@ endif
 
 # Default target
 .PHONY: all
-all: generate-freebsd-release $(ARM64_RAW_TEST)
+all: generate-freebsd-release $(ARM64_MEMSTICK_TEST)
 
 # Generate the release file if:
 # - It does not exist
@@ -96,19 +105,19 @@ generate-freebsd-release:
 	[ -f "$(ARM64_RELEASE_F)" -a "`cat "$(ARM64_RELEASE_F)" 2> /dev/null`" = "$(ARM64_RELEASE)" ] || echo "$(ARM64_RELEASE)" > "$(ARM64_RELEASE_F)"
 
 # Download latest image if we don't have it
-$(ARM64_XZ_RAW): $(ARM64_RELEASE_F)
+$(ARM64_XZ_MEMSTICK): $(ARM64_RELEASE_F)
 	echo "Downloading the $(ARM64_RELEASE) compressed raw image"
 	curl --progress-bar -Lo $@ $(ARM64_XZ_URL)
 
 # Download latest image checksum if we don't have it
-$(ARM64_XZ_CKSUM): $(ARM64_XZ_RAW)
+$(ARM64_XZ_CKSUM): $(ARM64_XZ_MEMSTICK)
 	echo "Downloading checksum"
-	curl -sLo - $(ARM64_XZ_CKSUM_URL) | grep aarch64.raw.xz | awk '-F=' '{print $$2}' | tr -d ' ' > $@
+	curl -sLo - $(ARM64_XZ_CKSUM_URL) | grep aarch64-memstick.img.xz | awk '-F=' '{print $$2}' | tr -d ' ' > $@
 
 # Generate a checksum to compare against downloaded checksum
 $(ARM64_XZ_CKSUM_GEN): $(ARM64_XZ_CKSUM)
 	echo "Generating checksum"
-	sha512sum -b $(ARM64_XZ_RAW) | awk '{print $$1}' > $@
+	sha512sum -b $(ARM64_XZ_MEMSTICK) | awk '{print $$1}' > $@
 
 # Compare checksums
 $(ARM64_XZ_CKSUM_CMP): $(ARM64_XZ_CKSUM) $(ARM64_XZ_CKSUM_GEN)
@@ -122,14 +131,14 @@ $(ARM64_XZ_CKSUM_CMP): $(ARM64_XZ_CKSUM) $(ARM64_XZ_CKSUM_GEN)
 # Decompress image
 # By default, xz extracts the file using the date inside the archive.
 # We need to update the extracted file to the current date to avoid always re-extracting.
-$(ARM64_RAW): $(ARM64_XZ_CKSUM_CMP)
+$(ARM64_MEMSTICK): $(ARM64_XZ_CKSUM_CMP)
 	echo "Extracting memstick image"
 	xz --verbose -kfd $@.xz
 	touch $@
 
 # Make an installer copy of the decompressed memstick image every time it is extracted or bootstrap.sh is modified
 # For some reason, cp is really slow to copy this 6GB file, but cat is only a few seconds
-$(ARM64_RAW_BOOT): $(ARM64_RAW) bootstrap.sh
+$(ARM64_MEMSTICK_BOOT): $(ARM64_MEMSTICK) bootstrap.sh
 	echo "Copying memstick image for manual modification"
 	cat $< > $@
 
@@ -162,14 +171,20 @@ $(ARM64_OVMF_VARS): $(OVMF_TAR_XZ)
 	tar xfO $< $(OVMF_TAR_AARCH64_VARS) > $@
 
 # Modify the memstick image to install bootstrap.sh script
-$(ARM64_RAW_CONF): $(ARM64_RAW_BOOT) $(ARM64_IMAGE_INSTALL) generate-edk2-release $(ARM64_OVMF_CODE) $(ARM64_OVMF_VARS) bootstrap-setup.sh setup.sh
+$(ARM64_MEMSTICK_CONF): $(ARM64_MEMSTICK_BOOT) $(ARM64_IMAGE_INSTALL) generate-edk2-release $(ARM64_OVMF_CODE) $(ARM64_OVMF_VARS) bootstrap-setup.sh setup.sh
 	echo
 	echo '#### Configure copy of memstick image to auto install'
 	echo
-	echo '1. Download bootstrap script:'
+	echo '1. Remount root as read/write:'
+	echo 'mount -u -w /'
+	echo
+	echo '2. Get network up'
+	echo 'dhclient vtnet0'
+	echo
+	echo '3. Download bootstrap script:'
 	echo 'echo "get bootstrap.sh" | tftp 10.0.2.2'
 	echo
-	echo '2. Run bootstrap.sh:'
+	echo '4. Run bootstrap.sh:'
 	echo 'sh /bootstrap.sh'
 	echo
 	qemu-system-aarch64 \
@@ -180,7 +195,7 @@ $(ARM64_RAW_CONF): $(ARM64_RAW_BOOT) $(ARM64_IMAGE_INSTALL) generate-edk2-releas
 	  -boot c \
 	  -drive if=pflash,media=disk,file=$(ARM64_OVMF_CODE),cache=writethrough,format=raw \
 	  -drive if=pflash,media=disk,file=$(ARM64_OVMF_VARS),cache=writethrough,format=raw \
-	  -drive file=$(ARM64_RAW_BOOT),format=raw,file.locking=off,if=virtio \
+	  -drive file=$(ARM64_MEMSTICK_BOOT),format=raw,file.locking=off,if=virtio \
 	  -drive file=$(ARM64_IMAGE_INSTALL),format=raw,if=virtio \
 	  -nic user,model=virtio-net-pci,tftp=. \
 	  -device virtio-gpu-pci \
@@ -195,13 +210,13 @@ $(ARM64_IMAGE_TEST):
 	qemu-img create -f raw $@ 8G
 
 # Install into a test image using the install image with real world devices, to manually test installing to another drive
-# Touches both ARM64_RAW_CONF file and target file:
+# Touches both ARM64_MEMSTICK_CONF file and target file:
 # - The ARM64_IMAGE_INSTALL is modified by the process of starting it up, as it is a regular read/write filesystem
-# - Causes the ARM64_IMAGE_INSTALL to have a newer date than ARM64_RAW_CONF
-# - Causes the ARM64_RAW_CONF target to re-execute on next make, since it is older than the ARM64_IMAGE_INSTALL prereq
-# By touching the ARM64_RAW_CONF file after QEMU quits, it has a newer date than the ARM64_IMAGE_INSTALL prereq,
+# - Causes the ARM64_IMAGE_INSTALL to have a newer date than ARM64_MEMSTICK_CONF
+# - Causes the ARM64_MEMSTICK_CONF target to re-execute on next make, since it is older than the ARM64_IMAGE_INSTALL prereq
+# By touching the ARM64_MEMSTICK_CONF file after QEMU quits, it has a newer date than the ARM64_IMAGE_INSTALL prereq,
 # which prevents endless make loop
-$(ARM64_RAW_INST): $(ARM64_RAW_CONF) $(ARM64_IMAGE_TEST)
+$(ARM64_MEMSTICK_INST): $(ARM64_MEMSTICK_CONF) $(ARM64_IMAGE_TEST)
 	echo
 	echo '#### Use modified memstick image to auto install into a test image'
 	echo
@@ -233,8 +248,8 @@ $(ARM64_IMAGE_TEST2):
 	qemu-img create -f raw $@ 8G
 
 # Test the test image boots
-# Touches ARM64_RAW_INST, ARM64_RAW_CONF, and target file for same reasons as above for ARM64_RAW_INST target
-$(ARM64_RAW_TEST): $(ARM64_RAW_INST) $(ARM64_IMAGE_TEST2)
+# Touches ARM64_MEMSTICK_INST, ARM64_MEMSTICK_CONF, and target file for same reasons as above for ARM64_MEMSTICK_INST target
+$(ARM64_MEMSTICK_TEST): $(ARM64_MEMSTICK_INST) $(ARM64_IMAGE_TEST2)
 	echo
 	echo '#### Boot test image, with same network config as auto install image'
 	echo
@@ -256,31 +271,31 @@ $(ARM64_RAW_TEST): $(ARM64_RAW_INST) $(ARM64_IMAGE_TEST2)
 		-device ide-hd,drive=disk1,bus=ahci.1 \
 		-nic user,model=e1000,net=192.168.0.0/24,dhcpstart=192.168.0.1 \
 		-nic user,model=rtl8139,net=192.168.1.0/24,dhcpstart=192.168.1.1,tftp=.
-	touch $< $(ARM64_RAW_CONF) $@
+	touch $< $(ARM64_MEMSTICK_CONF) $@
 
 .PHONY: recopy
 recopy:
-	rm -f $(ARM64_RAW_BOOT)
+	rm -f $(ARM64_MEMSTICK_BOOT)
 	$(MAKE)
 
 .PHONY: reconfig
 reconfig:
-	rm -f $(ARM64_RAW_CONF) $(ARM64_RAW_INST) $(ARM64_RAW_TEST)
+	rm -f $(ARM64_MEMSTICK_CONF) $(ARM64_MEMSTICK_INST) $(ARM64_MEMSTICK_TEST)
 	$(MAKE)
 
 .PHONY: reinstall
 reinstall:
-	rm -f $(ARM64_RAW_INST) $(ARM64_RAW_TEST)
+	rm -f $(ARM64_MEMSTICK_INST) $(ARM64_MEMSTICK_TEST)
 	$(MAKE)
 
 .PHONY: retest
 retest:
-	rm -f $(ARM64_RAW_TEST)
+	rm -f $(ARM64_MEMSTICK_TEST)
 	$(MAKE)
 
 .PHONY: clean
 clean:
-	find . -maxdepth 1 -type f \( -name 'arm64*' -o -name '.arm64*' \) -a \! \( -name '$(ARM64_RELEASE_F)' -o -name '$(ARM64_XZ_RAW)' \) -print0 | xargs -0 rm
+	find . -maxdepth 1 -type f \( -name 'arm64*' -o -name '.arm64*' \) -a \! \( -name '$(ARM64_RELEASE_F)' -o -name '$(ARM64_XZ_MEMSTICK)' \) -print0 | xargs -0 rm
 
 .PHONY: push
 push:
@@ -294,16 +309,16 @@ vars:
 	echo "ARM64_RELEASE         = $(ARM64_RELEASE)"
 	echo "ARM64_RELEASE_F       = $(ARM64_RELEASE_F)"
 	echo "ARM64_XZ_URL          = $(ARM64_XZ_URL)"
-	echo "ARM64_RAW             = $(ARM64_RAW)"
-	echo "ARM64_XZ_RAW     = $(ARM64_XZ_RAW)"
+	echo "ARM64_MEMSTICK        = $(ARM64_MEMSTICK)"
+	echo "ARM64_XZ_MEMSTICK     = $(ARM64_XZ_MEMSTICK)"
 	echo "ARM64_XZ_CKSUM_URL    = $(ARM64_XZ_CKSUM_URL)"
 	echo "ARM64_XZ_CKSUM        = $(ARM64_XZ_CKSUM)"
 	echo "ARM64_XZ_CKSUM_GEN    = $(ARM64_XZ_CKSUM_GEN)"
 	echo "ARM64_XZ_CKSUM_CMP    = $(ARM64_XZ_CKSUM_CMP)"
-	echo "ARM64_RAW_BOOT        = $(ARM64_RAW_BOOT)"
-	echo "ARM64_RAW_CONF        = $(ARM64_RAW_CONF)"
-	echo "ARM64_RAW_INST        = $(ARM64_RAW_INST)"
-	echo "ARM64_RAW_TEST        = $(ARM64_RAW_TEST)"
+	echo "ARM64_MEMSTICK_BOOT   = $(ARM64_MEMSTICK_BOOT)"
+	echo "ARM64_MEMSTICK_CONF   = $(ARM64_MEMSTICK_CONF)"
+	echo "ARM64_MEMSTICK_INST   = $(ARM64_MEMSTICK_INST)"
+	echo "ARM64_MEMSTICK_TEST   = $(ARM64_MEMSTICK_TEST)"
 	echo "OVMF_REPO             = $(OVMF_REPO)"
 	echo "OVMF_API              = $(OVMF_API)"
 	echo "OVMF_RELEASE          = $(OVMF_RELEASE)"
