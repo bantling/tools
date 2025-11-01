@@ -4,6 +4,7 @@
 asciidoc/top-level-readme/docs/readme/build
 cross-compile/*/make/*/build
 qemu-vms/freebsd/*amd*
+qemu-vms/freebsd/*arm*
 qemu-vms/*/*img*
 qemu-vms/*/*iso*
 qemu-vms/ArchLinux.app
