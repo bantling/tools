@@ -60,10 +60,7 @@ ARM64_XZ_CKSUM_URL    := $(ARM64_ISO_BASE_URL)/$(ARM64_RELEASE)/CHECKSUM.SHA512-
 ARM64_XZ_CKSUM        := .arm64.sha512
 ARM64_XZ_CKSUM_GEN    := $(ARM64_XZ_CKSUM).gen
 ARM64_XZ_CKSUM_CMP    := $(ARM64_XZ_CKSUM).cmp
-ARM64_MEMSTICK_BOOT   := .arm64.boot.img
-ARM64_MEMSTICK_CONF   := .arm64.conf
-ARM64_MEMSTICK_INST   := .arm64.inst
-ARM64_MEMSTICK_TEST   := .arm64.test
+ARM64_RETRO           := arm64.retro.qcow2
 OVMF_REPO             := rust-osdev/ovmf-prebuilt
 OVMF_API              := https://api.github.com/repos/$(OVMF_REPO)
 OVMF_RELEASE          := $(shell curl -s $(OVMF_API)/releases | jq -r '.[].tag_name' | grep stable | head -n 1)
@@ -74,6 +71,7 @@ OVMF_TAR_AARCH64_CODE := $(OVMF_RELEASE)-bin/aarch64/code.fd
 OVMF_TAR_AARCH64_VARS := $(OVMF_RELEASE)-bin/aarch64/vars.fd
 ARM64_OVMF_CODE       := .arm64.OVMF_CODE.fd
 ARM64_OVMF_VARS       := .arm64.OVMF_VARS.fd
+ARM64_RETRO_INST      := .arm64.retro.inst
 
 
 # Define other vars
@@ -94,7 +92,7 @@ endif
 
 # Default target
 .PHONY: all
-all: generate-freebsd-release $(ARM64_MEMSTICK_TEST)
+all: generate-freebsd-release generate-edk2-release run
 
 # Generate the release file if:
 # - It does not exist
@@ -136,19 +134,24 @@ $(ARM64_MEMSTICK): $(ARM64_XZ_CKSUM_CMP)
 	xz --verbose -kfd $@.xz
 	touch $@
 
-# Make an installer copy of the decompressed memstick image every time it is extracted or bootstrap.sh is modified
+# Make an installer copy of the decompressed memstick image every time it is extracted or setup-arm64.sh is modified
 # For some reason, cp is really slow to copy this 6GB file, but cat is only a few seconds
-$(ARM64_MEMSTICK_BOOT): $(ARM64_MEMSTICK) bootstrap.sh
-	echo "Copying memstick image for manual modification"
-	cat $< > $@
+$(ARM64_RETRO): $(ARM64_MEMSTICK)
+	echo "Creating a sparse compressed 8GB image"
+	qemu-img create -f qcow2 -o compression_type=zstd,lazy_refcounts=on $@ 8G
 
-# Create the install image
-$(ARM64_IMAGE_INSTALL):
-	echo 'Creating install image $@'
-	qemu-img create -f raw $@ 8G
+# Execute $(ARM64_RETRO) goal and touch target only if $(ARM64_RETRO) file does not exist
+# The $(ARM64_RETRO) changes every time it boots, whether or not any changes were made
+$(ARM64_RETRO_EXISTS): setup-arm64.sh
+	echo here
+	[ -f "arm64.retro.qcow2" -a "arm64.retro.qcow2" -nt "setup-arm64.sh" ] || { \
+	  echo y; \
+	  $(MAKE) $(ARM64_RETRO); \
+	  touch $@; \
+	}
 
 # Generate the edk2 file if:
-# -It does not exist
+# - It does not exist
 # - It contains a different version than the current one
 .PHONY: generate-edk2-release
 generate-edk2-release:
@@ -171,7 +174,7 @@ $(ARM64_OVMF_VARS): $(OVMF_TAR_XZ)
 	tar xfO $< $(OVMF_TAR_AARCH64_VARS) > $@
 
 # Modify the memstick image to install bootstrap.sh script
-$(ARM64_MEMSTICK_CONF): $(ARM64_MEMSTICK_BOOT) $(ARM64_IMAGE_INSTALL) generate-edk2-release $(ARM64_OVMF_CODE) $(ARM64_OVMF_VARS) bootstrap-setup.sh setup.sh
+$(ARM64_RETRO_INST): $(ARM64_RETRO) $(ARM64_OVMF_CODE)
 	echo
 	echo '#### Configure copy of memstick image to auto install'
 	echo
@@ -181,121 +184,83 @@ $(ARM64_MEMSTICK_CONF): $(ARM64_MEMSTICK_BOOT) $(ARM64_IMAGE_INSTALL) generate-e
 	echo '2. Get network up'
 	echo 'dhclient vtnet0'
 	echo
-	echo '3. Download bootstrap script:'
-	echo 'echo "get bootstrap.sh" | tftp 10.0.2.2'
+	echo '3. Download script:'
+	echo 'echo "get setup-arm64.sh" | tftp 10.0.2.2'
 	echo
-	echo '4. Run bootstrap.sh:'
-	echo 'sh /bootstrap.sh'
+	echo '4. Run script:'
+	echo 'sh /setup-arm64.sh'
 	echo
 	qemu-system-aarch64 \
 	  -accel "$(QEMU_ACCEL)" \
 	  -cpu host \
 	  -M virt \
 	  -m 1024 \
-	  -boot c \
+	  -boot menu=on,splash-time=0 \
 	  -drive if=pflash,media=disk,file=$(ARM64_OVMF_CODE),cache=writethrough,format=raw \
 	  -drive if=pflash,media=disk,file=$(ARM64_OVMF_VARS),cache=writethrough,format=raw \
-	  -drive file=$(ARM64_MEMSTICK_BOOT),format=raw,file.locking=off,if=virtio \
-	  -drive file=$(ARM64_IMAGE_INSTALL),format=raw,if=virtio \
+	  -drive file=$(ARM64_MEMSTICK),format=raw,if=virtio \
+	  -drive file=$(ARM64_RETRO),if=virtio \
 	  -nic user,model=virtio-net-pci,tftp=. \
-	  -device virtio-gpu-pci \
 	  -device qemu-xhci \
 	  -device usb-kbd \
 	  -device usb-tablet \
+	  -device virtio-gpu-pci \
 	  -display cocoa
 	touch $@
 
-$(ARM64_IMAGE_TEST):
-	echo 'Creating image $@'
-	qemu-img create -f raw $@ 8G
+# -boot menu=on,splash-time=0 \
 
-# Install into a test image using the install image with real world devices, to manually test installing to another drive
-# Touches both ARM64_MEMSTICK_CONF file and target file:
-# - The ARM64_IMAGE_INSTALL is modified by the process of starting it up, as it is a regular read/write filesystem
-# - Causes the ARM64_IMAGE_INSTALL to have a newer date than ARM64_MEMSTICK_CONF
-# - Causes the ARM64_MEMSTICK_CONF target to re-execute on next make, since it is older than the ARM64_IMAGE_INSTALL prereq
-# By touching the ARM64_MEMSTICK_CONF file after QEMU quits, it has a newer date than the ARM64_IMAGE_INSTALL prereq,
-# which prevents endless make loop
-$(ARM64_MEMSTICK_INST): $(ARM64_MEMSTICK_CONF) $(ARM64_IMAGE_TEST)
+# Run the installed retro system
+.PHONY: run
+run:
 	echo
-	echo '#### Use modified memstick image to auto install into a test image'
-	echo
-	echo 'When prompt appears, login as root (password toor) and run /setup.sh -d ada1'
-	echo 'The default is to have swap, a label of hd, a pool named zroot, UTC timezone'
-	echo
-	echo 'you can run /setup.sh -d ada1 [ -l label ] [ -n ] [ -p poolname ] [ -a ] [-t timezone]'
-	echo "Where:"
-	echo "-l sets a different label, -n means no swap, -p poolname provides an alternate pool name (don't use zinstall),"
-	echo "-a means autologin, and -t sets a different timezone"
-	echo
-	echo 'When the setup completes, run poweroff to quit and test the target image under EFI'
+	echo "Running installed system"
 	qemu-system-aarch64 \
 	  -accel "$(QEMU_ACCEL)" \
-	  -cpu qemu64 \
+	  -cpu host \
+	  -M virt \
 	  -m 1024 \
-	  -boot c \
-	  -drive file=$(ARM64_IMAGE_INSTALL),format=raw,id=disk0,cache=writeback,if=none \
-	  -drive file=$(ARM64_IMAGE_TEST),format=raw,id=disk1,cache=writeback,if=none \
-	  -device ahci,id=ahci \
-	  -device ide-hd,drive=disk0,bus=ahci.0 \
-	  -device ide-hd,drive=disk1,bus=ahci.1 \
-	  -nic user,model=virtio-net-pci
-	touch $< $@
+	  -boot menu=on,splash-time=0 \
+	  -drive if=pflash,media=disk,file=$(ARM64_OVMF_CODE),cache=writethrough,format=raw \
+	  -drive if=pflash,media=disk,file=$(ARM64_OVMF_VARS),cache=writethrough,format=raw \
+	  -drive file=$(ARM64_RETRO),file.locking=off,if=virtio \
+	  -nic user,model=virtio-net-pci,tftp=. \
+	  -device qemu-xhci \
+	  -device usb-kbd \
+	  -device usb-tablet \
+	  -device virtio-gpu-pci \
+	  -display cocoa \
+	  -device virtio-sound-device \
+	  -audiodev coreaudio,id=snd \
+	  -device intel-hda,audiodev=snd
 
-.PHONY: $(ARM64_IMAGE_TEST2)
-$(ARM64_IMAGE_TEST2):
-	echo 'Creating image $@'
-	qemu-img create -f raw $@ 8G
+#	  -device intel-hda -device hda-output,audiodev=coreaudio \
+#	  -audiodev coreaudio,id=coreaudio
 
-# Test the test image boots
-# Touches ARM64_MEMSTICK_INST, ARM64_MEMSTICK_CONF, and target file for same reasons as above for ARM64_MEMSTICK_INST target
-$(ARM64_MEMSTICK_TEST): $(ARM64_MEMSTICK_INST) $(ARM64_IMAGE_TEST2)
-	echo
-	echo '#### Boot test image, with same network config as auto install image'
-	echo
-	echo 'When login prompt appears, login as root, password is toor'
-	echo 'Both network cards should work, where 192.168.0.1 and 192.168.1.1 are the gateways'
-	echo "tftp can be used on 192.168.1.2"
-	echo
-	qemu-system-aarch64 \
-		-accel "$(QEMU_ACCEL)" \
-		-cpu qemu64 \
-		-m 1024 \
-		-boot c \
-		-drive if=pflash,media=disk,file=$(ARM64_OVMF_CODE),cache=writethrough,format=raw \
-		-drive if=pflash,media=disk,file=$(ARM64_OVMF_VARS),cache=writethrough,format=raw \
-		-drive file=$(ARM64_IMAGE_TEST),format=raw,id=disk0,if=none \
-		-drive file=$(ARM64_IMAGE_TEST2),format=raw,id=disk1,if=none \
-		-device ahci,id=ahci \
-		-device ide-hd,drive=disk0,bus=ahci.0 \
-		-device ide-hd,drive=disk1,bus=ahci.1 \
-		-nic user,model=e1000,net=192.168.0.0/24,dhcpstart=192.168.0.1 \
-		-nic user,model=rtl8139,net=192.168.1.0/24,dhcpstart=192.168.1.1,tftp=.
-	touch $< $(ARM64_MEMSTICK_CONF) $@
+#	  -device ich9-ahci,id=ich9-bus \
+#	  -device ich9-intel-hda,id=sound0,bus=ich9-bus.0 \
+#	  -device hda-duplex,bus=sound0.0,cad=0
 
-.PHONY: recopy
-recopy:
-	rm -f $(ARM64_MEMSTICK_BOOT)
-	$(MAKE)
+# -device usb-host,vendorid=0x2222,productid=0x4010 \
+#name "AC97", bus PCI, alias "ac97", desc "Intel 82801AA AC97 Audio"
+#name "ES1370", bus PCI, alias "es1370", desc "ENSONIQ AudioPCI ES1370"
+#name "hda-duplex", bus HDA, desc "HDA Audio Codec, duplex (line-out, line-in)"
+#name "hda-micro", bus HDA, desc "HDA Audio Codec, duplex (speaker, microphone)"
+#name "hda-output", bus HDA, desc "HDA Audio Codec, output-only (line-out)"
+#name "ich9-intel-hda", bus PCI, desc "Intel HD Audio Controller (ich9)"
+#name "intel-hda", bus PCI, desc "Intel HD Audio Controller (ich6)"
+#name "usb-audio", bus usb-bus
+#name "virtio-sound-device", bus virtio-bus
+#name "virtio-sound-pci", bus PCI, alias "virtio-sound", desc "Virtio Sound"
 
-.PHONY: reconfig
-reconfig:
-	rm -f $(ARM64_MEMSTICK_CONF) $(ARM64_MEMSTICK_INST) $(ARM64_MEMSTICK_TEST)
-	$(MAKE)
 
 .PHONY: reinstall
 reinstall:
-	rm -f $(ARM64_MEMSTICK_INST) $(ARM64_MEMSTICK_TEST)
-	$(MAKE)
-
-.PHONY: retest
-retest:
-	rm -f $(ARM64_MEMSTICK_TEST)
-	$(MAKE)
+	rm -f $(ARM64_RETRO)
 
 .PHONY: clean
 clean:
-	find . -maxdepth 1 -type f \( -name 'arm64*' -o -name '.arm64*' \) -a \! \( -name '$(ARM64_RELEASE_F)' -o -name '$(ARM64_XZ_MEMSTICK)' \) -print0 | xargs -0 rm
+	find . -maxdepth 1 -type f \( -name 'arm64*' -o -name '.arm64*' \) -a \! -name '$(ARM64_XZ_MEMSTICK)' -print0 | xargs -0 rm
 
 .PHONY: push
 push:
@@ -315,10 +280,7 @@ vars:
 	echo "ARM64_XZ_CKSUM        = $(ARM64_XZ_CKSUM)"
 	echo "ARM64_XZ_CKSUM_GEN    = $(ARM64_XZ_CKSUM_GEN)"
 	echo "ARM64_XZ_CKSUM_CMP    = $(ARM64_XZ_CKSUM_CMP)"
-	echo "ARM64_MEMSTICK_BOOT   = $(ARM64_MEMSTICK_BOOT)"
-	echo "ARM64_MEMSTICK_CONF   = $(ARM64_MEMSTICK_CONF)"
-	echo "ARM64_MEMSTICK_INST   = $(ARM64_MEMSTICK_INST)"
-	echo "ARM64_MEMSTICK_TEST   = $(ARM64_MEMSTICK_TEST)"
+	echo "ARM64_RETRO      = $(ARM64_RETRO)"
 	echo "OVMF_REPO             = $(OVMF_REPO)"
 	echo "OVMF_API              = $(OVMF_API)"
 	echo "OVMF_RELEASE          = $(OVMF_RELEASE)"
@@ -329,10 +291,8 @@ vars:
 	echo "OVMF_TAR_AARCH64_VARS = $(OVMF_TAR_AARCH64_VARS)"
 	echo "ARM64_OVMF_CODE       = $(ARM64_OVMF_CODE)"
 	echo "ARM64_OVMF_VARS       = $(ARM64_OVMF_VARS)"
+	echo "ARM64_RETRO_INST      = $(ARM64_RETRO_INST)"
 	echo "QEMU_ACCEL_HVF        = $(QEMU_ACCEL_HVF)"
 	echo "QEMU_ACCEL_WHPX       = $(QEMU_ACCEL_WHPX)"
 	echo "QEMU_ACCEL_KVM        = $(QEMU_ACCEL_KVM)"
 	echo "QEMU_ACCEL            = $(QEMU_ACCEL)"
-	echo "ARM64_IMAGE_INSTALL   = $(ARM64_IMAGE_INSTALL)"
-	echo "ARM64_IMAGE_TEST      = $(ARM64_IMAGE_TEST)"
-	echo "ARM64_IMAGE_TEST2     = $(ARM64_IMAGE_TEST2)"
