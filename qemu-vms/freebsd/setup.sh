@@ -18,12 +18,6 @@ usage() {
 -t timezone : specify a timezone like America/Halifax (default UTC)
 -m          : add additional device as a mirror
 
-Notes:
-- If -h occurs anywhere, all other options are ignored
-- when -m is provided, device, label, and poolname are all required
-  the device given is the device to add to the pool
-- without -m, only device is required, remaining options have defaults
-
 Setup a bootable ZFS filesystem on the specified device:
 - Create a gpt label on specified device of the form {poolname}-{label}
 - The gpt label is used by the zpool, making it easier to identify which drive failed
@@ -149,12 +143,11 @@ if [ "$mirror" -eq 0 ]; then
   umount -A 2> /dev/null || :
 
   ## Get a list of existing zpools on devices that need to be destroyed
-    for zpd in "`zpool import 2> /dev/null | grep gpt | awk '{print $1}'`"
-    do
-      echo "Clearing label of old zpool device $zpd"
-      zpool labelclear -f "$zpd" || :
-    done
-  }
+  for zpd in "`zpool import 2> /dev/null | grep gpt | awk '{print $1}'`"
+  do
+    echo "Clearing label of old zpool device $zpd"
+    zpool labelclear -f "$zpd" || :
+  done
 
   ## Destroy any existing gpt partitions
   ## The command fails if no partitions exist
