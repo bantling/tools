@@ -213,22 +213,30 @@ if [ "$mirror" -eq 0 ]; then
   sleep 1
   cd /tmp/zfs
 
-  echo 'Installing kernel'
-  sleep 1
-  tar xf /usr/freebsd-dist/kernel.txz
-
-  echo 'Installing base'
-  sleep 1
-  tar xf /usr/freebsd-dist/base.txz
-
   # Copy setup script and base and kernel sets
   echo 'Copying setup.sh and base and kernel sets'
   sleep 1
   cp /setup.sh .
   chmod +x setup.sh
   mkdir -p usr/freebsd-dist
-  cp /usr/freebsd-dist/base.txz usr/freebsd-dist
-  cp /usr/freebsd-dist/kernel.txz usr/freebsd-dist
+  if [ -f /usr/freebsd-dist/kernel.txz ]; then
+    cp /usr/freebsd-dist/kernel.txz usr/freebsd-dist
+  else
+    fetch -o usr/freebsd-dist/kernel.txz https://download.freebsd.org/releases/amd64/`uname -r`/kernel.txz
+  fi
+  if [ -f /usr/freebsd-dist/base.txz ]; then
+    cp /usr/freebsd-dist/base.txz usr/freebsd-dist
+  else
+    fetch -o usr/freebsd-dist/base.txz https://download.freebsd.org/releases/amd64/`uname -r`/base.txz
+  fi
+
+  echo 'Installing kernel'
+  sleep 1
+  tar xf usr/freebsd-dist/kernel.txz
+
+  echo 'Installing base'
+  sleep 1
+  tar xf usr/freebsd-dist/base.txz
 
   ## Create swap space, if desired
   [ "$swap" -eq 0 ] || {

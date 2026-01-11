@@ -270,12 +270,10 @@ $(AMD64_MEMSTICK_TEST): $(AMD64_MEMSTICK_INST) generate-edk2-release $(AMD64_OVM
 .PHONY: recopy
 recopy:
 	rm -f $(AMD64_MEMSTICK_BOOT)
-	$(MAKE)
 
 .PHONY: reconfig
 reconfig:
 	rm -f $(AMD64_MEMSTICK_CONF) $(AMD64_MEMSTICK_INST) $(AMD64_MEMSTICK_TEST)
-	$(MAKE)
 
 .PHONY: reinstall
 reinstall:
