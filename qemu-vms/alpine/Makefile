@@ -84,13 +84,13 @@ endif
 # - xen     : for Xen hypervisor
 #
 # We want alpine-standard-<latest_version>-x86_64.{iso,iso.sha512}
-# The virt images do not include the setup-zfs installer
+# The extended images include the zfs kernel module
 
 # URL to get latest stable x86_64 releases:
 X86_64_ISO_VERSION_URL := https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64
 
-# Get the latest virt X86_64 version
-X86_64_RELEASE         := $(shell curl -sL $(X86_64_ISO_VERSION_URL)/ | grep alpine-virt | sed -r 's,.*>alpine-virt-(.*)-x86_64.*,\1,' | sort -urV | head -1)
+# Get the latest extended X86_64 version
+X86_64_RELEASE         := $(shell curl -sL $(X86_64_ISO_VERSION_URL)/ | grep alpine-extended | sed -r 's,.*>alpine-extended-(.*)-x86_64.*,\1,' | sort -urV | head -1)
 
 # Get the major.minor Alpine release
 X86_64_MAJOR_MINOR     := $(shell echo $(X86_64_RELEASE) | sed -r 's,(.*)[.][0-9]+,\1,')
@@ -98,13 +98,13 @@ X86_64_MAJOR_MINOR     := $(shell echo $(X86_64_RELEASE) | sed -r 's,(.*)[.][0-9
 # The file that contains the latest release download
 X86_64_RELEASE_F       := .x86_64.release
 
-# Get the url to download the latest virt X86_64 iso
-X86_64_ISO_URL         := $(X86_64_ISO_VERSION_URL)/alpine-standard-$(X86_64_RELEASE)-x86_64.iso
+# Get the url to download the latest extended X86_64 iso
+X86_64_ISO_URL         := $(X86_64_ISO_VERSION_URL)/alpine-extended-$(X86_64_RELEASE)-x86_64.iso
 
-# The file to download the latest virt X86_64 iso into
+# The file to download the latest extended X86_64 iso into
 X86_64_ISO_IMG         := .x86_64.iso
 
-# Get the url to download the latest virt X86_64 iso sha512 sum file
+# Get the url to download the latest extended X86_64 iso sha512 sum file
 X86_64_ISO_CKSUM_URL   := $(X86_64_ISO_URL).sha512
 
 # The file that contains the latest release download
@@ -155,17 +155,17 @@ generate-alpine-release:
 
 # Download latest image if we don't have it
 $(X86_64_ISO_IMG): $(X86_64_RELEASE_F)
-	echo "Downloading the $(X86_64_RELEASE) virt image"
+	echo "Downloading the $(X86_64_RELEASE) extended image"
 	curl --progress-bar -Lo $@ $(X86_64_ISO_URL)
 
 # Download latest sha512 checksum if we don't have it
 $(X86_64_ISO_CKSUM): $(X86_64_ISO_IMG)
-	echo "Download the $(X86_64_RELEASE) virt image checksum"
+	echo "Download the $(X86_64_RELEASE) extended image checksum"
 	curl -sLo - $(X86_64_ISO_CKSUM_URL) | awk '{print $$1}' > $@
 
-# Generate a checksum of the downloaded virt iso image
+# Generate a checksum of the downloaded extended iso image
 $(X86_64_ISO_CKSUM_GEN): $(X86_64_ISO_CKSUM)
-	echo "Generating virt image checksum"
+	echo "Generating extended image checksum"
 	sha512sum -b $(X86_64_ISO_IMG) | awk '{print $$1}' > $@
 
 # Commpare the downloaded and generated checksums
@@ -177,7 +177,7 @@ $(X86_64_ISO_CKSUM_CMP): $(X86_64_ISO_CKSUM) $(X86_64_ISO_CKSUM_GEN)
 # Create the image
 $(X86_64_IMAGE): $(X86_64_ISO_CKSUM_CMP)
 	echo 'Creating image $@'
-	qemu-img create -f raw $@ 8G
+	qemu-img create -f raw $@ 32G
 
 # Generate the edk2 file if:
 # - It does not exist
@@ -209,8 +209,13 @@ ovmf: $(X86_64_OVMF_CODE) $(X86_64_OVMF_VARS)
 $(X86_64_IMAGE_ALPINE): generate-alpine-release $(X86_64_IMAGE) generate-edk2-release ovmf
 	echo 'Installing Alpine into the image'
 	echo
-	echo 'Run the following command:'
-	echo 'setup-zfs'
+	echo 'Run the following commands:'
+	echo 'setup-interfaces'
+	echo '/etc/init.d/networking restart'
+	echo 'echo "https://dl-cdn.alpinelinux.org/alpine/v$(X86_64_MAJOR_MINOR)/main" >> /etc/apk/repositories'
+	echo 'apk update && apk upgrade && apk add tftp-hpa'
+	echo 'tftp 10.0.2.2 -m octet -c get setup.sh'
+	echo 'modprobe zfs'
 	echo
 	echo 'Choose the "sys" type of disk setup'
 	echo 'Set root password to toortoor'
@@ -228,7 +233,7 @@ $(X86_64_IMAGE_ALPINE): generate-alpine-release $(X86_64_IMAGE) generate-edk2-re
 	  -device ahci,id=ahci \
 	  -device ide-hd,drive=disk0,bus=ahci.0 \
 	  -device ide-hd,drive=disk1,bus=ahci.1 \
-	  -nic user,model=virtio-net-pci
+	  -nic user,model=virtio-net-pci,tftp=.
 	touch $@
 
 # Boot the configured image so emby can be configured on it
@@ -254,7 +259,7 @@ $(X86_64_IMAGE_EMBY): $(X86_64_IMAGE_ALPINE)
 
 .PHONY: clean
 clean:
-	rm -f .*
+	rm -f .* 2> /dev/null || :
 
 .PHONY: vars
 vars:
