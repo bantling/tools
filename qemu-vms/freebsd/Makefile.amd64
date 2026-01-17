@@ -3,7 +3,7 @@
 # Build a FreeBSD x86_64 bootable image with the following basic steps:
 # - Determine latest release of FreeBSD memstick image
 # - Download latest release and hash file
-# - Generate a hash file, and commpare against downloaded hash file
+# - Generate a hash file, and compare against downloaded hash file
 # - Make a copy of memstick image
 # - MBR boot copy of memstick
 # - Modify memstick image so that it has autologin, and a bootstrap script
@@ -11,7 +11,7 @@
 # - Auto powers off once installer is setup
 # - MBR boot installer image to install into a test image
 # - User manually runs installer, and powers off
-# - EFI boot test image to verify it boots up, user can login on and poweroff
+# - EFI boot test image to verify it boots up, user can login and poweroff
 
 # Execute all recipe lines in one shell
 .ONESHELL:
@@ -19,7 +19,7 @@
 # Turn off default rules
 .SUFFIXES:
 
-# We need a target to determine the latest release version of FreeBSD
+# We need to determine the latest release version of FreeBSD
 # This is a nuisance because there may be a beta version that is newer than the current release
 # EG:
 # We grab contents of https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES:
@@ -214,7 +214,7 @@ $(AMD64_MEMSTICK_INST): $(AMD64_MEMSTICK_CONF) $(AMD64_IMAGE_TEST)
 	touch $< $@
 
 # Generate the edk2 file if:
-# -It does not exist
+# - It does not exist
 # - It contains a different version than the current one
 .PHONY: generate-edk2-release
 generate-edk2-release:
