@@ -3,7 +3,7 @@
 # Build a FreeBSD aarch64 bootable image with the following basic steps:
 # - Determine latest release of FreeBSD memstick image
 # - Download latest release and hash file
-# - Generate a hash file, and commpare against downloaded hash file
+# - Generate a hash file, and compare against downloaded hash file
 # - Make a copy of memstick image
 # - EFI boot copy of memstick
 # - Modify memstick image so that it has autologin, and a bootstrap script
@@ -11,7 +11,7 @@
 # - Auto powers off once installer is setup
 # - EFI boot installer image to install into a test image
 # - User manually runs installer, and powers off
-# - EFI boot test image to verify it boots up, user can login on and poweroff
+# - EFI boot test image to verify it boots up, user can login and poweroff
 
 # Execute all recipe lines in one shell
 .ONESHELL:
@@ -19,7 +19,7 @@
 # Turn off default rules
 .SUFFIXES:
 
-# We need a target to determine the latest release version of FreeBSD
+# We need to determine the latest release version of FreeBSD
 # This is a nuisance because there may be a beta version that is newer than the current release
 # EG:
 # We grab contents of https://download.freebsd.org/releases/arm64/aarch64/ISO-IMAGES:
@@ -41,7 +41,7 @@
 # URL to get available versions of FreeBSD
 ARM64_ISO_BASE_URL := https://download.freebsd.org/releases/arm64/aarch64/ISO-IMAGES
 
-# Define a script to get the latest x86 RELEASE version
+# Define a script to get the latest aarch64 RELEASE version
 define ARM64_GET_RELEASE
 for version in $$(curl -sL $(ARM64_ISO_BASE_URL) | grep '<a href="[0-9]' | sed -r 's,.*href="([^/]*)/.*,\1,' | sort -rV); do
 	[ $$(curl -sL $(ARM64_ISO_BASE_URL)/$$version | grep 'href="FreeBSD.*RELEASE' | wc -l) -gt 0 ] || continue;
@@ -60,7 +60,8 @@ ARM64_XZ_CKSUM_URL    := $(ARM64_ISO_BASE_URL)/$(ARM64_RELEASE)/CHECKSUM.SHA512-
 ARM64_XZ_CKSUM        := .arm64.sha512
 ARM64_XZ_CKSUM_GEN    := $(ARM64_XZ_CKSUM).gen
 ARM64_XZ_CKSUM_CMP    := $(ARM64_XZ_CKSUM).cmp
-ARM64_RETRO           := arm64.retro.qcow2
+ARM64_HD              := arm64.hd.qcow2
+ARM64_HD_EXISTS       := .$(ARM64_HD).exists 
 OVMF_REPO             := rust-osdev/ovmf-prebuilt
 OVMF_API              := https://api.github.com/repos/$(OVMF_REPO)
 OVMF_RELEASE          := $(shell curl -s $(OVMF_API)/releases | jq -r '.[].tag_name' | grep stable | head -n 1)
@@ -71,7 +72,7 @@ OVMF_TAR_AARCH64_CODE := $(OVMF_RELEASE)-bin/aarch64/code.fd
 OVMF_TAR_AARCH64_VARS := $(OVMF_RELEASE)-bin/aarch64/vars.fd
 ARM64_OVMF_CODE       := .arm64.OVMF_CODE.fd
 ARM64_OVMF_VARS       := .arm64.OVMF_VARS.fd
-ARM64_RETRO_INST      := .arm64.retro.inst
+ARM64_HD_INST         := .$(ARM64_HD).inst
 
 
 # Define other vars
@@ -135,20 +136,20 @@ $(ARM64_MEMSTICK): $(ARM64_XZ_CKSUM_CMP)
 	touch $@
 
 # Make an installer copy of the decompressed memstick image every time it is extracted or setup-arm64.sh is modified
-# For some reason, cp is really slow to copy this 6GB file, but cat is only a few seconds
-$(ARM64_RETRO): $(ARM64_MEMSTICK)
+$(ARM64_HD): $(ARM64_MEMSTICK)
 	echo "Creating a sparse compressed 8GB image"
 	qemu-img create -f qcow2 -o compression_type=zstd,lazy_refcounts=on $@ 8G
 
-# Execute $(ARM64_RETRO) goal and touch target only if $(ARM64_RETRO) file does not exist
-# The $(ARM64_RETRO) changes every time it boots, whether or not any changes were made
-$(ARM64_RETRO_EXISTS): setup-arm64.sh
-	echo here
-	[ -f "arm64.retro.qcow2" -a "arm64.retro.qcow2" -nt "setup-arm64.sh" ] || { \
-	  echo y; \
-	  $(MAKE) $(ARM64_RETRO); \
-	  touch $@; \
-	}
+# Execute $(ARM64_HD) goal and touch target only if $(ARM64_HD) file does not exist, or is older than setup-arm64.sh
+# The $(ARM64_HD) file changes every time it boots, whether or not any changes were made
+# Note -nt is newer than comparison
+.PHONY: $(ARM64_HD_EXISTS)
+$(ARM64_HD_EXISTS):
+	[ -f "$(ARM64_HD)" -a "$(ARM64_HD)" -nt "setup-arm64.sh" ] || { \
+	  echo ; \
+	  $(MAKE) $(ARM64_HD); \
+	}; \
+	touch $@
 
 # Generate the edk2 file if:
 # - It does not exist
@@ -174,7 +175,7 @@ $(ARM64_OVMF_VARS): $(OVMF_TAR_XZ)
 	tar xfO $< $(OVMF_TAR_AARCH64_VARS) > $@
 
 # Modify the memstick image to install bootstrap.sh script
-$(ARM64_RETRO_INST): $(ARM64_RETRO) $(ARM64_OVMF_CODE)
+$(ARM64_HD_INST): $(ARM64_HD) $(ARM64_OVMF_CODE) $(ARM64_OVMF_VARS)
 	echo
 	echo '#### Configure copy of memstick image to auto install'
 	echo
@@ -188,7 +189,7 @@ $(ARM64_RETRO_INST): $(ARM64_RETRO) $(ARM64_OVMF_CODE)
 	echo 'echo "get setup-arm64.sh" | tftp 10.0.2.2'
 	echo
 	echo '4. Run script:'
-	echo 'sh /setup-arm64.sh'
+	echo 'sh /setup.sh -d vtbd1 -a'
 	echo
 	qemu-system-aarch64 \
 	  -accel "$(QEMU_ACCEL)" \
@@ -199,7 +200,7 @@ $(ARM64_RETRO_INST): $(ARM64_RETRO) $(ARM64_OVMF_CODE)
 	  -drive if=pflash,media=disk,file=$(ARM64_OVMF_CODE),cache=writethrough,format=raw \
 	  -drive if=pflash,media=disk,file=$(ARM64_OVMF_VARS),cache=writethrough,format=raw \
 	  -drive file=$(ARM64_MEMSTICK),format=raw,if=virtio \
-	  -drive file=$(ARM64_RETRO),if=virtio \
+	  -drive file=$(ARM64_HD),if=virtio \
 	  -nic user,model=virtio-net-pci,tftp=. \
 	  -device qemu-xhci \
 	  -device usb-kbd \
@@ -208,9 +209,7 @@ $(ARM64_RETRO_INST): $(ARM64_RETRO) $(ARM64_OVMF_CODE)
 	  -display cocoa
 	touch $@
 
-# -boot menu=on,splash-time=0 \
-
-# Run the installed retro system
+# Run the installed system
 .PHONY: run
 run:
 	echo
@@ -223,16 +222,16 @@ run:
 	  -boot menu=on,splash-time=0 \
 	  -drive if=pflash,media=disk,file=$(ARM64_OVMF_CODE),cache=writethrough,format=raw \
 	  -drive if=pflash,media=disk,file=$(ARM64_OVMF_VARS),cache=writethrough,format=raw \
-	  -drive file=$(ARM64_RETRO),file.locking=off,if=virtio \
+	  -drive file=$(ARM64_HD),file.locking=off,if=virtio \
 	  -nic user,model=virtio-net-pci,tftp=. \
 	  -device qemu-xhci \
 	  -device usb-kbd \
 	  -device usb-tablet \
 	  -device virtio-gpu-pci \
-	  -display cocoa \
-	  -device virtio-sound-device \
-	  -audiodev coreaudio,id=snd \
-	  -device intel-hda,audiodev=snd
+	  -display cocoa
+#	  -device virtio-sound-device \
+#	  -audiodev coreaudio,id=snd \
+#	  -device intel-hda,audiodev=snd
 
 #	  -device intel-hda -device hda-output,audiodev=coreaudio \
 #	  -audiodev coreaudio,id=coreaudio
@@ -256,11 +255,15 @@ run:
 
 .PHONY: reinstall
 reinstall:
-	rm -f $(ARM64_RETRO)
+	rm -f $(ARM64_HD)
 
 .PHONY: clean
 clean:
 	find . -maxdepth 1 -type f \( -name 'arm64*' -o -name '.arm64*' \) -a \! -name '$(ARM64_XZ_MEMSTICK)' -print0 | xargs -0 rm
+
+.PHONY: clean-all
+clean-all:
+	find . -maxdepth 1 -type f -name 'arm64*' -o -name '.arm64*' -print0 | xargs -0 rm
 
 .PHONY: push
 push:
@@ -280,7 +283,8 @@ vars:
 	echo "ARM64_XZ_CKSUM        = $(ARM64_XZ_CKSUM)"
 	echo "ARM64_XZ_CKSUM_GEN    = $(ARM64_XZ_CKSUM_GEN)"
 	echo "ARM64_XZ_CKSUM_CMP    = $(ARM64_XZ_CKSUM_CMP)"
-	echo "ARM64_RETRO      = $(ARM64_RETRO)"
+	echo "ARM64_HD              = $(ARM64_HD)"
+	echo "ARM64_HD_EXISTS       = $(ARM64_HD_EXISTS)"
 	echo "OVMF_REPO             = $(OVMF_REPO)"
 	echo "OVMF_API              = $(OVMF_API)"
 	echo "OVMF_RELEASE          = $(OVMF_RELEASE)"
@@ -291,8 +295,11 @@ vars:
 	echo "OVMF_TAR_AARCH64_VARS = $(OVMF_TAR_AARCH64_VARS)"
 	echo "ARM64_OVMF_CODE       = $(ARM64_OVMF_CODE)"
 	echo "ARM64_OVMF_VARS       = $(ARM64_OVMF_VARS)"
-	echo "ARM64_RETRO_INST      = $(ARM64_RETRO_INST)"
+	echo "ARM64_HD_INST         = $(ARM64_HD_INST)"
 	echo "QEMU_ACCEL_HVF        = $(QEMU_ACCEL_HVF)"
 	echo "QEMU_ACCEL_WHPX       = $(QEMU_ACCEL_WHPX)"
 	echo "QEMU_ACCEL_KVM        = $(QEMU_ACCEL_KVM)"
 	echo "QEMU_ACCEL            = $(QEMU_ACCEL)"
+	echo "ARM64_IMAGE_INSTALL   = $(ARM64_IMAGE_INSTALL)"
+	echo "ARM64_IMAGE_TEST      = $(ARM64_IMAGE_TEST)"
+	echo "ARM64_IMAGE_TEST2     = $(ARM64_IMAGE_TEST2)"

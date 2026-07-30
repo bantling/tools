@@ -145,8 +145,11 @@ if [ "$mirror" -eq 0 ]; then
   ## Get a list of existing zpools on devices that need to be destroyed
   for zpd in "`zpool import 2> /dev/null | grep gpt | awk '{print $1}'`"
   do
-    echo "Clearing label of old zpool device $zpd"
-    zpool labelclear -f "$zpd" || :
+    [ -z "$zpd" ] || {
+      echo "Clearing label of old zpool device $zpd"
+      sleep 1
+      zpool labelclear -f "$zpd" || :
+    }
   done
 
   ## Destroy any existing gpt partitions
@@ -168,9 +171,12 @@ if [ "$mirror" -eq 0 ]; then
   gpart add -a 4K -t freebsd-zfs  -l "${poolname}-${label}"          "$device"
 
   ## Install mbr boot sector and partition code
-  echo 'Installing gpt boot sector and gpt partition boot loader'
-  sleep 1
-  gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 "$device"
+  ## Note that arm64 builds won't have a partition boot loader, as they can only boot via EFI
+  if [ -f /boot/pmbr ]; then
+    echo 'Installing gpt boot sector and gpt partition boot loader'
+    sleep 1
+    gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 "$device"
+  fi
 
   ## Create EFI filesystem
   echo 'Creating EFI filesystem'
@@ -254,12 +260,12 @@ if [ "$mirror" -eq 0 ]; then
   echo
   sleep 1
 
-cat <<-EOF > etc/rc.local
-  #!/bin/sh
-  for netdev in \`ifconfig -a | sed -r '/^[ \t]/d;s,^([^:]*).*,\1,' | grep -v lo\`; do
-    ifconfig \$netdev -rxcsum
-    dhclient \$netdev
-  done
+  cat <<-EOF > etc/rc.local
+#!/bin/sh
+for netdev in \`ifconfig -a | sed -r '/^[ \t]/d;s,^([^:]*).*,\1,' | grep -v lo\`; do
+  ifconfig \$netdev -rxcsum
+  dhclient \$netdev
+done
 EOF
 
   sleep 1
@@ -410,11 +416,14 @@ else
   [ "`zpool import 2> /dev/null | grep ONLINE | wc -l`" -eq 0 ] || {
     for zpd in "`zpool import 2> /dev/null | grep gpt | awk '{print $1}'`"
     do
-      echo "Clearing label of old zpool device $zpd"
-      sleep 1
-      zpool labelclear -f "$zpd" || :
+      [ -z "$zpd" ] || {
+        echo "Clearing label of old zpool device $zpd"
+        sleep 1
+        zpool labelclear -f "$zpd" || :
+      }
     done
   }
+  exit 1
 
   ## Remove any existing zpool labels on the target device
   echo "Clearing any labels on $device"

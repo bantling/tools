@@ -289,6 +289,10 @@ retest:
 clean:
 	find . -maxdepth 1 -type f \( -name 'amd64*' -o -name '.amd64*' \) -a \! \( -name '$(AMD64_RELEASE_F)' -o -name '$(AMD64_XZ_MEMSTICK)' \) -print0 | xargs -0 rm
 
+.PHONY: clean-all
+clean-all:
+	find . -maxdepth 1 -type f -name 'amd64*' -o -name '.amd64*' -print0 | xargs -0 rm
+
 .PHONY: push
 push:
 	git add -A
