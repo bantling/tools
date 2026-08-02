@@ -61,7 +61,7 @@ ARM64_XZ_CKSUM        := .arm64.sha512
 ARM64_XZ_CKSUM_GEN    := $(ARM64_XZ_CKSUM).gen
 ARM64_XZ_CKSUM_CMP    := $(ARM64_XZ_CKSUM).cmp
 ARM64_HD              := arm64.hd.qcow2
-ARM64_HD_EXISTS       := .$(ARM64_HD).exists 
+#ARM64_HD_EXISTS       := .$(ARM64_HD).exists 
 OVMF_REPO             := rust-osdev/ovmf-prebuilt
 OVMF_API              := https://api.github.com/repos/$(OVMF_REPO)
 OVMF_RELEASE          := $(shell curl -s $(OVMF_API)/releases | jq -r '.[].tag_name' | grep stable | head -n 1)
@@ -93,7 +93,7 @@ endif
 
 # Default target
 .PHONY: all
-all: generate-freebsd-release generate-edk2-release run
+all: generate-freebsd-release $(ARM64_HD) generate-edk2-release $(ARM64_HD_INST) run
 
 # Generate the release file if:
 # - It does not exist
@@ -135,21 +135,21 @@ $(ARM64_MEMSTICK): $(ARM64_XZ_CKSUM_CMP)
 	xz --verbose -kfd $@.xz
 	touch $@
 
-# Make an installer copy of the decompressed memstick image every time it is extracted or setup-arm64.sh is modified
-$(ARM64_HD): $(ARM64_MEMSTICK)
+# Make an installer copy of the decompressed memstick image every time it is extracted or setup.sh is modified
+$(ARM64_HD): $(ARM64_MEMSTICK) setup.sh
 	echo "Creating a sparse compressed 8GB image"
 	qemu-img create -f qcow2 -o compression_type=zstd,lazy_refcounts=on $@ 8G
 
-# Execute $(ARM64_HD) goal and touch target only if $(ARM64_HD) file does not exist, or is older than setup-arm64.sh
+# Execute $(ARM64_HD) goal and touch target only if $(ARM64_HD) file does not exist, or is older than setup.sh
 # The $(ARM64_HD) file changes every time it boots, whether or not any changes were made
 # Note -nt is newer than comparison
-.PHONY: $(ARM64_HD_EXISTS)
-$(ARM64_HD_EXISTS):
-	[ -f "$(ARM64_HD)" -a "$(ARM64_HD)" -nt "setup-arm64.sh" ] || { \
-	  echo ; \
-	  $(MAKE) $(ARM64_HD); \
-	}; \
-	touch $@
+#.PHONY: $(ARM64_HD_EXISTS)
+#$(ARM64_HD_EXISTS):
+#	[ -f "$(ARM64_HD)" -a "$(ARM64_HD)" -nt "setup.sh" ] || { \
+#	  echo ; \
+#	  $(MAKE) $(ARM64_HD); \
+#	}; \
+#	touch $@
 
 # Generate the edk2 file if:
 # - It does not exist
@@ -186,7 +186,7 @@ $(ARM64_HD_INST): $(ARM64_HD) $(ARM64_OVMF_CODE) $(ARM64_OVMF_VARS)
 	echo 'dhclient vtnet0'
 	echo
 	echo '3. Download script:'
-	echo 'echo "get setup-arm64.sh" | tftp 10.0.2.2'
+	echo 'echo "get setup.sh" | tftp 10.0.2.2'
 	echo
 	echo '4. Run script:'
 	echo 'sh /setup.sh -d vtbd1 -a'
@@ -259,7 +259,7 @@ reinstall:
 
 .PHONY: clean
 clean:
-	find . -maxdepth 1 -type f \( -name 'arm64*' -o -name '.arm64*' \) -a \! -name '$(ARM64_XZ_MEMSTICK)' -print0 | xargs -0 rm
+	find . -maxdepth 1 -type f \( -name 'arm64*' -o -name '.arm64*' \) -a \! \( -name '$(ARM64_RELEASE_F)' -o -name '$(ARM64_XZ_MEMSTICK)' \) -print0 | xargs -0 rm
 
 .PHONY: clean-all
 clean-all:
@@ -284,7 +284,7 @@ vars:
 	echo "ARM64_XZ_CKSUM_GEN    = $(ARM64_XZ_CKSUM_GEN)"
 	echo "ARM64_XZ_CKSUM_CMP    = $(ARM64_XZ_CKSUM_CMP)"
 	echo "ARM64_HD              = $(ARM64_HD)"
-	echo "ARM64_HD_EXISTS       = $(ARM64_HD_EXISTS)"
+	#echo "ARM64_HD_EXISTS       = $(ARM64_HD_EXISTS)"
 	echo "OVMF_REPO             = $(OVMF_REPO)"
 	echo "OVMF_API              = $(OVMF_API)"
 	echo "OVMF_RELEASE          = $(OVMF_RELEASE)"

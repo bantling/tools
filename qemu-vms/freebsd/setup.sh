@@ -42,6 +42,7 @@ poolname=zroot
 autologin=0
 timezone=UTC
 mirror=0
+arch="`uname -m`"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -197,7 +198,12 @@ if [ "$mirror" -eq 0 ]; then
   echo 'Installing EFI boot code'
   sleep 1
   mkdir -p /tmp/efi/EFI/BOOT
-  cp /boot/boot1.efi /tmp/efi/EFI/BOOT/BOOTX64.EFI
+  
+  if [ "$arch" = "amd64" ]; then
+    cp /boot/boot1.efi /tmp/efi/EFI/BOOT/BOOTX64.EFI
+  else
+    cp /boot/boot1.efi /tmp/efi/EFI/BOOT/BOOTAA64.EFI
+  fi
 
   echo 'Setting zpool device by gpart label'
   sleep 1
@@ -228,12 +234,12 @@ if [ "$mirror" -eq 0 ]; then
   if [ -f /usr/freebsd-dist/kernel.txz ]; then
     cp /usr/freebsd-dist/kernel.txz usr/freebsd-dist
   else
-    fetch -o usr/freebsd-dist/kernel.txz https://download.freebsd.org/releases/amd64/`uname -r`/kernel.txz
+    fetch -o usr/freebsd-dist/kernel.txz https://download.freebsd.org/releases/$arch/`uname -r`/kernel.txz
   fi
   if [ -f /usr/freebsd-dist/base.txz ]; then
     cp /usr/freebsd-dist/base.txz usr/freebsd-dist
   else
-    fetch -o usr/freebsd-dist/base.txz https://download.freebsd.org/releases/amd64/`uname -r`/base.txz
+    fetch -o usr/freebsd-dist/base.txz https://download.freebsd.org/releases/$arch/`uname -r`/base.txz
   fi
 
   echo 'Installing kernel'
