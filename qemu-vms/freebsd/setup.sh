@@ -429,7 +429,6 @@ else
       }
     done
   }
-  exit 1
 
   ## Remove any existing zpool labels on the target device
   echo "Clearing any labels on $device"
